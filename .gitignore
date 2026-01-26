@@ -1,0 +1,132 @@
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+!**/src/main/**/build/
+!**/src/test/**/build/
+
+# IntelliJ IDEA
+.idea/
+*.iml
+*.iws
+*.ipr
+out/
+!**/src/main/**/out/
+!**/src/test/**/out/
+
+# Eclipse
+.classpath
+.project
+.settings/
+bin/
+!**/src/main/**/bin/
+!**/src/test/**/bin/
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Linux
+*~
+.directory
+.Trash-*
+
+# Kotlin
+*.kt.swp
+*.kt~
+*.kt.bak
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Runtime
+*.pid
+*.seed
+*.pid.lock
+
+# Application specific
+*.local
+.env
+.env.local
+.env.*.local
+
+# Test coverage
+.nyc_output/
+coverage/
+*.lcov
+
+# Temporary files
+*.tmp
+*.temp
+*.swp
+*.swo
+*~
+.cache/
+
+# Package files
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+*.war
+*.nar
+*.ear
+*.zip
+*.tar.gz
+*.rar
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# DynamoDB Local
+.dynamodb/
+
+# Docker
+docker-compose.override.yml
+
+# Secrets
+secrets/
+*.pem
+*.key
+*.crt
+*.p12
+*.jks
+
+# Local configuration
+application-local.yml
+application-local.properties
+config/local/
+
+# Build artifacts
+dist/
+target/
+out/
+
+# Kotlin compiler
+*.kotlin_module
+*.class
+
+# Generated files
+generated/
+gen/
