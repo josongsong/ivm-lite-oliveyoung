@@ -1,0 +1,83 @@
+kind: RULESET
+id: ruleset.core.v1
+version: 1.0.0
+status: ACTIVE
+
+entityType: PRODUCT
+
+impactMap:
+  CORE:
+    - "/title"
+    - "/brand"
+    - "/price"
+  PRICE:
+    - "/price"
+    - "/salePrice"
+    - "/discount"
+  INVENTORY:
+    - "/stock"
+    - "/availability"
+  MEDIA:
+    - "/images"
+    - "/videos"
+  CATEGORY:
+    - "/categoryId"
+    - "/categoryPath"
+  PROMOTION:
+    - "/promotionIds"
+    - "/couponIds"
+  REVIEW:
+    - "/reviewCount"
+    - "/averageRating"
+
+joins: []
+
+slices:
+  - type: CORE
+    buildRules:
+      type: PassThrough
+      fields:
+        - "*"
+    # RFC-IMPL-010 GAP-B: Light JOIN 예시
+    # 실제 운영에서는 brandId로 BRAND 엔티티 조회하여 payload에 병합
+    joins:
+      - name: brandInfo
+        type: LOOKUP
+        sourceFieldPath: brandId
+        targetEntityType: BRAND
+        targetKeyPattern: BRAND#{tenantId}#{value}
+        required: false  # 브랜드 없어도 슬라이싱 진행
+  - type: PRICE
+    buildRules:
+      type: PassThrough
+      fields:
+        - "price"
+        - "salePrice"
+        - "discount"
+  - type: INVENTORY
+    buildRules:
+      type: PassThrough
+      fields:
+        - "stock"
+        - "availability"
+  - type: MEDIA
+    buildRules:
+      type: PassThrough
+      fields:
+        - "images"
+        - "videos"
+  - type: CATEGORY
+    buildRules:
+      type: PassThrough
+      fields:
+        - "categoryId"
+        - "categoryPath"
+
+# RFC-IMPL-010 Phase D-9: Inverted Index 정의
+indexes:
+  - type: brand
+    selector: $.brand
+  - type: category
+    selector: $.categoryId
+  - type: tag
+    selector: $.tags[*]

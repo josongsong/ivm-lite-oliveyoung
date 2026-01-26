@@ -1,0 +1,53 @@
+kind: InvertedIndexContract
+id: inverted-index.v1
+version: 1.0.0
+status: ACTIVE
+
+definition:
+  meaning: Entity-to-Entity reverse reference index for JOIN fanout and incremental impact computation
+  notAsearchIndex: true
+
+identity:
+  tenantId: string
+
+keySpec:
+  pkPattern: "REF#{refEntityType}#{tenantId}#{refEntityId}#v{pad(refVersion,12)}"
+  skPattern: "{targetEntityType}#{targetEntityId}"
+  padWidth: 12
+  separator: "#"
+
+entrySchema:
+  ref:
+    fields:
+      entityType: { type: enum, values: [BRAND, CATEGORY, PRODUCT] }
+      entityId: { type: string }
+      entityKey: { type: string }
+      version: { type: long, description: "refVersion, SSOT for validity" }
+  target:
+    fields:
+      entityType: { type: enum, values: [PRODUCT, BRAND, CATEGORY] }
+      entityId: { type: string }
+      entityKey: { type: string }
+
+semantics:
+  versionedValidity: true
+  immutability:
+    sameKeySameHashOk: true
+    mismatchHashIsInvariantViolation: true
+  tombstone:
+    enabled: true
+    fields:
+      isDeleted: boolean
+      deletedAtVersion: long
+      deleteReason: { type: enum, values: [REF_REMOVED, TARGET_DELETED, CONTRACT_CHANGE, REPLAY] }
+
+guards:
+  noScan: true
+  maxTargetsPerRef: 500000
+  maxWritesPerRequest: 50000
+
+attributes:
+  hash: { type: string, rule: "sha256:<hex>" }
+  createdAt: { type: string, rule: "ISO-8601" }
+  producedByRuleSetRef:
+    fields: { id: string, version: semver }

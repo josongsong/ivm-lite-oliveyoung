@@ -1,0 +1,28 @@
+# ViewDefinition Contract - Product Cart
+kind: VIEW_DEFINITION
+id: view.product.cart.v1
+version: 1.0.0
+status: ACTIVE
+
+requiredSlices:
+  - CORE
+  - PRICING
+  - INVENTORY
+
+optionalSlices:
+  - PROMOTION
+
+missingPolicy: FAIL_CLOSED
+
+partialPolicy:
+  allowed: true
+  optionalOnly: true
+  responseMeta:
+    includeMissingSlices: true
+    includeUsedContracts: false
+
+fallbackPolicy: NONE
+
+ruleSetRef:
+  id: ruleset.core.v1
+  version: 1.0.0

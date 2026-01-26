@@ -1,0 +1,42 @@
+# EntitySchema Contract - Brand
+kind: ENTITY_SCHEMA
+id: entity.brand.v1
+version: 1.0.0
+status: ACTIVE
+
+entityType: BRAND
+
+fields:
+  - name: brandId
+    type: string
+    required: true
+    description: "브랜드 고유 식별자"
+  
+  - name: name
+    type: string
+    required: true
+    description: "브랜드명"
+  
+  - name: logoUrl
+    type: string
+    required: false
+    description: "로고 이미지 URL"
+  
+  - name: description
+    type: string
+    required: false
+    description: "브랜드 설명"
+  
+  - name: country
+    type: string
+    required: false
+    description: "국가 코드 (ISO 3166-1)"
+  
+  - name: website
+    type: string
+    required: false
+    description: "공식 웹사이트"
+
+ruleSetRef:
+  id: ruleset.brand.v1
+  version: 1.0.0

@@ -1,0 +1,56 @@
+kind: JoinSpecContract
+id: join-spec.v1
+version: 1.0.0
+status: ACTIVE
+
+definition:
+  meaning: Lightweight single-hop lookup join for slice compilation
+  joinIsNotPersisted: true
+  joinResultsMustNotBeMaterialized: true
+
+constraints:
+  allowedJoinTypes: [LOOKUP]
+  maxJoinDepth: 1
+  forbidJoinChain: true
+  forbidCycles: true
+  forbidNMJoin: true
+  sourceCardinality: SINGLE
+  maxJoinTargetsPerSource: 1
+  requireDeterministicResolution: true
+
+inputs:
+  sourceEntityType: { type: enum, values: [PRODUCT, BRAND, CATEGORY] }
+  sourceFieldPath: { type: string, rule: RFC6901_JSON_POINTER }
+
+target:
+  targetEntityType: { type: enum, values: [BRAND, CATEGORY] }
+  targetKeyPattern: { type: string }
+  required: { type: boolean, default: true }
+  missingPolicy: { type: enum, values: [FAIL_CLOSED, PARTIAL_ALLOWED], default: FAIL_CLOSED }
+
+projection:
+  mode: { type: enum, values: [COPY_FIELDS], default: COPY_FIELDS }
+  fields:
+    type: array
+    items:
+      fields:
+        fromTargetPath: { type: string, rule: RFC6901_JSON_POINTER }
+        toOutputPath: { type: string, rule: RFC6901_JSON_POINTER }
+
+fanout:
+  invertedIndex:
+    required: true
+    contractRef: { id: inverted-index.v1, version: 1.0.0 }
+    maxFanout: 10000
+  joinDepReason: JOIN_DEP
+
+determinism:
+  canonicalJsonProfile: RFC8785
+  hashAlg: sha256
+  ordering:
+    joinResult: DECLARED_ORDER
+
+runtimeGuards:
+  forbidTimeSemantics: true
+  forbidMaterializeJoin: true
+  maxReadAttempts: 5

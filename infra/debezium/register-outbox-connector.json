@@ -1,0 +1,37 @@
+{
+  "name": "ivm-outbox-connector",
+  "config": {
+    "connector.class": "io.debezium.connector.postgresql.PostgresConnector",
+    "tasks.max": "1",
+    
+    "database.hostname": "postgres",
+    "database.port": "5432",
+    "database.user": "ivm",
+    "database.password": "ivm_local_dev",
+    "database.dbname": "ivmlite",
+    "database.server.name": "ivm",
+    
+    "topic.prefix": "ivm",
+    "schema.include.list": "public",
+    "table.include.list": "public.outbox",
+    
+    "tombstones.on.delete": "false",
+    "slot.name": "ivm_outbox_slot",
+    "publication.name": "ivm_outbox_publication",
+    
+    "transforms": "outbox",
+    "transforms.outbox.type": "io.debezium.transforms.outbox.EventRouter",
+    "transforms.outbox.table.fields.additional.placement": "type:header:eventType",
+    "transforms.outbox.route.topic.replacement": "ivm.events.${routedByValue}",
+    "transforms.outbox.table.field.event.key": "aggregateid",
+    "transforms.outbox.table.field.event.payload": "payload",
+    "transforms.outbox.route.by.field": "aggregatetype",
+    
+    "key.converter": "org.apache.kafka.connect.storage.StringConverter",
+    "value.converter": "org.apache.kafka.connect.json.JsonConverter",
+    "value.converter.schemas.enable": "false",
+    
+    "heartbeat.interval.ms": "10000",
+    "heartbeat.action.query": "UPDATE debezium_heartbeat SET last_heartbeat = NOW() WHERE id = 1"
+  }
+}

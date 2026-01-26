@@ -1,0 +1,27 @@
+# Semgrep ignore - ivm-lite
+# See: https://semgrep.dev/docs/ignoring-files-folders-code
+
+# Build & generated
+build/
+.gradle/
+**/generated-src/
+**/generated/
+
+# Gradle
+gradle/wrapper/*.jar
+
+# IDE / OS
+.DS_Store
+.idea/
+*.iml
+.vscode/
+
+# Docs / RFC (no Kotlin)
+docs/
+
+# Infra scripts (shell, JSON)
+infra/
+
+# Lockfiles / config only
+*.lock
+gradle.properties

@@ -1,0 +1,26 @@
+# ViewDefinition Contract - Product Search
+kind: VIEW_DEFINITION
+id: view.product.search.v1
+version: 1.0.0
+status: ACTIVE
+
+requiredSlices:
+  - CORE
+  - PRICING
+
+optionalSlices: []
+
+missingPolicy: FAIL_CLOSED
+
+partialPolicy:
+  allowed: false
+  optionalOnly: true
+  responseMeta:
+    includeMissingSlices: true
+    includeUsedContracts: false
+
+fallbackPolicy: NONE
+
+ruleSetRef:
+  id: ruleset.core.v1
+  version: 1.0.0

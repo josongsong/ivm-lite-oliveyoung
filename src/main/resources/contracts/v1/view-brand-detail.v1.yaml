@@ -1,0 +1,26 @@
+# ViewDefinition Contract - Brand Detail
+kind: VIEW_DEFINITION
+id: view.brand.detail.v1
+version: 1.0.0
+status: ACTIVE
+
+requiredSlices:
+  - CORE
+  - METADATA
+
+optionalSlices: []
+
+missingPolicy: FAIL_CLOSED
+
+partialPolicy:
+  allowed: false
+  optionalOnly: true
+  responseMeta:
+    includeMissingSlices: true
+    includeUsedContracts: false
+
+fallbackPolicy: NONE
+
+ruleSetRef:
+  id: ruleset.core.v1
+  version: 1.0.0

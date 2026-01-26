@@ -1,0 +1,41 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<configuration>
+    <!-- RFC-IMPL-009: JSON structured logging -->
+    
+    <!-- Console Appender (Development) -->
+    <appender name="CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder class="net.logstash.logback.encoder.LogstashEncoder">
+            <includeMdcKeyName>requestId</includeMdcKeyName>
+            <includeMdcKeyName>traceId</includeMdcKeyName>
+            <includeMdcKeyName>spanId</includeMdcKeyName>
+        </encoder>
+    </appender>
+    
+    <!-- Plain Console (for local development readability) -->
+    <appender name="PLAIN_CONSOLE" class="ch.qos.logback.core.ConsoleAppender">
+        <encoder>
+            <pattern>%d{HH:mm:ss.SSS} [%thread] %-5level %logger{36} - %msg%n</pattern>
+        </encoder>
+    </appender>
+    
+    <!-- Application loggers -->
+    <logger name="com.oliveyoung.ivmlite" level="DEBUG"/>
+    
+    <!-- Ktor loggers -->
+    <logger name="io.ktor" level="INFO"/>
+    
+    <!-- Koin loggers -->
+    <logger name="org.koin" level="INFO"/>
+    
+    <!-- jOOQ loggers -->
+    <logger name="org.jooq" level="WARN"/>
+    
+    <!-- HikariCP loggers -->
+    <logger name="com.zaxxer.hikari" level="INFO"/>
+    
+    <!-- Root logger -->
+    <root level="INFO">
+        <!-- Use PLAIN_CONSOLE for development, CONSOLE for production -->
+        <appender-ref ref="PLAIN_CONSOLE"/>
+    </root>
+</configuration>

@@ -1,0 +1,52 @@
+›11:31:36.709 [DefaultDispatcher-worker-1 @call-context#135] INFO  ktor.test - No ktor.deployment.watch patterns specified, automatic reload is not active.
+q11:31:36.729 [DefaultDispatcher-worker-1 @call-context#135] INFO  [Koin] - Started 25 definitions in 0.367625 ms
+{11:31:36.971 [DefaultDispatcher-worker-1 @call-context#135] INFO  ktor.test - ivm-lite Runtime API started on 0.0.0.0:8080
+t11:31:36.971 [DefaultDispatcher-worker-1 @call-context#135] INFO  ktor.test - Application started in 0.265 seconds.
+º11:31:36.972 [DefaultDispatcher-worker-1 @call-context#135] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=100, pollInterval=100ms, idleInterval=1000ms]
+j11:31:36.972 [DefaultDispatcher-worker-1 @call-context#135] INFO  ktor.test - OutboxPollingWorker started
+s11:31:36.972 [DefaultDispatcher-worker-3 @coroutine#138] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+m11:31:36.973 [DefaultDispatcher-worker-4 @coroutine#137] INFO  ktor.test - Responding at http://localhost:80
+o11:31:36.973 [DefaultDispatcher-worker-4 @coroutine#137] INFO  ktor.test - Responding at https://localhost:443
+…11:31:37.057 [pool-1-thread-1 @coroutine#144] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=10000ms)
+q11:31:37.975 [DefaultDispatcher-worker-4 @coroutine#138] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“11:31:37.975 [pool-1-thread-1 @coroutine#144] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=1]
+g11:31:37.975 [pool-1-thread-1 @coroutine#144] INFO  ktor.test - OutboxPollingWorker stopped gracefully
+›11:31:37.999 [DefaultDispatcher-worker-4 @call-context#147] INFO  ktor.test - No ktor.deployment.watch patterns specified, automatic reload is not active.
+q11:31:38.000 [DefaultDispatcher-worker-4 @call-context#147] INFO  [Koin] - Started 25 definitions in 0.139375 ms
+{11:31:38.021 [DefaultDispatcher-worker-4 @call-context#147] INFO  ktor.test - ivm-lite Runtime API started on 0.0.0.0:8080
+t11:31:38.021 [DefaultDispatcher-worker-4 @call-context#147] INFO  ktor.test - Application started in 0.022 seconds.
+º11:31:38.021 [DefaultDispatcher-worker-4 @call-context#147] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=100, pollInterval=100ms, idleInterval=1000ms]
+j11:31:38.021 [DefaultDispatcher-worker-4 @call-context#147] INFO  ktor.test - OutboxPollingWorker started
+s11:31:38.021 [DefaultDispatcher-worker-1 @coroutine#150] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+m11:31:38.021 [DefaultDispatcher-worker-3 @coroutine#149] INFO  ktor.test - Responding at http://localhost:80
+o11:31:38.021 [DefaultDispatcher-worker-3 @coroutine#149] INFO  ktor.test - Responding at https://localhost:443
+…11:31:38.026 [pool-1-thread-1 @coroutine#156] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=10000ms)
+q11:31:39.026 [DefaultDispatcher-worker-5 @coroutine#150] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“11:31:39.026 [pool-1-thread-1 @coroutine#156] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=1]
+g11:31:39.026 [pool-1-thread-1 @coroutine#156] INFO  ktor.test - OutboxPollingWorker stopped gracefully
+›11:31:39.029 [DefaultDispatcher-worker-5 @call-context#159] INFO  ktor.test - No ktor.deployment.watch patterns specified, automatic reload is not active.
+q11:31:39.029 [DefaultDispatcher-worker-5 @call-context#159] INFO  [Koin] - Started 25 definitions in 0.051125 ms
+{11:31:39.047 [DefaultDispatcher-worker-5 @call-context#159] INFO  ktor.test - ivm-lite Runtime API started on 0.0.0.0:8080
+t11:31:39.047 [DefaultDispatcher-worker-5 @call-context#159] INFO  ktor.test - Application started in 0.018 seconds.
+º11:31:39.047 [DefaultDispatcher-worker-5 @call-context#159] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=100, pollInterval=100ms, idleInterval=1000ms]
+j11:31:39.047 [DefaultDispatcher-worker-5 @call-context#159] INFO  ktor.test - OutboxPollingWorker started
+s11:31:39.048 [DefaultDispatcher-worker-4 @coroutine#162] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+m11:31:39.048 [DefaultDispatcher-worker-1 @coroutine#161] INFO  ktor.test - Responding at http://localhost:80
+o11:31:39.048 [DefaultDispatcher-worker-1 @coroutine#161] INFO  ktor.test - Responding at https://localhost:443
+…11:31:39.052 [pool-1-thread-1 @coroutine#168] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=10000ms)
+q11:31:40.048 [DefaultDispatcher-worker-1 @coroutine#162] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“11:31:40.048 [pool-1-thread-1 @coroutine#168] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=1]
+g11:31:40.048 [pool-1-thread-1 @coroutine#168] INFO  ktor.test - OutboxPollingWorker stopped gracefully
+›11:31:40.050 [DefaultDispatcher-worker-1 @call-context#171] INFO  ktor.test - No ktor.deployment.watch patterns specified, automatic reload is not active.
+q11:31:40.051 [DefaultDispatcher-worker-1 @call-context#171] INFO  [Koin] - Started 25 definitions in 0.058417 ms
+{11:31:40.066 [DefaultDispatcher-worker-1 @call-context#171] INFO  ktor.test - ivm-lite Runtime API started on 0.0.0.0:8080
+t11:31:40.066 [DefaultDispatcher-worker-1 @call-context#171] INFO  ktor.test - Application started in 0.016 seconds.
+º11:31:40.066 [DefaultDispatcher-worker-1 @call-context#171] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=100, pollInterval=100ms, idleInterval=1000ms]
+j11:31:40.066 [DefaultDispatcher-worker-1 @call-context#171] INFO  ktor.test - OutboxPollingWorker started
+s11:31:40.066 [DefaultDispatcher-worker-5 @coroutine#174] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+m11:31:40.066 [DefaultDispatcher-worker-4 @coroutine#173] INFO  ktor.test - Responding at http://localhost:80
+o11:31:40.066 [DefaultDispatcher-worker-4 @coroutine#173] INFO  ktor.test - Responding at https://localhost:443
+…11:31:40.076 [pool-1-thread-1 @coroutine#182] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=10000ms)
+q11:31:41.070 [DefaultDispatcher-worker-4 @coroutine#174] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“11:31:41.070 [pool-1-thread-1 @coroutine#182] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=1]
+g11:31:41.070 [pool-1-thread-1 @coroutine#182] INFO  ktor.test - OutboxPollingWorker stopped gracefully

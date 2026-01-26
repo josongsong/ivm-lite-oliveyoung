@@ -1,0 +1,89 @@
+# EntitySchema Contract - Product
+kind: ENTITY_SCHEMA
+id: entity.product.v1
+version: 1.0.0
+status: ACTIVE
+
+entityType: PRODUCT
+
+# 필드 스키마 정의
+fields:
+  # 필수 필드
+  - name: sku
+    type: string
+    required: true
+    description: "상품 고유 식별자"
+  
+  - name: name
+    type: string
+    required: true
+    description: "상품명"
+  
+  - name: price
+    type: long
+    required: true
+    description: "정가 (원)"
+  
+  # 선택 필드
+  - name: salePrice
+    type: long
+    required: false
+    description: "할인가 (원)"
+  
+  - name: currency
+    type: string
+    required: false
+    default: "KRW"
+    description: "통화"
+  
+  - name: category
+    type: string
+    required: false
+    description: "카테고리"
+  
+  - name: categoryPath
+    type: string
+    required: false
+    description: "카테고리 경로 (예: 건강식품>비타민)"
+  
+  - name: brand
+    type: string
+    required: false
+    description: "브랜드"
+  
+  - name: brandId
+    type: string
+    required: false
+    description: "브랜드 ID (JOIN용)"
+  
+  - name: stock
+    type: int
+    required: false
+    default: 0
+    description: "재고 수량"
+  
+  - name: isAvailable
+    type: boolean
+    required: false
+    default: true
+    description: "판매 가능 여부"
+  
+  - name: images
+    type: list<string>
+    required: false
+    description: "이미지 URL 목록"
+  
+  - name: tags
+    type: list<string>
+    required: false
+    description: "태그 목록"
+  
+  - name: description
+    type: string
+    required: false
+    description: "상품 설명"
+
+# 연관 RuleSet
+ruleSetRef:
+  id: ruleset.core.v1
+  version: 1.0.0

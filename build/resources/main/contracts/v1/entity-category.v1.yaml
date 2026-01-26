@@ -1,0 +1,50 @@
+# EntitySchema Contract - Category
+kind: ENTITY_SCHEMA
+id: entity.category.v1
+version: 1.0.0
+status: ACTIVE
+
+entityType: CATEGORY
+
+fields:
+  - name: categoryId
+    type: string
+    required: true
+    description: "카테고리 고유 식별자"
+  
+  - name: name
+    type: string
+    required: true
+    description: "카테고리명"
+  
+  - name: parentId
+    type: string
+    required: false
+    description: "상위 카테고리 ID"
+  
+  - name: depth
+    type: int
+    required: false
+    default: 0
+    description: "깊이 (0 = 루트)"
+  
+  - name: displayOrder
+    type: int
+    required: false
+    default: 0
+    description: "표시 순서"
+  
+  - name: path
+    type: string
+    required: false
+    description: "전체 경로 (예: ROOT>스킨케어>토너)"
+  
+  - name: isActive
+    type: boolean
+    required: false
+    default: true
+    description: "활성화 여부"
+
+ruleSetRef:
+  id: ruleset.category.v1
+  version: 1.0.0

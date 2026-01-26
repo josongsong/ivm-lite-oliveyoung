@@ -1,0 +1,32 @@
+# ViewDefinition Contract v1.0.0 (RFC-003)
+# Contract is Law: ViewDefinition이 조회 정책의 SSOT
+kind: VIEW_DEFINITION
+id: view.product.pdp.v1
+version: 1.0.0
+status: ACTIVE
+
+# 필수 슬라이스: 반드시 존재해야 함
+requiredSlices:
+  - CORE
+
+# 선택적 슬라이스: 없어도 됨
+optionalSlices: []
+
+# 필수 슬라이스 누락 시 정책 (fail-closed 기본값)
+missingPolicy: FAIL_CLOSED
+
+# 부분 응답 세부 정책
+partialPolicy:
+  allowed: false
+  optionalOnly: true
+  responseMeta:
+    includeMissingSlices: true
+    includeUsedContracts: false
+
+# 폴백 정책
+fallbackPolicy: NONE
+
+# 참조할 RuleSet 계약
+ruleSetRef:
+  id: ruleset.core.v1
+  version: 1.0.0

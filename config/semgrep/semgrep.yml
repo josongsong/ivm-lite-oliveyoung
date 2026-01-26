@@ -1,0 +1,17 @@
+# ivm-lite Semgrep config
+# Registry rulesets: p/default, p/kotlin, p/security-audit (see scripts/semgrep.sh)
+# Custom rules / overrides below.
+
+rules:
+  - id: no-print-stack-trace
+    message: Avoid printStackTrace(); use proper logging (e.g. logger.error).
+    severity: WARNING
+    languages: [kotlin, java]
+    pattern: $X.printStackTrace(...)
+  - id: no-runtime-exec
+    message: Avoid Runtime.exec/ProcessBuilder for shell commands; use validated APIs to prevent command injection.
+    severity: WARNING
+    languages: [kotlin, java]
+    pattern-either:
+      - pattern: Runtime.getRuntime().exec(...)
+      - pattern: ProcessBuilder(...)

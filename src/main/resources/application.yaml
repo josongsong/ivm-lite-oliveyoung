@@ -1,0 +1,40 @@
+# ivm-lite Application Configuration
+# RFC-IMPL-009: Hoplite 기반 (Env > YAML > defaults)
+
+server:
+  host: 0.0.0.0
+  port: 8080
+
+database:
+  url: ${DB_URL:-jdbc:postgresql://localhost:5432/ivmlite}
+  user: ${DB_USER:-ivm}
+  password: ${DB_PASSWORD:-ivm_local_dev}
+  maxPoolSize: 10
+  minIdle: 2
+
+dynamodb:
+  endpoint: ${DYNAMODB_ENDPOINT:-http://localhost:8000}
+  region: ${AWS_REGION:-ap-northeast-2}
+  tableName: ${DYNAMODB_TABLE:-ivm-lite-schema-registry-local}
+
+kafka:
+  bootstrapServers: ${KAFKA_BOOTSTRAP_SERVERS:-localhost:9094}
+  consumerGroup: ivm-lite
+
+contracts:
+  resourcePath: /contracts/v1
+
+observability:
+  metricsEnabled: true
+  tracingEnabled: true
+  otlpEndpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}
+
+worker:
+  enabled: ${WORKER_ENABLED:-true}
+  pollIntervalMs: ${WORKER_POLL_INTERVAL_MS:-100}
+  idlePollIntervalMs: ${WORKER_IDLE_POLL_INTERVAL_MS:-1000}
+  batchSize: ${WORKER_BATCH_SIZE:-100}
+  maxBackoffMs: ${WORKER_MAX_BACKOFF_MS:-30000}
+  backoffMultiplier: ${WORKER_BACKOFF_MULTIPLIER:-2.0}
+  jitterFactor: ${WORKER_JITTER_FACTOR:-0.1}
+  shutdownTimeoutMs: ${WORKER_SHUTDOWN_TIMEOUT_MS:-10000}

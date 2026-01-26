@@ -1,0 +1,84 @@
+kind: ChangeSetContract
+id: changeset.v1
+version: 1.0.0
+status: ACTIVE
+
+semantics:
+  ssot:
+    versionLongIsSSOT: true
+  determinism:
+    canonicalJsonProfile: RFC8785
+    hashAlg: sha256
+    ordering:
+      list: LEXICOGRAPHIC
+      mapKeys: SORTED
+      joinResult: DECLARED_ORDER
+
+identity:
+  entityKeyFormat: "{ENTITY_TYPE}#{tenantId}#{entityId}"
+
+fields:
+  changeSetId:
+    type: string
+    rule: ULID
+
+  tenantId: { type: string }
+  entityType: { type: enum, values: [PRODUCT, BRAND, CATEGORY] }
+  entityKey: { type: string }
+
+  fromVersion: { type: long, min: 0 }
+  toVersion: { type: long, min: 0 }
+
+  changeType: { type: enum, values: [CREATE, UPDATE, DELETE, NO_CHANGE] }
+
+  changedPaths:
+    type: array
+    items:
+      type: object
+      fields:
+        path: { type: string, rule: RFC6901_JSON_POINTER }
+        valueHash: { type: string, rule: "sha256:<hex>" }
+
+impact:
+  impactedSliceTypes: { type: array, items: string }
+  impactMap:
+    type: map
+    key: string
+    value:
+      type: object
+      fields:
+        reason: { type: enum, values: [FIELD_CHANGE, JOIN_DEP, POLICY_CHANGE, VALIDATION, TOMBSTONE] }
+        paths: { type: array, items: string }
+        notes: { type: string, optional: true }
+
+fanout:
+  enabled: true
+  triggerKind: { type: enum, values: [SELF, EXTERNAL] }
+  sourceEntity:
+    fields:
+      entityKey: { type: string, optional: true }
+      version: { type: long, optional: true }
+  via:
+    type: array
+    items:
+      fields:
+        joinSpecRef:
+          fields: { id: string, version: semver }
+        sliceTypes: { type: array, items: string }
+        maxFanout: { type: int, default: 10000 }
+
+payload:
+  payloadHash: { type: string, rule: "sha256:<hex>" }
+  payloadLocation: { type: string, optional: true }
+  externalizationPolicy:
+    thresholdBytes: 100000
+    prefer: S3
+
+runtimeGuards:
+  disallowTimeSemantics: true
+  forbidSinkOnlyReplay: true
+  requireContiguousVersion: true
+
+audit:
+  createdAt: { type: string, rule: "ISO-8601" }
+  producedBy: { type: string, optional: true }

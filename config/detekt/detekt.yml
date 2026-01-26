@@ -1,0 +1,35 @@
+# Detekt configuration for ivm-lite
+# RFC-IMPL-001: 기본 코드 품질 규칙
+
+build:
+  maxIssues: 50  # 점진적으로 줄여나가기
+  weights:
+    complexity: 2
+    style: 1
+    comments: 1
+
+complexity:
+  LongParameterList:
+    functionThreshold: 8
+    constructorThreshold: 10
+  LongMethod:
+    threshold: 80
+  TooManyFunctions:
+    thresholdInFiles: 30
+    thresholdInClasses: 30
+    thresholdInInterfaces: 30
+    thresholdInObjects: 30
+    thresholdInEnums: 30
+
+style:
+  MaxLineLength:
+    maxLineLength: 140
+    excludeCommentStatements: true
+  MagicNumber:
+    active: false
+  WildcardImport:
+    active: false
+  ForbiddenComment:
+    active: false  # TODO 허용 (개발 중)
+  ReturnCount:
+    max: 5
