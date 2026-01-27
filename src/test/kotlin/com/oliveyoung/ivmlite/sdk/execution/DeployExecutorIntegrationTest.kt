@@ -6,8 +6,10 @@ import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
+import com.oliveyoung.ivmlite.pkg.orchestration.application.ShipWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkAdapter
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
@@ -79,9 +81,13 @@ class DeployExecutorIntegrationTest : StringSpec({
         mockContractRegistry,
     )
 
+    val openSearchSink = InMemorySinkAdapter("opensearch")
+    val shipWorkflow = ShipWorkflow(sliceRepo, mapOf("opensearch" to openSearchSink))
+
     val executor = DeployExecutor(
         ingestWorkflow = ingestWorkflow,
         slicingWorkflow = slicingWorkflow,
+        shipWorkflow = shipWorkflow,
         outboxRepository = outboxRepo
     )
 

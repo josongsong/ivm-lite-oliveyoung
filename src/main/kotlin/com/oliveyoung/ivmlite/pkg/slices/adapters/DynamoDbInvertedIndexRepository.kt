@@ -10,6 +10,7 @@ import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import kotlinx.coroutines.future.await
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
+import software.amazon.awssdk.services.dynamodb.model.Select
 
 /**
  * DynamoDB 기반 Inverted Index Repository
@@ -53,9 +54,9 @@ class DynamoDbInvertedIndexRepository(
                             "SK" to AttributeValue.builder().s(sk).build(),
                             "tenant_id" to AttributeValue.builder().s(entry.tenantId.value).build(),
                             "ref_entity_key" to AttributeValue.builder().s(entry.refEntityKey.value).build(),
-                            "ref_version" to AttributeValue.builder().n(entry.refVersion.toString()).build(),
+                            "ref_version" to AttributeValue.builder().n(entry.refVersion.value.toString()).build(),
                             "target_entity_key" to AttributeValue.builder().s(entry.targetEntityKey.value).build(),
-                            "target_version" to AttributeValue.builder().n(entry.targetVersion.toString()).build(),
+                            "target_version" to AttributeValue.builder().n(entry.targetVersion.value.toString()).build(),
                             "index_type" to AttributeValue.builder().s(entry.indexType).build(),
                             "index_value" to AttributeValue.builder().s(entry.indexValue).build(),
                             "slice_type" to AttributeValue.builder().s(entry.sliceType.name).build(),
@@ -106,6 +107,102 @@ class DynamoDbInvertedIndexRepository(
         } catch (e: Exception) {
             InvertedIndexRepositoryPort.Result.Err(
                 DomainError.StorageError("DynamoDB listTargets failed: ${e.message}")
+            )
+        }
+    }
+
+    /**
+     * RFC-IMPL-012: Fanout을 위한 역참조 조회
+     */
+    override suspend fun queryByIndexType(
+        tenantId: TenantId,
+        indexType: String,
+        indexValue: String,
+        limit: Int,
+        cursor: String?,
+    ): InvertedIndexRepositoryPort.Result<com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult> {
+        return try {
+            val pk = buildPK(tenantId, indexType, indexValue)
+            
+            val queryBuilder = dynamoClient.query {
+                it.tableName(tableName)
+                it.keyConditionExpression("PK = :pk")
+                it.filterExpression("tombstone = :false OR attribute_not_exists(tombstone)")
+                it.expressionAttributeValues(
+                    mapOf(
+                        ":pk" to AttributeValue.builder().s(pk).build(),
+                        ":false" to AttributeValue.builder().bool(false).build(),
+                    )
+                )
+                it.limit(limit)
+                
+                // 커서 기반 페이지네이션
+                if (cursor != null) {
+                    it.exclusiveStartKey(
+                        mapOf(
+                            "PK" to AttributeValue.builder().s(pk).build(),
+                            "SK" to AttributeValue.builder().s(cursor).build(),
+                        )
+                    )
+                }
+            }
+            
+            val response = queryBuilder.await()
+            
+            // RFC-IMPL-013: targetEntityKey(참조하는 엔티티)를 반환해야 함
+            // refEntityKey는 참조되는 엔티티(예: BRAND), targetEntityKey는 참조하는 엔티티(예: PRODUCT)
+            val entries = response.items().mapNotNull { item ->
+                try {
+                    val entry = parseEntry(item)
+                    com.oliveyoung.ivmlite.pkg.slices.ports.FanoutTarget(
+                        entityKey = entry.targetEntityKey,  // 재슬라이싱 대상
+                        currentVersion = entry.targetVersion.value,
+                    )
+                } catch (e: Exception) {
+                    null  // 파싱 실패 시 스킵
+                }
+            }.distinctBy { it.entityKey.value }
+            
+            val nextCursor = response.lastEvaluatedKey()?.get("SK")?.s()
+            
+            InvertedIndexRepositoryPort.Result.Ok(
+                com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult(entries, nextCursor)
+            )
+        } catch (e: Exception) {
+            InvertedIndexRepositoryPort.Result.Err(
+                DomainError.StorageError("DynamoDB queryByIndexType failed: ${e.message}")
+            )
+        }
+    }
+
+    /**
+     * RFC-IMPL-012: Fanout 대상 수 조회
+     */
+    override suspend fun countByIndexType(
+        tenantId: TenantId,
+        indexType: String,
+        indexValue: String,
+    ): InvertedIndexRepositoryPort.Result<Long> {
+        return try {
+            val pk = buildPK(tenantId, indexType, indexValue)
+            
+            val response = dynamoClient.query {
+                it.tableName(tableName)
+                it.keyConditionExpression("PK = :pk")
+                it.filterExpression("tombstone = :false OR attribute_not_exists(tombstone)")
+                it.expressionAttributeValues(
+                    mapOf(
+                        ":pk" to AttributeValue.builder().s(pk).build(),
+                        ":false" to AttributeValue.builder().bool(false).build(),
+                    )
+                )
+                it.select(Select.COUNT)
+            }.await()
+            
+            InvertedIndexRepositoryPort.Result.Ok(response.count().toLong())
+        } catch (e: Exception) {
+            InvertedIndexRepositoryPort.Result.Err(
+                DomainError.StorageError("DynamoDB countByIndexType failed: ${e.message}")
             )
         }
     }

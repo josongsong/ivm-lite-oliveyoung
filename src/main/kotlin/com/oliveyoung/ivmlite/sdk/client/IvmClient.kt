@@ -136,7 +136,7 @@ class IvmClient internal constructor(
      * @example
      * ```kotlin
      * val view = Ivm.client()
-     *     .query(Views.Product.pdp)
+     *     .query(Views.Product.Pdp)
      *     .key("SKU-001")
      *     .get()
      * ```

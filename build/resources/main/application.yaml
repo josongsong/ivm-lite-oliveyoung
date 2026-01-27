@@ -16,6 +16,9 @@ dynamodb:
   endpoint: ${DYNAMODB_ENDPOINT:-http://localhost:8000}
   region: ${AWS_REGION:-ap-northeast-2}
   tableName: ${DYNAMODB_TABLE:-ivm-lite-schema-registry-local}
+  # AWS 자격 증명 (환경 변수 우선, 없으면 여기서 사용)
+  accessKeyId: ${AWS_ACCESS_KEY_ID:-}
+  secretAccessKey: ${AWS_SECRET_ACCESS_KEY:-}
 
 kafka:
   bootstrapServers: ${KAFKA_BOOTSTRAP_SERVERS:-localhost:9094}

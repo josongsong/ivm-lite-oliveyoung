@@ -48,6 +48,7 @@ class JooqOutboxRepository(
     companion object {
         private val OUTBOX = DSL.table("outbox")
         private val ID = DSL.field("id", UUID::class.java)
+        private val IDEMPOTENCY_KEY = DSL.field("idempotency_key", String::class.java)
         private val AGGREGATE_TYPE = DSL.field("aggregatetype", String::class.java)
         private val AGGREGATE_ID = DSL.field("aggregateid", String::class.java)
         private val TYPE = DSL.field("type", String::class.java)
@@ -56,6 +57,7 @@ class JooqOutboxRepository(
         private val CREATED_AT = DSL.field("created_at", OffsetDateTime::class.java)
         private val PROCESSED_AT = DSL.field("processed_at", OffsetDateTime::class.java)
         private val RETRY_COUNT = DSL.field("retry_count", Int::class.java)
+        private val FAILURE_REASON = DSL.field("failure_reason", String::class.java)
     }
 
     override suspend fun insert(entry: OutboxEntry): OutboxRepositoryPort.Result<OutboxEntry> =
@@ -70,20 +72,33 @@ class JooqOutboxRepository(
         ) {
             withContext(Dispatchers.IO) {
                 try {
-                // 중복 체크
-                val existing = dsl.selectCount()
+                // 중복 체크: ID 또는 idempotencyKey
+                val existingById = dsl.selectCount()
                     .from(OUTBOX)
                     .where(ID.eq(entry.id))
                     .fetchOne(0, Int::class.java) ?: 0
 
-                if (existing > 0) {
+                if (existingById > 0) {
                     return@withContext OutboxRepositoryPort.Result.Err(
                         DomainError.IdempotencyViolation("OutboxEntry already exists: ${entry.id}"),
+                    )
+                }
+                
+                // idempotencyKey 중복 체크 (동일 비즈니스 이벤트 방지)
+                val existingByKey = dsl.selectCount()
+                    .from(OUTBOX)
+                    .where(IDEMPOTENCY_KEY.eq(entry.idempotencyKey))
+                    .fetchOne(0, Int::class.java) ?: 0
+
+                if (existingByKey > 0) {
+                    return@withContext OutboxRepositoryPort.Result.Err(
+                        DomainError.IdempotencyViolation("OutboxEntry with same idempotencyKey already exists: ${entry.idempotencyKey}"),
                     )
                 }
 
                 dsl.insertInto(OUTBOX)
                     .set(ID, entry.id)
+                    .set(IDEMPOTENCY_KEY, entry.idempotencyKey)
                     .set(AGGREGATE_TYPE, entry.aggregateType.name)
                     .set(AGGREGATE_ID, entry.aggregateId)
                     .set(TYPE, entry.eventType)
@@ -92,6 +107,7 @@ class JooqOutboxRepository(
                     .set(CREATED_AT, entry.createdAt.atOffset(ZoneOffset.UTC))
                     .set(PROCESSED_AT, entry.processedAt?.atOffset(ZoneOffset.UTC))
                     .set(RETRY_COUNT, entry.retryCount)
+                    .set(FAILURE_REASON, entry.failureReason)
                     .execute()
 
                     logger.debug("Inserted outbox entry: {}", entry.id)
@@ -131,6 +147,7 @@ class JooqOutboxRepository(
                         ctx.insertInto(
                             OUTBOX,
                             ID,
+                            IDEMPOTENCY_KEY,
                             AGGREGATE_TYPE,
                             AGGREGATE_ID,
                             TYPE,
@@ -138,8 +155,10 @@ class JooqOutboxRepository(
                             STATUS,
                             CREATED_AT,
                             RETRY_COUNT,
+                            FAILURE_REASON,
                         ).values(
                             null as UUID?,
+                            null as String?,
                             null as String?,
                             null as String?,
                             null as String?,
@@ -147,12 +166,14 @@ class JooqOutboxRepository(
                             null as String?,
                             null as OffsetDateTime?,
                             null as Int?,
+                            null as String?,
                         ),
                     )
 
                     entries.forEach { entry ->
                         batch.bind(
                             entry.id,
+                            entry.idempotencyKey,
                             entry.aggregateType.name,
                             entry.aggregateId,
                             entry.eventType,
@@ -160,6 +181,7 @@ class JooqOutboxRepository(
                             entry.status.name,
                             entry.createdAt.atOffset(ZoneOffset.UTC),
                             entry.retryCount,
+                            entry.failureReason,
                         )
                     }
 
@@ -200,6 +222,15 @@ class JooqOutboxRepository(
             }
         }
 
+    /**
+     * PENDING 상태 조회 (SELECT FOR UPDATE SKIP LOCKED)
+     * 
+     * Race Condition 방지:
+     * - FOR UPDATE: 조회한 row에 exclusive lock
+     * - SKIP LOCKED: 이미 lock된 row는 건너뜀
+     * 
+     * 이를 통해 여러 worker가 동시에 같은 entry를 처리하는 것을 방지
+     */
     override suspend fun findPending(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> =
         tracer.withSpanSuspend(
             "PostgreSQL.findPending",
@@ -211,11 +242,16 @@ class JooqOutboxRepository(
         ) {
             withContext(Dispatchers.IO) {
                 try {
-                val rows = dsl.selectFrom(OUTBOX)
-                    .where(STATUS.eq(OutboxStatus.PENDING.name))
-                    .orderBy(CREATED_AT.asc())
-                    .limit(limit)
-                    .fetch()
+                    // SELECT FOR UPDATE SKIP LOCKED: 
+                    // - 다른 트랜잭션이 lock한 row는 건너뜀
+                    // - 동시에 여러 worker가 다른 entry를 처리 가능
+                    val rows = dsl.selectFrom(OUTBOX)
+                        .where(STATUS.eq(OutboxStatus.PENDING.name))
+                        .orderBy(CREATED_AT.asc())
+                        .limit(limit)
+                        .forUpdate()
+                        .skipLocked()
+                        .fetch()
 
                     OutboxRepositoryPort.Result.Ok(rows.map { rowToEntry(it) })
                 } catch (e: Exception) {
@@ -286,6 +322,7 @@ class JooqOutboxRepository(
                 val updated = dsl.update(OUTBOX)
                     .set(STATUS, OutboxStatus.FAILED.name)
                     .set(RETRY_COUNT, RETRY_COUNT.plus(1))
+                    .set(FAILURE_REASON, reason)  // 실패 사유 저장
                     .where(ID.eq(id))
                     .returning()
                     .fetchOne()
@@ -345,16 +382,26 @@ class JooqOutboxRepository(
 
     private fun rowToEntry(row: org.jooq.Record): OutboxEntry {
         val processedAtValue = row.get(PROCESSED_AT)
+        val aggregateId = row.get(AGGREGATE_ID)!!
+        val eventType = row.get(TYPE)!!
+        val payload = row.get(PAYLOAD)?.data() ?: "{}"
+        
+        // idempotencyKey: 마이그레이션 후에는 항상 존재, 없으면 즉시 생성
+        val idempotencyKey = row.get(IDEMPOTENCY_KEY)?.takeIf { it.isNotBlank() }
+            ?: OutboxEntry.generateIdempotencyKey(aggregateId, eventType, payload)
+        
         return OutboxEntry(
             id = row.get(ID)!!,
+            idempotencyKey = idempotencyKey,
             aggregateType = AggregateType.valueOf(row.get(AGGREGATE_TYPE)!!),
-            aggregateId = row.get(AGGREGATE_ID)!!,
-            eventType = row.get(TYPE)!!,
-            payload = row.get(PAYLOAD)?.data() ?: "{}",
+            aggregateId = aggregateId,
+            eventType = eventType,
+            payload = payload,
             status = OutboxStatus.valueOf(row.get(STATUS)!!),
             createdAt = row.get(CREATED_AT)!!.toInstant(),
             processedAt = processedAtValue?.toInstant(),
             retryCount = row.get(RETRY_COUNT) ?: 0,
+            failureReason = row.get(FAILURE_REASON),
         )
     }
 }

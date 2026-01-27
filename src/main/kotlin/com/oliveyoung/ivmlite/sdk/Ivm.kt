@@ -269,20 +269,20 @@ object Ivm {
      * 
      * @example 기본 사용법 (타입 세이프, 추천!)
      * ```kotlin
-     * // Views.Product.pdp 사용 (IDE 자동완성)
-     * val view = Ivm.query(Views.Product.pdp)
+     * // Views.Product.Pdp 사용 (IDE 자동완성)
+     * val view = Ivm.query(Views.Product.Pdp)
      *     .key("SKU-001")
      *     .get()
      * ```
      * 
      * @example 더 간결하게
      * ```kotlin
-     * val view = Views.Product.pdp.query()
+     * val view = Views.Product.Pdp.query()
      *     .key("SKU-001")
      *     .get()
      * 
      * // 또는
-     * val view = Views.Product.pdp["SKU-001"].get()
+     * val view = Views.Product.Pdp["SKU-001"].get()
      * ```
      * 
      * @example 타입 세이프 결과 (파서 포함 ViewRef)
@@ -308,7 +308,7 @@ object Ivm {
      * }
      * ```
      * 
-     * @param viewRef ViewRef<T> (예: Views.Product.pdp, Views.Product.Pdp)
+     * @param viewRef ViewRef<T> (예: Views.Product.Pdp, Views.Product.Pdp)
      * @return TypedQueryBuilder<T> for fluent chaining
      */
     fun <T : Any> query(viewRef: ViewRef<T>): TypedQueryBuilder<T> {

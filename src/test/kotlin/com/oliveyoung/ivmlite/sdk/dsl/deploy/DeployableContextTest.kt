@@ -42,7 +42,8 @@ class DeployableContextTest {
         assertTrue(result.success)
         assertEquals("product:TEST-001", result.entityKey)
         assertNotNull(result.version)
-        assertTrue(result.version.startsWith("v1-"))
+        // TSID 기반 version은 Long 문자열 (예: "568920170376192001")
+        assertTrue(result.version.toLongOrNull() != null, "version should be a valid Long: ${result.version}")
     }
 
     @Test

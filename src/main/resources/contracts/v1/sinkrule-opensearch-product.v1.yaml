@@ -1,0 +1,39 @@
+# RFC-IMPL-012: Minimal Coupling SinkRule
+# IVM은 데이터 전달자. 인덱스 설정은 OpenSearch 운영팀 책임.
+
+kind: SINKRULE
+id: sinkrule.opensearch.product
+version: 1.0.0
+status: ACTIVE
+
+# 입력: 어떤 Slice를 Ship할지
+input:
+  type: SLICE
+  sliceTypes: [CORE]
+  entityTypes: [PRODUCT, CATEGORY, BRAND]
+
+# 타겟: 최소한의 라우팅 정보만
+target:
+  type: OPENSEARCH
+  endpoint: ${OPENSEARCH_ENDPOINT:-http://localhost:9200}
+  indexPattern: "ivm-products-{tenantId}"
+  
+  # 인증 (선택)
+  auth:
+    type: BASIC
+    username: ${OPENSEARCH_USERNAME:-}
+    password: ${OPENSEARCH_PASSWORD:-}
+
+# 문서 ID (멱등성 보장)
+docId:
+  pattern: "{tenantId}__{entityKey}"
+
+# 필드 매핑: 비활성화 (Slice payload 그대로 전송)
+# OpenSearch dynamic mapping에 맡김
+fieldMapping:
+  enabled: false
+
+# 커밋 설정
+commit:
+  batchSize: 1000
+  timeoutMs: 30000

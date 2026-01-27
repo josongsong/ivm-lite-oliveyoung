@@ -277,6 +277,10 @@ class OutboxPollingWorker(
             OutboxEventTypes.RAW_DATA_INGESTED -> {
                 val payload = parseRawDataIngestedPayload(entry.payload)
 
+                // Payload 버전 로깅 (확장성 추적)
+                logger.debug("Processing RawDataIngested: entity={}, payloadVersion={}", 
+                    payload.entityKey, payload.payloadVersion)
+
                 // RFC-IMPL-010 GAP-F: 자동으로 FULL/INCREMENTAL 선택
                 // 이전 버전이 있으면 INCREMENTAL, 없으면 FULL로 실행
                 val result = slicingWorkflow.executeAuto(
@@ -308,7 +312,10 @@ class OutboxPollingWorker(
 
     private fun parseRawDataIngestedPayload(json: String): RawDataIngestedPayload {
         return try {
-            Json.decodeFromString<RawDataIngestedPayload>(json)
+            // ignoreUnknownKeys = true로 하위 호환성 보장 (payloadVersion 없는 기존 payload도 처리 가능)
+            Json {
+                ignoreUnknownKeys = true
+            }.decodeFromString<RawDataIngestedPayload>(json)
         } catch (e: Exception) {
             throw ProcessingException("Failed to parse payload: ${e.message}")
         }
@@ -337,6 +344,7 @@ class OutboxPollingWorker(
 
     @Serializable
     data class RawDataIngestedPayload(
+        val payloadVersion: String = "1.0",
         val tenantId: String,
         val entityKey: String,
         val version: Long,

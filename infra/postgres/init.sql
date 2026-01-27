@@ -22,3 +22,7 @@ CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
 -- - inverted_index (V004)
 -- - outbox (V005)
 -- - debezium_heartbeat (V006)
+-- - outbox 컬럼 추가: status, processed_at, retry_count (V007)
+-- - slice 컬럼 추가: tombstone (V008)
+-- - inverted_index 개선 (V009)
+-- - outbox 컬럼 추가: idempotency_key, failure_reason (V010)

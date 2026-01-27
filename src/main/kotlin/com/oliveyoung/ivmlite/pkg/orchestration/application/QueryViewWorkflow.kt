@@ -171,6 +171,9 @@ class QueryViewWorkflow(
 
     /**
      * View 데이터 JSON 생성 (결정성 보장: sliceTypes 순서대로)
+     * 
+     * NOTE: slices 배열은 각 slice의 data(이미 JSON string)를 그대로 포함
+     * escape 처리는 slice.data가 이미 valid JSON이므로 불필요
      */
     private fun buildViewData(
         viewId: String,
@@ -180,25 +183,28 @@ class QueryViewWorkflow(
         allSliceTypes: List<SliceType>,
         gotTypes: Set<SliceType>,
     ): String {
-        val sb = StringBuilder()
-        sb.append("{\"viewId\":\"")
-        sb.append(viewId)
-        sb.append("\",\"entityKey\":\"")
-        sb.append(entityKey.value)
-        sb.append("\",\"version\":")
-        sb.append(version)
-        sb.append(",\"slices\":[")
-
         // Determinism: sliceTypes 순서대로, 존재하는 것만 출력
         val existingTypes = allSliceTypes.filter { it in gotTypes }
-        existingTypes.forEachIndexed { i, st ->
-            if (i > 0) sb.append(',')
-            val s = slices.first { it.sliceType == st }
-            sb.append(s.data)
-        }
-        sb.append("]}")
-
-        return sb.toString()
+        val slicesJson = existingTypes.map { st ->
+            slices.first { it.sliceType == st }.data
+        }.joinToString(",")
+        
+        // viewId와 entityKey는 안전한 문자열이어야 함 (특수문자 escape)
+        val safeViewId = escapeJsonString(viewId)
+        val safeEntityKey = escapeJsonString(entityKey.value)
+        
+        return """{"viewId":"$safeViewId","entityKey":"$safeEntityKey","version":$version,"slices":[$slicesJson]}"""
+    }
+    
+    /**
+     * JSON 문자열 escape (XSS 방지)
+     */
+    private fun escapeJsonString(s: String): String {
+        return s.replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
     }
 
     sealed class Result<out T> {
@@ -220,5 +226,135 @@ class QueryViewWorkflow(
     data class ViewMeta(
         val missingSlices: List<String>?,
         val usedContracts: List<String>?,
+    )
+
+    // ===== RFC-IMPL-011 Wave 6: Range Query & Count =====
+
+    /**
+     * Range Query: 키 프리픽스로 여러 엔티티 조회
+     * 
+     * @param tenantId 테넌트 ID
+     * @param keyPrefix 엔티티 키 프리픽스
+     * @param sliceType 특정 Slice 타입 (null이면 전체)
+     * @param limit 최대 결과 수
+     * @param cursor 페이지네이션 커서
+     * @return 결과 페이지
+     */
+    suspend fun executeRange(
+        tenantId: TenantId,
+        keyPrefix: String,
+        sliceType: SliceType? = null,
+        limit: Int = 100,
+        cursor: String? = null,
+    ): Result<RangeResult> {
+        return tracer.withSpanSuspend(
+            "QueryViewWorkflow.executeRange",
+            mapOf(
+                "tenant_id" to tenantId.value,
+                "key_prefix" to keyPrefix,
+                "slice_type" to (sliceType?.name ?: "ALL"),
+                "limit" to limit.toString(),
+            ),
+        ) {
+            val queryResult = when (val r = sliceRepo.findByKeyPrefix(tenantId, keyPrefix, sliceType, limit, cursor)) {
+                is SliceRepositoryPort.Result.Ok -> r.value
+                is SliceRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+            }
+            
+            val items = queryResult.items.map { slice ->
+                RangeItem(
+                    entityKey = slice.entityKey.value,
+                    version = slice.version,
+                    sliceType = slice.sliceType.name,
+                    data = slice.data,
+                    hash = slice.hash
+                )
+            }
+            
+            Result.Ok(RangeResult(
+                items = items,
+                totalCount = items.size.toLong(),
+                hasMore = queryResult.hasMore,
+                nextCursor = queryResult.nextCursor
+            ))
+        }
+    }
+
+    /**
+     * Count: 조건에 맞는 Slice 개수 조회
+     */
+    suspend fun executeCount(
+        tenantId: TenantId,
+        keyPrefix: String? = null,
+        sliceType: SliceType? = null,
+    ): Result<Long> {
+        return tracer.withSpanSuspend(
+            "QueryViewWorkflow.executeCount",
+            mapOf(
+                "tenant_id" to tenantId.value,
+                "key_prefix" to (keyPrefix ?: "ALL"),
+                "slice_type" to (sliceType?.name ?: "ALL"),
+            ),
+        ) {
+            when (val r = sliceRepo.count(tenantId, keyPrefix, sliceType)) {
+                is SliceRepositoryPort.Result.Ok -> Result.Ok(r.value)
+                is SliceRepositoryPort.Result.Err -> Result.Err(r.error)
+            }
+        }
+    }
+
+    /**
+     * 최신 버전 조회
+     */
+    suspend fun executeLatest(
+        tenantId: TenantId,
+        entityKey: EntityKey,
+        sliceType: SliceType? = null,
+    ): Result<ViewResponse> {
+        return tracer.withSpanSuspend(
+            "QueryViewWorkflow.executeLatest",
+            mapOf(
+                "tenant_id" to tenantId.value,
+                "entity_key" to entityKey.value,
+                "slice_type" to (sliceType?.name ?: "ALL"),
+            ),
+        ) {
+            val slices = when (val r = sliceRepo.getLatestVersion(tenantId, entityKey, sliceType)) {
+                is SliceRepositoryPort.Result.Ok -> r.value
+                is SliceRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+            }
+            
+            if (slices.isEmpty()) {
+                return@withSpanSuspend Result.Err(DomainError.NotFoundError("Slice", entityKey.value))
+            }
+            
+            val version = slices.first().version
+            val sliceTypes = slices.map { it.sliceType }.sortedBy { it.name }
+            val gotTypes = sliceTypes.toSet()
+            val viewData = buildViewData("latest", entityKey, version, slices, sliceTypes, gotTypes)
+            
+            Result.Ok(ViewResponse(data = viewData, meta = null))
+        }
+    }
+
+    /**
+     * Range 결과
+     */
+    data class RangeResult(
+        val items: List<RangeItem>,
+        val totalCount: Long,
+        val hasMore: Boolean,
+        val nextCursor: String?
+    )
+
+    /**
+     * Range 결과 아이템
+     */
+    data class RangeItem(
+        val entityKey: String,
+        val version: Long,
+        val sliceType: String,
+        val data: String,
+        val hash: String
     )
 }

@@ -83,7 +83,10 @@ class JooqRawDataRepository(
                     val existingSchemaId = existing.get(SCHEMA_ID)
                     val existingSchemaVersion = existing.get(SCHEMA_VERSION)
 
-                    if (existingHash == record.payloadHash &&
+                    // DB에는 접두사 없이 저장되므로 비교 시 접두사 제거
+                    val recordHashWithoutPrefix = record.payloadHash.removePrefix("sha256:")
+                    val existingHashWithoutPrefix = existingHash?.removePrefix("sha256:")
+                    if (existingHashWithoutPrefix == recordHashWithoutPrefix &&
                         existingSchemaId == record.schemaId &&
                         existingSchemaVersion == record.schemaVersion.toString()
                     ) {
@@ -105,6 +108,8 @@ class JooqRawDataRepository(
                 }
 
                 // 새 레코드 삽입
+                // content_hash는 VARCHAR(64)이므로 "sha256:" 접두사 제거 (hex만 저장)
+                val hashWithoutPrefix = record.payloadHash.removePrefix("sha256:")
                 dsl.insertInto(RAW_DATA)
                     .set(ID, UUID.randomUUID())
                     .set(TENANT_ID, record.tenantId.value)
@@ -112,7 +117,7 @@ class JooqRawDataRepository(
                     .set(VERSION, record.version)
                     .set(SCHEMA_ID, record.schemaId)
                     .set(SCHEMA_VERSION, record.schemaVersion.toString())
-                    .set(CONTENT_HASH, record.payloadHash)
+                    .set(CONTENT_HASH, hashWithoutPrefix.take(64)) // 안전하게 64자로 제한
                     .set(CONTENT, JSONB.valueOf(record.payload))
                     .execute()
 
@@ -166,17 +171,20 @@ class JooqRawDataRepository(
 
             val content = row.get(CONTENT)?.data()
                 ?: throw DomainError.StorageError("Missing required field 'content' in raw data row")
+            // DB에서 읽을 때는 "sha256:" 접두사 복원
+            val hashFromDb = row.get(CONTENT_HASH)!!
+            val hashWithPrefix = if (hashFromDb.startsWith("sha256:")) hashFromDb else "sha256:$hashFromDb"
             val record = RawDataRecord(
                 tenantId = TenantId(row.get(TENANT_ID)!!),
                 entityKey = EntityKey(row.get(ENTITY_KEY)!!),
                 version = row.get(VERSION)!!,
                 schemaId = row.get(SCHEMA_ID)!!,
                 schemaVersion = SemVer.parse(row.get(SCHEMA_VERSION)!!),
-                payloadHash = row.get(CONTENT_HASH)!!,
+                payloadHash = hashWithPrefix,
                 payload = content,
             )
 
-                RawDataRepositoryPort.Result.Ok(record)
+            RawDataRepositoryPort.Result.Ok(record)
             } catch (e: DomainError) {
                 RawDataRepositoryPort.Result.Err(e)
             } catch (e: Exception) {
@@ -209,13 +217,16 @@ class JooqRawDataRepository(
                 )
             }
 
+            // DB에서 읽을 때는 "sha256:" 접두사 복원
+            val hashFromDb = row.get(CONTENT_HASH)!!
+            val hashWithPrefix = if (hashFromDb.startsWith("sha256:")) hashFromDb else "sha256:$hashFromDb"
             val record = RawDataRecord(
                 tenantId = TenantId(row.get(TENANT_ID)!!),
                 entityKey = EntityKey(row.get(ENTITY_KEY)!!),
                 version = row.get(VERSION)!!,
                 schemaId = row.get(SCHEMA_ID)!!,
                 schemaVersion = SemVer.parse(row.get(SCHEMA_VERSION)!!),
-                payloadHash = row.get(CONTENT_HASH)!!,
+                payloadHash = hashWithPrefix,
                 payload = row.get(CONTENT)?.data() ?: "{}",
             )
 

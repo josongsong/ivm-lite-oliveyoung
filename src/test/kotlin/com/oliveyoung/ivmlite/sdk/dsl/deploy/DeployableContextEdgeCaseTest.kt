@@ -284,8 +284,8 @@ class DeployableContextEdgeCaseTest {
 
         val result = context.deployNow { opensearch() }
 
-        // Version format: v1-{timestamp}
-        assertTrue(result.version.matches(Regex("^v1-\\d+$")))
+        // Version format: TSID Long (예: "568920170376192001")
+        assertTrue(result.version.toLongOrNull() != null, "version should be a valid Long")
     }
 
     @Test

@@ -17,7 +17,7 @@ import com.oliveyoung.ivmlite.sdk.model.ViewResult
  * @example
  * ```kotlin
  * // 타입이 자동으로 추론됨
- * val result: ProductPdpView = Views.Product.pdp.typedQuery()
+ * val result: ProductPdpView = Views.Product.Pdp.typedQuery()
  *     .key("SKU-001")
  *     .get()
  * 

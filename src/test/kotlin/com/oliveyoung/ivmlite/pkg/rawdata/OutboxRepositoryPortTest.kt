@@ -284,15 +284,21 @@ class OutboxRepositoryPortTest {
         retryCount: Int = 0,
         createdAt: Instant = Instant.now(),
         aggregateType: AggregateType = AggregateType.RAW_DATA,
-    ): OutboxEntry = OutboxEntry(
-        id = UUID.randomUUID(),
-        aggregateType = aggregateType,
-        aggregateId = "tenant-1:entity-${UUID.randomUUID().toString().take(8)}",
-        eventType = "TestEvent",
-        payload = """{"test": true}""",
-        status = status,
-        createdAt = createdAt,
-        processedAt = if (status == OutboxStatus.PROCESSED) Instant.now() else null,
-        retryCount = retryCount,
-    )
+    ): OutboxEntry {
+        val aggregateId = "tenant-1:entity-${UUID.randomUUID().toString().take(8)}"
+        val eventType = "TestEvent"
+        val payload = """{"test": true}"""
+        return OutboxEntry(
+            id = UUID.randomUUID(),
+            idempotencyKey = OutboxEntry.generateIdempotencyKey(aggregateId, eventType, payload),
+            aggregateType = aggregateType,
+            aggregateId = aggregateId,
+            eventType = eventType,
+            payload = payload,
+            status = status,
+            createdAt = createdAt,
+            processedAt = if (status == OutboxStatus.PROCESSED) Instant.now() else null,
+            retryCount = retryCount,
+        )
+    }
 }

@@ -41,7 +41,8 @@ class ShortcutApiTest {
         assertTrue(result.success)
         assertEquals("product:TEST-001", result.entityKey)
         assertNotNull(result.version)
-        assertTrue(result.version.startsWith("v1-"))
+        // TSID 기반 version은 Long 문자열
+        assertTrue(result.version.toLongOrNull() != null, "version should be a valid Long")
     }
 
     @Test
@@ -75,7 +76,8 @@ class ShortcutApiTest {
         assertTrue(result.success)
         assertEquals("product:TEST-001", result.entityKey)
         assertNotNull(result.version)
-        assertTrue(result.version.startsWith("v1-"))
+        // TSID 기반 version은 Long 문자열
+        assertTrue(result.version.toLongOrNull() != null, "version should be a valid Long")
     }
 
     @Test
@@ -108,7 +110,8 @@ class ShortcutApiTest {
 
         assertEquals("product:TEST-001", job.entityKey)
         assertNotNull(job.version)
-        assertTrue(job.version.startsWith("v1-"))
+        // TSID 기반 version은 Long 문자열
+        assertTrue(job.version.toLongOrNull() != null, "version should be a valid Long")
         assertNotNull(job.jobId)
         assertTrue(job.jobId.startsWith("job-"))
         assertEquals(DeployState.QUEUED, job.state)

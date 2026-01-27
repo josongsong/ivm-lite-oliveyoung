@@ -30,6 +30,12 @@ class GatedContractRegistryAdapter(
         return gateCheck(delegate.loadJoinSpecContract(ref)) { it.meta }
     }
 
+    /**
+     * @deprecated InvertedIndexContract는 더 이상 사용되지 않습니다.
+     * RuleSet.indexes의 IndexSpec.references로 통합되었습니다.
+     */
+    @Deprecated("Use IndexSpec.references in RuleSet instead")
+    @Suppress("DEPRECATION")
     override suspend fun loadInvertedIndexContract(ref: ContractRef): ContractRegistryPort.Result<InvertedIndexContract> {
         return gateCheck(delegate.loadInvertedIndexContract(ref)) { it.meta }
     }

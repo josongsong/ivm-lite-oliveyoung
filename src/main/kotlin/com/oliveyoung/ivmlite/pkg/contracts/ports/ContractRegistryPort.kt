@@ -13,7 +13,19 @@ interface ContractRegistryPort {
     // ===== Load (Single) =====
     suspend fun loadChangeSetContract(ref: ContractRef): Result<ChangeSetContract>
     suspend fun loadJoinSpecContract(ref: ContractRef): Result<JoinSpecContract>
-    suspend fun loadInvertedIndexContract(ref: ContractRef): Result<InvertedIndexContract>
+    
+    /**
+     * @deprecated InvertedIndexContract는 더 이상 사용되지 않습니다.
+     * RuleSet.indexes의 IndexSpec.references로 통합되었습니다.
+     * 역방향 인덱스는 Slice 생성 시 자동으로 생성됩니다.
+     */
+    @Deprecated("Use IndexSpec.references in RuleSet instead", level = DeprecationLevel.WARNING)
+    @Suppress("DEPRECATION")
+    suspend fun loadInvertedIndexContract(ref: ContractRef): Result<InvertedIndexContract> {
+        // 기본 구현: 빈 계약 반환 (하위 호환성)
+        return Result.Err(DomainError.ContractError("InvertedIndexContract is deprecated. Use IndexSpec.references in RuleSet instead."))
+    }
+    
     suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract>
     suspend fun loadViewDefinitionContract(ref: ContractRef): Result<ViewDefinitionContract>
 

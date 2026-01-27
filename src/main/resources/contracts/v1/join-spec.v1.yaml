@@ -38,10 +38,13 @@ projection:
         toOutputPath: { type: string, rule: RFC6901_JSON_POINTER }
 
 fanout:
+  # DEPRECATED: invertedIndex.contractRef는 더 이상 사용되지 않습니다.
+  # 역방향 인덱스는 RuleSet.indexes의 IndexSpec.references로 통합되었습니다.
+  # 아래 설정은 하위 호환성을 위해 유지되지만 무시됩니다.
   invertedIndex:
-    required: true
-    contractRef: { id: inverted-index.v1, version: 1.0.0 }
-    maxFanout: 10000
+    required: false  # deprecated: 더 이상 필수 아님
+    # contractRef: { id: inverted-index.v1, version: 1.0.0 }  # removed
+    maxFanout: 10000  # 이제 IndexSpec.maxFanout으로 이동
   joinDepReason: JOIN_DEP
 
 determinism:

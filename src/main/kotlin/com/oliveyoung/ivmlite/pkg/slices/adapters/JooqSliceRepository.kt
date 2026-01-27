@@ -93,7 +93,10 @@ class JooqSliceRepository(
                         if (existing != null) {
                             // 멱등성 검사: hash가 동일해야 함
                             val existingHash = existing.get(CONTENT_HASH)
-                            if (existingHash != slice.hash) {
+                            // DB에는 접두사 없이 저장되므로 비교 시 접두사 제거
+                            val sliceHashWithoutPrefix = slice.hash.removePrefix("sha256:")
+                            val existingHashWithoutPrefix = existingHash?.removePrefix("sha256:")
+                            if (existingHashWithoutPrefix != sliceHashWithoutPrefix) {
                                 throw DomainError.InvariantViolation(
                                     "Slice hash mismatch for ${slice.tenantId.value}:" +
                                         "${slice.entityKey.value}:${slice.sliceType.name}@${slice.version}",
@@ -120,7 +123,8 @@ class JooqSliceRepository(
                             .set(ENTITY_KEY, slice.entityKey.value)
                             .set(SLICE_TYPE, slice.sliceType.name)
                             .set(SLICE_VERSION, slice.version)
-                            .set(CONTENT_HASH, slice.hash)
+                            // content_hash는 VARCHAR(64)이므로 "sha256:" 접두사 제거
+                    .set(CONTENT_HASH, slice.hash.removePrefix("sha256:").take(64))
                             .set(CONTENT, JSONB.valueOf(slice.data))
                             .set(RULESET_REF, rulesetRef)
                             .set(IS_DELETED, ts?.isDeleted ?: false)
@@ -222,7 +226,8 @@ class JooqSliceRepository(
                     sliceType = SliceType.valueOf(row.get(SLICE_TYPE)!!),
                     data = row.get(CONTENT)?.data()
                         ?: throw DomainError.StorageError("Missing required field 'content' in slice row"),
-                    hash = row.get(CONTENT_HASH)!!,
+                    // DB에서 읽을 때는 "sha256:" 접두사 복원
+                    hash = "sha256:${row.get(CONTENT_HASH)!!}",
                     ruleSetId = ruleSetId,
                     ruleSetVersion = SemVer.parse(ruleSetVersionStr),
                     tombstone = tombstone,
@@ -291,7 +296,8 @@ class JooqSliceRepository(
                     sliceType = SliceType.valueOf(row.get(SLICE_TYPE)!!),
                     data = row.get(CONTENT)?.data()
                         ?: throw DomainError.StorageError("Missing required field 'content' in slice row"),
-                    hash = row.get(CONTENT_HASH)!!,
+                    // DB에서 읽을 때는 "sha256:" 접두사 복원
+                    hash = "sha256:${row.get(CONTENT_HASH)!!}",
                     ruleSetId = ruleSetId,
                     ruleSetVersion = SemVer.parse(ruleSetVersionStr),
                     tombstone = tombstone,
@@ -307,5 +313,172 @@ class JooqSliceRepository(
                 DomainError.StorageError("Failed to get slices by version: ${e.message}"),
             )
         }
+    }
+
+    override suspend fun findByKeyPrefix(
+        tenantId: TenantId,
+        keyPrefix: String,
+        sliceType: SliceType?,
+        limit: Int,
+        cursor: String?
+    ): SliceRepositoryPort.Result<SliceRepositoryPort.RangeQueryResult> = withContext(Dispatchers.IO) {
+        try {
+            var query = dsl.selectFrom(SLICES)
+                .where(TENANT_ID.eq(tenantId.value))
+                .and(ENTITY_KEY.like("$keyPrefix%"))
+                .and(IS_DELETED.eq(false))
+            
+            if (sliceType != null) {
+                query = query.and(SLICE_TYPE.eq(sliceType.name))
+            }
+            
+            // 커서 파싱
+            cursor?.let {
+                val parts = it.split("|")
+                if (parts.size >= 2) {
+                    query = query.and(
+                        ENTITY_KEY.gt(parts[0]).or(
+                            ENTITY_KEY.eq(parts[0]).and(SLICE_VERSION.gt(parts[1].toLongOrNull() ?: 0L))
+                        )
+                    )
+                }
+            }
+            
+            val rows = query
+                .orderBy(ENTITY_KEY, SLICE_VERSION)
+                .limit(limit + 1)
+                .fetch()
+            
+            val hasMore = rows.size > limit
+            val resultRows = if (hasMore) rows.take(limit) else rows
+            
+            val items = resultRows.map { row -> parseRow(row) }
+            
+            val nextCursor = if (hasMore && items.isNotEmpty()) {
+                val last = items.last()
+                "${last.entityKey.value}|${last.version}"
+            } else null
+            
+            SliceRepositoryPort.Result.Ok(SliceRepositoryPort.RangeQueryResult(
+                items = items,
+                nextCursor = nextCursor,
+                hasMore = hasMore
+            ))
+        } catch (e: Exception) {
+            logger.error("Failed to find slices by key prefix", e)
+            SliceRepositoryPort.Result.Err(
+                DomainError.StorageError("Failed to find slices by key prefix: ${e.message}")
+            )
+        }
+    }
+
+    override suspend fun count(
+        tenantId: TenantId,
+        keyPrefix: String?,
+        sliceType: SliceType?
+    ): SliceRepositoryPort.Result<Long> = withContext(Dispatchers.IO) {
+        try {
+            var query = dsl.selectCount().from(SLICES)
+                .where(TENANT_ID.eq(tenantId.value))
+                .and(IS_DELETED.eq(false))
+            
+            if (keyPrefix != null) {
+                query = query.and(ENTITY_KEY.like("$keyPrefix%"))
+            }
+            
+            if (sliceType != null) {
+                query = query.and(SLICE_TYPE.eq(sliceType.name))
+            }
+            
+            val count = query.fetchOne(0, Long::class.java) ?: 0L
+            SliceRepositoryPort.Result.Ok(count)
+        } catch (e: Exception) {
+            logger.error("Failed to count slices", e)
+            SliceRepositoryPort.Result.Err(
+                DomainError.StorageError("Failed to count slices: ${e.message}")
+            )
+        }
+    }
+
+    override suspend fun getLatestVersion(
+        tenantId: TenantId,
+        entityKey: EntityKey,
+        sliceType: SliceType?
+    ): SliceRepositoryPort.Result<List<SliceRecord>> = withContext(Dispatchers.IO) {
+        try {
+            // 최신 버전 찾기
+            var maxVersionQuery = dsl.select(DSL.max(SLICE_VERSION))
+                .from(SLICES)
+                .where(TENANT_ID.eq(tenantId.value))
+                .and(ENTITY_KEY.eq(entityKey.value))
+                .and(IS_DELETED.eq(false))
+            
+            if (sliceType != null) {
+                maxVersionQuery = maxVersionQuery.and(SLICE_TYPE.eq(sliceType.name))
+            }
+            
+            val maxVersion = maxVersionQuery.fetchOne(0, Long::class.java)
+            
+            if (maxVersion == null) {
+                return@withContext SliceRepositoryPort.Result.Ok(emptyList())
+            }
+            
+            // 최신 버전의 모든 슬라이스 조회
+            var query = dsl.selectFrom(SLICES)
+                .where(TENANT_ID.eq(tenantId.value))
+                .and(ENTITY_KEY.eq(entityKey.value))
+                .and(SLICE_VERSION.eq(maxVersion))
+                .and(IS_DELETED.eq(false))
+            
+            if (sliceType != null) {
+                query = query.and(SLICE_TYPE.eq(sliceType.name))
+            }
+            
+            val rows = query.fetch()
+            val items = rows.map { row -> parseRow(row) }
+            
+            SliceRepositoryPort.Result.Ok(items)
+        } catch (e: Exception) {
+            logger.error("Failed to get latest version", e)
+            SliceRepositoryPort.Result.Err(
+                DomainError.StorageError("Failed to get latest version: ${e.message}")
+            )
+        }
+    }
+
+    private fun parseRow(row: org.jooq.Record): SliceRecord {
+        val rulesetRef = row.get(RULESET_REF)
+            ?: throw DomainError.StorageError("Missing required field 'ruleset_ref' in slice row")
+        val (ruleSetId, ruleSetVersionStr) = if (rulesetRef.contains("@")) {
+            val parts = rulesetRef.split("@", limit = 2)
+            if (parts.size != 2) {
+                throw DomainError.StorageError("Invalid ruleset_ref format in slice row: $rulesetRef")
+            }
+            parts[0] to parts[1]
+        } else {
+            throw DomainError.StorageError("Invalid ruleset_ref format in slice row (missing @): $rulesetRef")
+        }
+
+        val isDeleted = row.get(IS_DELETED) ?: false
+        val tombstone = if (isDeleted) {
+            val deletedAtVersion = row.get(DELETED_AT_VERSION)!!
+            val deleteReason = DeleteReason.fromDbValue(row.get(DELETE_REASON)!!)
+            Tombstone(isDeleted = true, deletedAtVersion = deletedAtVersion, deleteReason = deleteReason)
+        } else {
+            null
+        }
+
+        return SliceRecord(
+            tenantId = TenantId(row.get(TENANT_ID)!!),
+            entityKey = EntityKey(row.get(ENTITY_KEY)!!),
+            version = row.get(SLICE_VERSION)!!,
+            sliceType = SliceType.valueOf(row.get(SLICE_TYPE)!!),
+            data = row.get(CONTENT)?.data()
+                ?: throw DomainError.StorageError("Missing required field 'content' in slice row"),
+            hash = row.get(CONTENT_HASH)!!,
+            ruleSetId = ruleSetId,
+            ruleSetVersion = SemVer.parse(ruleSetVersionStr),
+            tombstone = tombstone,
+        )
     }
 }

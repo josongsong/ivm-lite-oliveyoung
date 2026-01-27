@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.rawdata.domain
 
+import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
 import java.time.Instant
@@ -10,6 +11,7 @@ import java.util.UUID
  * 비즈니스 데이터와 같은 트랜잭션에 저장되어 이벤트 발행의 원자성을 보장한다.
  *
  * @property id 고유 식별자 (UUID)
+ * @property idempotencyKey 멱등성 키 (동일 비즈니스 이벤트 중복 방지)
  * @property aggregateType 집계 타입 (RAW_DATA, SLICE, CHANGESET)
  * @property aggregateId 집계 ID (형식: "tenantId:entityKey")
  * @property eventType 이벤트 타입 (예: "RawDataIngested", "SliceCreated")
@@ -18,9 +20,11 @@ import java.util.UUID
  * @property createdAt 생성 시각
  * @property processedAt 처리 완료 시각 (null이면 미처리)
  * @property retryCount 재시도 횟수
+ * @property failureReason 실패 사유 (FAILED 상태일 때)
  */
 data class OutboxEntry(
     val id: UUID,
+    val idempotencyKey: String,
     val aggregateType: AggregateType,
     val aggregateId: String,
     val eventType: String,
@@ -29,8 +33,10 @@ data class OutboxEntry(
     val createdAt: Instant,
     val processedAt: Instant? = null,
     val retryCount: Int = 0,
+    val failureReason: String? = null,
 ) {
     init {
+        require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }
         require(aggregateId.isNotBlank()) { "aggregateId must not be blank" }
         require(aggregateId.contains(":")) { "aggregateId must be in format 'tenantId:entityKey'" }
         require(eventType.isNotBlank()) { "eventType must not be blank" }
@@ -43,21 +49,48 @@ data class OutboxEntry(
 
         /**
          * 새 OutboxEntry 생성 (PENDING 상태)
+         * 
+         * 결정성: idempotencyKey는 입력값 기반으로 결정적 생성
+         * - 동일 aggregateId + eventType + payload → 동일 idempotencyKey
+         * - 중복 이벤트 방지에 활용
+         * 
+         * @param aggregateType 집계 타입
+         * @param aggregateId 집계 ID
+         * @param eventType 이벤트 타입
+         * @param payload 페이로드
+         * @param timestamp 생성 시각 (테스트 시 주입 가능, 기본값: Instant.now())
          */
         fun create(
             aggregateType: AggregateType,
             aggregateId: String,
             eventType: String,
             payload: String,
-        ): OutboxEntry = OutboxEntry(
-            id = UUID.randomUUID(),
-            aggregateType = aggregateType,
-            aggregateId = aggregateId,
-            eventType = eventType,
-            payload = payload,
-            status = OutboxStatus.PENDING,
-            createdAt = Instant.now(),
-        )
+            timestamp: Instant = Instant.now(),
+        ): OutboxEntry {
+            // 결정적 idempotencyKey 생성: aggregateId + eventType + payload hash
+            val idempotencyKey = generateIdempotencyKey(aggregateId, eventType, payload)
+            return OutboxEntry(
+                id = UUID.randomUUID(),
+                idempotencyKey = idempotencyKey,
+                aggregateType = aggregateType,
+                aggregateId = aggregateId,
+                eventType = eventType,
+                payload = payload,
+                status = OutboxStatus.PENDING,
+                createdAt = timestamp,
+            )
+        }
+        
+        /**
+         * 결정적 idempotencyKey 생성
+         * 
+         * 동일 비즈니스 이벤트 → 동일 key
+         * 멱등성 보장에 활용 (INSERT 시 UNIQUE 제약조건)
+         */
+        fun generateIdempotencyKey(aggregateId: String, eventType: String, payload: String): String {
+            val input = "$aggregateId|$eventType|$payload"
+            return "idem_${Hashing.sha256Hex(input).take(32)}"
+        }
     }
 
     /**
@@ -69,11 +102,14 @@ data class OutboxEntry(
     )
 
     /**
-     * 실패로 마킹 (재시도 카운트 증가)
+     * 실패로 마킹 (재시도 카운트 증가, 실패 사유 기록)
+     * 
+     * @param reason 실패 사유 (에러 메시지)
      */
-    fun markFailed(): OutboxEntry = copy(
+    fun markFailed(reason: String? = null): OutboxEntry = copy(
         status = OutboxStatus.FAILED,
         retryCount = retryCount + 1,
+        failureReason = reason,
     )
 
     /**

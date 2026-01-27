@@ -194,6 +194,6 @@ private fun createTestEntry(
         aggregateType = AggregateType.RAW_DATA,
         aggregateId = "$tenantId:$entityKey",
         eventType = "RawDataIngested",
-        payload = """{"tenantId": "$tenantId", "entityKey": "$entityKey", "version": 1}""",
+        payload = """{"payloadVersion":"1.0","tenantId": "$tenantId", "entityKey": "$entityKey", "version": 1}""",
     )
 }

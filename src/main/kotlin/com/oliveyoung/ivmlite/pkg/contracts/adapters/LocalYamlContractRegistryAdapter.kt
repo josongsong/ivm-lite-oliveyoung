@@ -33,8 +33,14 @@ class LocalYamlContractRegistryAdapter(
         return parseJoinSpec(map)
     }
 
+    /**
+     * @deprecated InvertedIndexContract는 더 이상 사용되지 않습니다.
+     * RuleSet.indexes의 IndexSpec.references로 통합되었습니다.
+     */
+    @Deprecated("Use IndexSpec.references in RuleSet instead")
+    @Suppress("DEPRECATION")
     override suspend fun loadInvertedIndexContract(ref: ContractRef): ContractRegistryPort.Result<InvertedIndexContract> {
-        val map = loadYaml("inverted-index.v1.yaml") ?: return err("inverted-index.v1.yaml not found")
+        val map = loadYaml("inverted-index.v1.yaml") ?: return err("inverted-index.v1.yaml not found (deprecated)")
         return parseInvertedIndex(map)
     }
 
@@ -63,6 +69,11 @@ class LocalYamlContractRegistryAdapter(
         return ContractRegistryPort.Result.Ok(ContractMeta(kind, id, version, status))
     }
 
+    /**
+     * @deprecated InvertedIndexContract는 더 이상 사용되지 않습니다.
+     */
+    @Deprecated("Use IndexSpec.references in RuleSet instead")
+    @Suppress("DEPRECATION")
     private fun parseInvertedIndex(map: Map<String, Any?>): ContractRegistryPort.Result<InvertedIndexContract> {
         val meta = (parseMeta(map) as? ContractRegistryPort.Result.Ok)?.value ?: return parseMeta(map) as ContractRegistryPort.Result.Err
 
@@ -237,7 +248,7 @@ class LocalYamlContractRegistryAdapter(
             return err("invalid SliceDefinition: ${e.message}")
         }
 
-        // RFC-IMPL-010 Phase D-9: indexes 파싱 (GAP-C 해결)
+        // RFC-IMPL-010 Phase D-9: indexes 파싱 (통합 버전 - references/maxFanout 추가)
         @Suppress("UNCHECKED_CAST")
         val indexesRaw = map["indexes"] as? List<Map<String, Any?>> ?: emptyList()
         val indexes = try {
@@ -250,7 +261,16 @@ class LocalYamlContractRegistryAdapter(
                     return err("index selector must start with '$': $selector")
                 }
 
-                IndexSpec(type = type, selector = selector)
+                // 통합 버전: references 및 maxFanout 파싱 (옵션)
+                val references = idx["references"]?.toString()
+                val maxFanout = idx["maxFanout"]?.toString()?.toIntOrNull() ?: 10000
+
+                IndexSpec(
+                    type = type,
+                    selector = selector,
+                    references = references,
+                    maxFanout = maxFanout,
+                )
             }
         } catch (e: IllegalArgumentException) {
             return err("invalid IndexSpec: ${e.message}")

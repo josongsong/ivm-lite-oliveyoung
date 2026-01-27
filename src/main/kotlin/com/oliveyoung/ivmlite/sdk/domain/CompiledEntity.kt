@@ -24,7 +24,7 @@ class CompiledEntity<T : EntityInput>(
             "DeployExecutor is not configured. Cannot execute ship() operation. " +
             "Configure executor via Ivm.client().configure { executor = ... }"
         )
-        val result = runBlocking { executor.shipSync(input, compileResult.version) }
+        val result = runBlocking { executor.shipSync(input, compileResult.version, config.defaultSinks) }
         return ShippedEntity(input, result, config)
     }
 

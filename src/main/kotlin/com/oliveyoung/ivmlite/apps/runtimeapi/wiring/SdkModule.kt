@@ -15,6 +15,7 @@ val sdkModule = module {
         DeployExecutor(
             ingestWorkflow = get(),
             slicingWorkflow = get(),
+            shipWorkflow = get(),
             outboxRepository = get()
         )
     }

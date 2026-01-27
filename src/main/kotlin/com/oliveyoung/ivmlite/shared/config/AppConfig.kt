@@ -37,6 +37,10 @@ data class DynamoDbConfig(
     val endpoint: String? = null,
     val region: String = "ap-northeast-2",
     val tableName: String = "ivm-lite-schema-registry-local",
+    /** AWS Access Key ID (환경 변수 AWS_ACCESS_KEY_ID 우선) */
+    val accessKeyId: String? = null,
+    /** AWS Secret Access Key (환경 변수 AWS_SECRET_ACCESS_KEY 우선) */
+    val secretAccessKey: String? = null,
 )
 
 data class KafkaConfig(
@@ -97,19 +101,26 @@ data class WorkerConfig(
 
 /**
  * Config Loader (Singleton)
+ * SOTA급: 설정 로드 + 검증 통합
  */
 object ConfigLoader {
     
     /**
      * Load config from application.yaml + environment variables
      * RFC-IMPL-009: unknown key = fail-closed
+     * SOTA: 자동 검증 포함
      */
     fun load(): AppConfig {
-        return ConfigLoaderBuilder.default()
+        val config: AppConfig = ConfigLoaderBuilder.default()
             .addResourceSource("/application.yaml")
             .strict()  // unknown key → fail
             .build()
             .loadConfigOrThrow()
+        
+        // SOTA급 설정 검증
+        ConfigValidator.validate(config)
+        
+        return config
     }
     
     /**

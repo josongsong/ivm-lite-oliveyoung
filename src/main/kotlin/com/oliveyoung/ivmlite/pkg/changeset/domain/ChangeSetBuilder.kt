@@ -3,11 +3,14 @@ package com.oliveyoung.ivmlite.pkg.changeset.domain
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
-import java.util.UUID
 
 /**
  * v4 초기: JSON Pointer 수준의 간단 diff로 ChangeSet을 만든다.
  * - 정확한 RFC6901 전수 diff가 필요하면 v4.1+에서 별도 엔진으로 교체한다.
+ * 
+ * 결정성(Determinism): 동일 입력 → 동일 ChangeSet (ID 포함)
+ * - changeSetId는 입력값의 hash로 결정적 생성
+ * - UUID.randomUUID() 사용 금지
  */
 class ChangeSetBuilder(
     private val om: ObjectMapper = ObjectMapper(),
@@ -24,7 +27,11 @@ class ChangeSetBuilder(
         impactedSliceTypes: Set<String>,
         impactMap: Map<String, ImpactDetail>,
     ): ChangeSet {
-        val id = "CS_${UUID.randomUUID()}"
+        // 결정적 ID 생성: 입력값의 hash 기반
+        // 동일 입력 → 동일 changeSetId (멱등성, 결정성 보장)
+        val idInput = "${tenantId.value}|${entityType}|${entityKey.value}|$fromVersion|$toVersion"
+        val idHash = Hashing.sha256Hex(idInput).take(16)
+        val id = "CS_${idHash}"
         val changeType = when {
             fromPayload == null && toPayload != null -> ChangeType.CREATE
             fromPayload != null && toPayload == null -> ChangeType.DELETE

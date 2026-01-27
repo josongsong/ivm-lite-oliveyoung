@@ -1,6 +1,7 @@
 package com.oliveyoung.ivmlite.sdk.execution
 
 import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
+import com.oliveyoung.ivmlite.pkg.orchestration.application.ShipWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
@@ -12,14 +13,12 @@ import com.oliveyoung.ivmlite.sdk.dsl.entity.CategoryInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.EntityInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductInput
 import com.oliveyoung.ivmlite.sdk.model.*
-import com.oliveyoung.ivmlite.shared.domain.determinism.CanonicalJson
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
+import com.oliveyoung.ivmlite.shared.domain.types.VersionGenerator
 import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import java.util.UUID
@@ -34,6 +33,7 @@ import java.util.UUID
 class DeployExecutor(
     private val ingestWorkflow: IngestWorkflow,
     private val slicingWorkflow: SlicingWorkflow,
+    private val shipWorkflow: ShipWorkflow,
     private val outboxRepository: OutboxRepositoryPort
 ) {
     companion object {
@@ -122,6 +122,7 @@ class DeployExecutor(
                     aggregateId = "${rawDataParams.tenantId.value}:${rawDataParams.entityKey.value}",
                     eventType = "CompileRequested",
                     payload = buildJsonObject {
+                        put("payloadVersion", "1.0")
                         put("tenantId", rawDataParams.tenantId.value)
                         put("entityKey", rawDataParams.entityKey.value)
                         put("version", rawDataParams.version.toString())
@@ -144,12 +145,35 @@ class DeployExecutor(
 
         // 4. Ship
         spec.shipSpec?.let { shipSpec ->
+            val sinkTypes = shipSpec.sinks.map { sinkSpecToType(it) }
+
             when (shipSpec.mode) {
                 ShipMode.Sync -> {
-                    // 동기 Ship - 실제 Ship 로직 (TODO: ShipWorkflow 연동)
-                    shipSpec.sinks.forEach { _ ->
-                        // TODO: 실제 Sink로 전송 (OpenSearch, Personalize 등)
-                        // 현재는 stub으로 처리
+                    // 동기 Ship - ShipWorkflow 연동
+                    val shipResult = shipWorkflow.executeToMultipleSinks(
+                        tenantId = rawDataParams.tenantId,
+                        entityKey = rawDataParams.entityKey,
+                        version = rawDataParams.version,
+                        sinkTypes = sinkTypes
+                    )
+
+                    when (shipResult) {
+                        is ShipWorkflow.Result.Err -> {
+                            return DeployResult.failure(
+                                rawDataParams.entityKey.value,
+                                rawDataParams.version.toString(),
+                                "Ship failed: ${shipResult.error}"
+                            )
+                        }
+                        is ShipWorkflow.Result.Ok -> {
+                            if (shipResult.value.failedCount > 0) {
+                                return DeployResult.failure(
+                                    rawDataParams.entityKey.value,
+                                    rawDataParams.version.toString(),
+                                    "Ship partially failed: ${shipResult.value.errors}"
+                                )
+                            }
+                        }
                     }
                 }
                 ShipMode.Async -> {
@@ -160,10 +184,11 @@ class DeployExecutor(
                             aggregateId = "${rawDataParams.tenantId.value}:${rawDataParams.entityKey.value}",
                             eventType = "ShipRequested",
                             payload = buildJsonObject {
+                                put("payloadVersion", "1.0")
                                 put("tenantId", rawDataParams.tenantId.value)
                                 put("entityKey", rawDataParams.entityKey.value)
                                 put("version", rawDataParams.version.toString())
-                                put("sink", sink::class.simpleName ?: "unknown")
+                                put("sink", sinkSpecToType(sink))
                                 put("shipMode", "async")
                             }.toString()
                         )
@@ -223,6 +248,7 @@ class DeployExecutor(
             aggregateId = "${rawDataParams.tenantId.value}:${rawDataParams.entityKey.value}",
             eventType = "CompileRequested",
             payload = buildJsonObject {
+                put("payloadVersion", "1.0")
                 put("tenantId", rawDataParams.tenantId.value)
                 put("entityKey", rawDataParams.entityKey.value)
                 put("version", rawDataParams.version.toString())
@@ -251,7 +277,7 @@ class DeployExecutor(
      */
     private fun <T : EntityInput> convertToRawDataParams(input: T): RawDataParams {
         val tenantId = TenantId(input.tenantId)
-        val version = System.currentTimeMillis() // timestamp 기반 버전
+        val version = VersionGenerator.generate() // 충돌 없는 고유 버전 (SSOT)
 
         // EntityType별 처리
         val (entityKey, schemaId, schemaVersion, payloadJson) = when (input) {
@@ -355,6 +381,24 @@ class DeployExecutor(
      */
     private data class Tuple4<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
 
+    /**
+     * SinkSpec을 sinkType 문자열로 변환
+     */
+    private fun sinkSpecToType(spec: SinkSpec): String = when (spec) {
+        is OpenSearchSinkSpec -> "opensearch"
+        is PersonalizeSinkSpec -> "personalize"
+    }
+
+    /**
+     * EntityInput에서 EntityKey 추출 (DRY)
+     */
+    private fun <T : EntityInput> extractEntityKey(input: T): EntityKey = when (input) {
+        is ProductInput -> EntityKey("${input.entityType}:${input.sku}")
+        is BrandInput -> EntityKey("${input.entityType}:${input.brandId}")
+        is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}")
+        else -> throw IllegalArgumentException("Unsupported EntityInput type: ${input::class}")
+    }
+
     // ===== 단계별 제어 API (DX 끝판왕) =====
 
     /**
@@ -392,12 +436,7 @@ class DeployExecutor(
      */
     suspend fun <T : EntityInput> compileOnly(input: T, version: Long): CompileResult {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = when (input) {
-            is ProductInput -> EntityKey("${input.entityType}:${input.sku}")
-            is BrandInput -> EntityKey("${input.entityType}:${input.brandId}")
-            is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}")
-            else -> throw IllegalArgumentException("Unsupported EntityInput type")
-        }
+        val entityKey = extractEntityKey(input)
 
         val slicingResult = slicingWorkflow.execute(
             tenantId = tenantId,
@@ -416,7 +455,7 @@ class DeployExecutor(
             is SlicingWorkflow.Result.Ok -> CompileResult(
                 entityKey = entityKey.value,
                 version = version,
-                slices = listOf("search-doc", "reco-feed"), // TODO: 실제 생성된 Slice 목록
+                slices = slicingResult.value.map { it.sliceType.name.lowercase() },
                 success = true
             )
         }
@@ -427,18 +466,14 @@ class DeployExecutor(
      */
     suspend fun <T : EntityInput> compileAsync(input: T, version: Long): DeployJob {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = when (input) {
-            is ProductInput -> EntityKey("${input.entityType}:${input.sku}")
-            is BrandInput -> EntityKey("${input.entityType}:${input.brandId}")
-            is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}")
-            else -> throw IllegalArgumentException("Unsupported EntityInput type")
-        }
+        val entityKey = extractEntityKey(input)
 
         val compileTaskEntry = OutboxEntry.create(
             aggregateType = AggregateType.RAW_DATA,
             aggregateId = "${tenantId.value}:${entityKey.value}",
             eventType = "CompileRequested",
             payload = buildJsonObject {
+                put("payloadVersion", "1.0")
                 put("tenantId", tenantId.value)
                 put("entityKey", entityKey.value)
                 put("version", version.toString())
@@ -462,23 +497,28 @@ class DeployExecutor(
     /**
      * Ship 동기 실행 (전체 Sink)
      */
-    suspend fun <T : EntityInput> shipSync(input: T, version: Long): ShipResult {
+    suspend fun <T : EntityInput> shipSync(input: T, version: Long, sinkTypes: List<String>): ShipResult {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = when (input) {
-            is ProductInput -> EntityKey("${input.entityType}:${input.sku}")
-            is BrandInput -> EntityKey("${input.entityType}:${input.brandId}")
-            is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}")
-            else -> throw IllegalArgumentException("Unsupported EntityInput type")
-        }
+        val entityKey = extractEntityKey(input)
 
-        // TODO: 실제 Ship 구현 (OpenSearch, Personalize 등)
-        // 현재는 stub
-        return ShipResult(
-            entityKey = entityKey.value,
-            version = version,
-            sinks = listOf("opensearch", "personalize"),
-            success = true
-        )
+        val result = shipWorkflow.executeToMultipleSinks(tenantId, entityKey, version, sinkTypes)
+
+        return when (result) {
+            is ShipWorkflow.Result.Ok -> ShipResult(
+                entityKey = entityKey.value,
+                version = version,
+                sinks = result.value.sinkResults.filter { it.success }.map { it.sinkType },
+                success = result.value.failedCount == 0,
+                error = if (result.value.failedCount > 0) result.value.errors.joinToString() else null
+            )
+            is ShipWorkflow.Result.Err -> ShipResult(
+                entityKey = entityKey.value,
+                version = version,
+                sinks = emptyList(),
+                success = false,
+                error = result.error.toString()
+            )
+        }
     }
 
     /**
@@ -486,18 +526,14 @@ class DeployExecutor(
      */
     suspend fun <T : EntityInput> shipAsync(input: T, version: Long): DeployJob {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = when (input) {
-            is ProductInput -> EntityKey("${input.entityType}:${input.sku}")
-            is BrandInput -> EntityKey("${input.entityType}:${input.brandId}")
-            is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}")
-            else -> throw IllegalArgumentException("Unsupported EntityInput type")
-        }
+        val entityKey = extractEntityKey(input)
 
         val shipTaskEntry = OutboxEntry.create(
             aggregateType = AggregateType.SLICE,
             aggregateId = "${tenantId.value}:${entityKey.value}",
             eventType = "ShipRequested",
             payload = buildJsonObject {
+                put("payloadVersion", "1.0")
                 put("tenantId", tenantId.value)
                 put("entityKey", entityKey.value)
                 put("version", version.toString())
@@ -522,21 +558,28 @@ class DeployExecutor(
      * 특정 Sink만 동기 Ship
      */
     suspend fun <T : EntityInput> shipSyncTo(input: T, version: Long, sinks: List<SinkSpec>): ShipResult {
-        val entityKey = when (input) {
-            is ProductInput -> "${input.entityType}:${input.sku}"
-            is BrandInput -> "${input.entityType}:${input.brandId}"
-            is CategoryInput -> "${input.entityType}:${input.categoryId}"
-            else -> throw IllegalArgumentException("Unsupported EntityInput type")
-        }
+        val tenantId = TenantId(input.tenantId)
+        val entityKey = extractEntityKey(input)
 
-        // TODO: 실제 Sink별 Ship 구현
-        val sinkNames = sinks.map { it::class.simpleName ?: "unknown" }
-        return ShipResult(
-            entityKey = entityKey,
-            version = version,
-            sinks = sinkNames,
-            success = true
-        )
+        val sinkTypes = sinks.map { sinkSpecToType(it) }
+        val result = shipWorkflow.executeToMultipleSinks(tenantId, entityKey, version, sinkTypes)
+
+        return when (result) {
+            is ShipWorkflow.Result.Ok -> ShipResult(
+                entityKey = entityKey.value,
+                version = version,
+                sinks = result.value.sinkResults.filter { it.success }.map { it.sinkType },
+                success = result.value.failedCount == 0,
+                error = if (result.value.failedCount > 0) result.value.errors.joinToString() else null
+            )
+            is ShipWorkflow.Result.Err -> ShipResult(
+                entityKey = entityKey.value,
+                version = version,
+                sinks = emptyList(),
+                success = false,
+                error = result.error.toString()
+            )
+        }
     }
 
     /**
@@ -544,12 +587,9 @@ class DeployExecutor(
      */
     suspend fun <T : EntityInput> shipAsyncTo(input: T, version: Long, sinks: List<SinkSpec>): DeployJob {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = when (input) {
-            is ProductInput -> EntityKey("${input.entityType}:${input.sku}")
-            is BrandInput -> EntityKey("${input.entityType}:${input.brandId}")
-            is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}")
-            else -> throw IllegalArgumentException("Unsupported EntityInput type")
-        }
+        val entityKey = extractEntityKey(input)
+
+        val jobIds = mutableListOf<String>()
 
         sinks.forEach { sink ->
             val shipTaskEntry = OutboxEntry.create(
@@ -557,18 +597,24 @@ class DeployExecutor(
                 aggregateId = "${tenantId.value}:${entityKey.value}",
                 eventType = "ShipRequested",
                 payload = buildJsonObject {
+                    put("payloadVersion", "1.0")
                     put("tenantId", tenantId.value)
                     put("entityKey", entityKey.value)
                     put("version", version.toString())
-                    put("sink", sink::class.simpleName ?: "unknown")
+                    put("sink", sinkSpecToType(sink))
                     put("shipMode", "async")
                 }.toString()
             )
-            outboxRepository.insert(shipTaskEntry)
+
+            // fail-closed: 에러 발생 시 즉시 예외 던짐
+            when (val r = outboxRepository.insert(shipTaskEntry)) {
+                is OutboxRepositoryPort.Result.Ok -> jobIds.add(r.value.id.toString())
+                is OutboxRepositoryPort.Result.Err -> throw RuntimeException("Ship outbox insert failed: ${r.error}")
+            }
         }
 
         return DeployJob(
-            jobId = "job-${UUID.randomUUID()}",
+            jobId = jobIds.firstOrNull() ?: throw RuntimeException("No sinks specified"),
             entityKey = entityKey.value,
             version = version.toString(),
             state = DeployState.QUEUED

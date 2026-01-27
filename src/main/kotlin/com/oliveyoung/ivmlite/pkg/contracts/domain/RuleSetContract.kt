@@ -67,12 +67,19 @@ sealed class SliceBuildRules {
 }
 
 /**
- * RFC-IMPL-010 Phase D-9: 인덱스 사양
+ * RFC-IMPL-010 Phase D-9: 인덱스 사양 (통합 버전)
  *
- * Inverted Index 생성을 위한 정의.
+ * 정방향/역방향 인덱스 통합 정의.
  * Contract is Law: RuleSet.indexes가 인덱스 정의의 SSOT.
+ *
+ * @param type 인덱스 타입 (예: "brand", "category")
+ * @param selector JSON Path 선택자 (예: "$.brandId")
+ * @param references FK 참조 엔티티 타입 (예: "BRAND"). null이면 검색용 인덱스만 생성, 값이 있으면 역방향 인덱스도 자동 생성
+ * @param maxFanout 최대 fanout 수 (기본값: 10000). 역방향 인덱스 조회 시 circuit breaker 기준
  */
 data class IndexSpec(
     val type: String,
     val selector: String,
+    val references: String? = null,
+    val maxFanout: Int = 10000,
 )

@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.apps.runtimeapi.module
 import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 // QueryViewWorkflow는 Typed Query API 테스트에서 사용 (현재 비활성화)
 // import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
+import com.oliveyoung.ivmlite.pkg.orchestration.application.ShipWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.sdk.Ivm
@@ -46,10 +47,11 @@ class RealSdkDslE2ETest : StringSpec({
             val koin = GlobalContext.get()
             val ingestWorkflow = koin.get<IngestWorkflow>()
             val slicingWorkflow = koin.get<SlicingWorkflow>()
+            val shipWorkflow = koin.get<ShipWorkflow>()
             val outboxRepository = koin.get<OutboxRepositoryPort>()
 
             // DeployExecutor 생성 (실제 Workflow 연동)
-            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, outboxRepository)
+            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, shipWorkflow, outboxRepository)
 
             // SDK DSL로 Product 입력 구성
             val productInput = ProductInput(
@@ -100,9 +102,10 @@ class RealSdkDslE2ETest : StringSpec({
             val koin = GlobalContext.get()
             val ingestWorkflow = koin.get<IngestWorkflow>()
             val slicingWorkflow = koin.get<SlicingWorkflow>()
+            val shipWorkflow = koin.get<ShipWorkflow>()
             val outboxRepository = koin.get<OutboxRepositoryPort>()
 
-            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, outboxRepository)
+            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, shipWorkflow, outboxRepository)
 
             val productInput = ProductInput(
                 tenantId = "sdk-shortcut-tenant",
@@ -134,9 +137,10 @@ class RealSdkDslE2ETest : StringSpec({
             val koin = GlobalContext.get()
             val ingestWorkflow = koin.get<IngestWorkflow>()
             val slicingWorkflow = koin.get<SlicingWorkflow>()
+            val shipWorkflow = koin.get<ShipWorkflow>()
             val outboxRepository = koin.get<OutboxRepositoryPort>()
 
-            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, outboxRepository)
+            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, shipWorkflow, outboxRepository)
 
             val productInput = ProductInput(
                 tenantId = "sdk-sync-tenant",
@@ -166,9 +170,10 @@ class RealSdkDslE2ETest : StringSpec({
             val koin = GlobalContext.get()
             val ingestWorkflow = koin.get<IngestWorkflow>()
             val slicingWorkflow = koin.get<SlicingWorkflow>()
+            val shipWorkflow = koin.get<ShipWorkflow>()
             val outboxRepository = koin.get<OutboxRepositoryPort>()
 
-            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, outboxRepository)
+            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, shipWorkflow, outboxRepository)
             val config = IvmClientConfig(baseUrl = "http://localhost:8080", tenantId = "sdk-batch-dsl-tenant")
 
             // 3개 상품 배치 배포
@@ -202,9 +207,10 @@ class RealSdkDslE2ETest : StringSpec({
             val koin = GlobalContext.get()
             val ingestWorkflow = koin.get<IngestWorkflow>()
             val slicingWorkflow = koin.get<SlicingWorkflow>()
+            val shipWorkflow = koin.get<ShipWorkflow>()
             val outboxRepository = koin.get<OutboxRepositoryPort>()
 
-            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, outboxRepository)
+            val executor = DeployExecutor(ingestWorkflow, slicingWorkflow, shipWorkflow, outboxRepository)
 
             // SDK 설정
             Ivm.configure {
@@ -231,24 +237,24 @@ class RealSdkDslE2ETest : StringSpec({
             result.success shouldBe true
 
             // 타입 세이프 Query API 테스트
-            // 방법 1: Ivm.query(Views.Product.pdp) - TypedQueryBuilder.getRaw()로 ViewResult 반환
-            val view1 = Ivm.query(Views.Product.pdp)
+            // 방법 1: Ivm.query(Views.Product.Pdp) - TypedQueryBuilder.getRaw()로 ViewResult 반환
+            val view1 = Ivm.query(Views.Product.Pdp)
                 .key(result.entityKey)
                 .getRaw()
 
             view1.success shouldBe true
             view1.data.toString() shouldContain "QUERY-001"
 
-            // 방법 2: Views.Product.pdp.query() - QueryBuilder.get()는 ViewResult 반환
-            val view2 = Views.Product.pdp.query()
+            // 방법 2: Views.Product.Pdp.query() - QueryBuilder.get()는 ViewResult 반환
+            val view2 = Views.Product.Pdp.query()
                 .key(result.entityKey)
                 .get()
 
             view2.success shouldBe true
             view2.data.toString() shouldContain "타입 세이프 Query 테스트 상품"
 
-            // 방법 3: Views.Product.pdp["key"] shortcut - QueryBuilder.get()는 ViewResult 반환
-            val view3 = Views.Product.pdp[result.entityKey].get()
+            // 방법 3: Views.Product.Pdp["key"] shortcut - QueryBuilder.get()는 ViewResult 반환
+            val view3 = Views.Product.Pdp[result.entityKey].get()
             view3.success shouldBe true
 
             // 방법 4: 타입 세이프 버전 (파서 포함) - TypedQueryBuilder.getRaw()로 ViewResult 반환

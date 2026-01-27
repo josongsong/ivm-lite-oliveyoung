@@ -32,22 +32,35 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
         }
     }
 
+    // insertAll 원자성을 위한 lock 객체
+    private val insertLock = Any()
+    
     override suspend fun insertAll(entries: List<OutboxEntry>): OutboxRepositoryPort.Result<List<OutboxEntry>> {
         if (entries.isEmpty()) {
             return OutboxRepositoryPort.Result.Ok(emptyList())
         }
 
-        // 원자성: 먼저 중복 체크
-        for (entry in entries) {
-            if (store.containsKey(entry.id)) {
-                return OutboxRepositoryPort.Result.Err(
-                    DomainError.IdempotencyViolation("OutboxEntry already exists: ${entry.id}"),
-                )
+        // 원자성 보장: synchronized 블록으로 중복 체크 + 저장을 원자적으로
+        synchronized(insertLock) {
+            // 중복 체크 (id 또는 idempotencyKey)
+            for (entry in entries) {
+                if (store.containsKey(entry.id)) {
+                    return OutboxRepositoryPort.Result.Err(
+                        DomainError.IdempotencyViolation("OutboxEntry already exists: ${entry.id}"),
+                    )
+                }
+                // idempotencyKey 중복 체크
+                val duplicateByKey = store.values.any { it.idempotencyKey == entry.idempotencyKey }
+                if (duplicateByKey) {
+                    return OutboxRepositoryPort.Result.Err(
+                        DomainError.IdempotencyViolation("OutboxEntry with same idempotencyKey already exists: ${entry.idempotencyKey}"),
+                    )
+                }
             }
-        }
 
-        // 모두 저장
-        entries.forEach { store[it.id] = it }
+            // 모두 저장
+            entries.forEach { store[it.id] = it }
+        }
         return OutboxRepositoryPort.Result.Ok(entries)
     }
 
@@ -102,7 +115,7 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
                 DomainError.NotFoundError("OutboxEntry", id.toString()),
             )
 
-        val failed = entry.markFailed()
+        val failed = entry.markFailed(reason)
         store[id] = failed
         return OutboxRepositoryPort.Result.Ok(failed)
     }

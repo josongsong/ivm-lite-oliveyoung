@@ -126,7 +126,15 @@ class SlicingEngine(
         ruleSet: RuleSetContract,
     ): Result<SliceRecord> {
         // 1. Light JOIN 실행 (joins가 있으면)
-        val mergedPayload = if (def.joins.isNotEmpty() && joinExecutor != null) {
+        val mergedPayload = if (def.joins.isNotEmpty()) {
+            if (joinExecutor == null) {
+                // JOIN이 정의되어 있는데 executor가 없으면 에러 (fail-closed)
+                return Result.Err(
+                    DomainError.InvariantViolation(
+                        "JoinExecutor not configured but joins defined for slice ${def.type.name}"
+                    )
+                )
+            }
             val joinResult = joinExecutor.executeJoins(rawData, def.joins)
             when (joinResult) {
                 is JoinExecutor.Result.Ok -> {

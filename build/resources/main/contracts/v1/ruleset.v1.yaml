@@ -73,11 +73,18 @@ slices:
         - "categoryId"
         - "categoryPath"
 
-# RFC-IMPL-010 Phase D-9: Inverted Index 정의
+# RFC-IMPL-010 Phase D-9: Inverted Index 정의 (통합 버전)
+# references: FK 엔티티 타입 → 역방향 인덱스 자동 생성 (Fanout용)
+# maxFanout: circuit breaker 임계값 (기본값: 10000)
 indexes:
   - type: brand
-    selector: $.brand
+    selector: $.brandId      # EntityKey 형식: "BRAND#tenant#entityId" 또는 entityId만
+    references: BRAND        # Brand 변경 시 → 연관 Product 자동 재슬라이싱
+    maxFanout: 10000
   - type: category
     selector: $.categoryId
+    references: CATEGORY     # Category 변경 시 → 연관 Product 자동 재슬라이싱
+    maxFanout: 50000        # 카테고리는 연관 상품이 많을 수 있음
   - type: tag
     selector: $.tags[*]
+    # references 없음 → 검색용 인덱스만 생성 (Fanout 없음)

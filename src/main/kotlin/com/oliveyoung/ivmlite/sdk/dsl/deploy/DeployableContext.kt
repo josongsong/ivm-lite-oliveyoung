@@ -17,6 +17,7 @@ import com.oliveyoung.ivmlite.sdk.model.DeploySpec
 import com.oliveyoung.ivmlite.sdk.model.DeployState
 import com.oliveyoung.ivmlite.sdk.model.ShipMode
 import com.oliveyoung.ivmlite.sdk.model.ShipSpec
+import com.oliveyoung.ivmlite.shared.domain.types.VersionGenerator
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -158,7 +159,7 @@ class DeployableContext internal constructor(
     }
 
     private fun generateVersion(): String {
-        return "v1-${System.currentTimeMillis()}"
+        return VersionGenerator.generate().toString()
     }
 
     private fun generateJobId(): String {

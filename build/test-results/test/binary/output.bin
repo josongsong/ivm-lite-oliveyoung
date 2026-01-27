@@ -1,52 +1,100 @@
-›11:31:36.709 [DefaultDispatcher-worker-1 @call-context#135] INFO  ktor.test - No ktor.deployment.watch patterns specified, automatic reload is not active.
-q11:31:36.729 [DefaultDispatcher-worker-1 @call-context#135] INFO  [Koin] - Started 25 definitions in 0.367625 ms
-{11:31:36.971 [DefaultDispatcher-worker-1 @call-context#135] INFO  ktor.test - ivm-lite Runtime API started on 0.0.0.0:8080
-t11:31:36.971 [DefaultDispatcher-worker-1 @call-context#135] INFO  ktor.test - Application started in 0.265 seconds.
-º11:31:36.972 [DefaultDispatcher-worker-1 @call-context#135] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=100, pollInterval=100ms, idleInterval=1000ms]
-j11:31:36.972 [DefaultDispatcher-worker-1 @call-context#135] INFO  ktor.test - OutboxPollingWorker started
-s11:31:36.972 [DefaultDispatcher-worker-3 @coroutine#138] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
-m11:31:36.973 [DefaultDispatcher-worker-4 @coroutine#137] INFO  ktor.test - Responding at http://localhost:80
-o11:31:36.973 [DefaultDispatcher-worker-4 @coroutine#137] INFO  ktor.test - Responding at https://localhost:443
-…11:31:37.057 [pool-1-thread-1 @coroutine#144] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=10000ms)
-q11:31:37.975 [DefaultDispatcher-worker-4 @coroutine#138] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
-“11:31:37.975 [pool-1-thread-1 @coroutine#144] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=1]
-g11:31:37.975 [pool-1-thread-1 @coroutine#144] INFO  ktor.test - OutboxPollingWorker stopped gracefully
-›11:31:37.999 [DefaultDispatcher-worker-4 @call-context#147] INFO  ktor.test - No ktor.deployment.watch patterns specified, automatic reload is not active.
-q11:31:38.000 [DefaultDispatcher-worker-4 @call-context#147] INFO  [Koin] - Started 25 definitions in 0.139375 ms
-{11:31:38.021 [DefaultDispatcher-worker-4 @call-context#147] INFO  ktor.test - ivm-lite Runtime API started on 0.0.0.0:8080
-t11:31:38.021 [DefaultDispatcher-worker-4 @call-context#147] INFO  ktor.test - Application started in 0.022 seconds.
-º11:31:38.021 [DefaultDispatcher-worker-4 @call-context#147] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=100, pollInterval=100ms, idleInterval=1000ms]
-j11:31:38.021 [DefaultDispatcher-worker-4 @call-context#147] INFO  ktor.test - OutboxPollingWorker started
-s11:31:38.021 [DefaultDispatcher-worker-1 @coroutine#150] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
-m11:31:38.021 [DefaultDispatcher-worker-3 @coroutine#149] INFO  ktor.test - Responding at http://localhost:80
-o11:31:38.021 [DefaultDispatcher-worker-3 @coroutine#149] INFO  ktor.test - Responding at https://localhost:443
-…11:31:38.026 [pool-1-thread-1 @coroutine#156] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=10000ms)
-q11:31:39.026 [DefaultDispatcher-worker-5 @coroutine#150] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
-“11:31:39.026 [pool-1-thread-1 @coroutine#156] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=1]
-g11:31:39.026 [pool-1-thread-1 @coroutine#156] INFO  ktor.test - OutboxPollingWorker stopped gracefully
-›11:31:39.029 [DefaultDispatcher-worker-5 @call-context#159] INFO  ktor.test - No ktor.deployment.watch patterns specified, automatic reload is not active.
-q11:31:39.029 [DefaultDispatcher-worker-5 @call-context#159] INFO  [Koin] - Started 25 definitions in 0.051125 ms
-{11:31:39.047 [DefaultDispatcher-worker-5 @call-context#159] INFO  ktor.test - ivm-lite Runtime API started on 0.0.0.0:8080
-t11:31:39.047 [DefaultDispatcher-worker-5 @call-context#159] INFO  ktor.test - Application started in 0.018 seconds.
-º11:31:39.047 [DefaultDispatcher-worker-5 @call-context#159] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=100, pollInterval=100ms, idleInterval=1000ms]
-j11:31:39.047 [DefaultDispatcher-worker-5 @call-context#159] INFO  ktor.test - OutboxPollingWorker started
-s11:31:39.048 [DefaultDispatcher-worker-4 @coroutine#162] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
-m11:31:39.048 [DefaultDispatcher-worker-1 @coroutine#161] INFO  ktor.test - Responding at http://localhost:80
-o11:31:39.048 [DefaultDispatcher-worker-1 @coroutine#161] INFO  ktor.test - Responding at https://localhost:443
-…11:31:39.052 [pool-1-thread-1 @coroutine#168] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=10000ms)
-q11:31:40.048 [DefaultDispatcher-worker-1 @coroutine#162] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
-“11:31:40.048 [pool-1-thread-1 @coroutine#168] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=1]
-g11:31:40.048 [pool-1-thread-1 @coroutine#168] INFO  ktor.test - OutboxPollingWorker stopped gracefully
-›11:31:40.050 [DefaultDispatcher-worker-1 @call-context#171] INFO  ktor.test - No ktor.deployment.watch patterns specified, automatic reload is not active.
-q11:31:40.051 [DefaultDispatcher-worker-1 @call-context#171] INFO  [Koin] - Started 25 definitions in 0.058417 ms
-{11:31:40.066 [DefaultDispatcher-worker-1 @call-context#171] INFO  ktor.test - ivm-lite Runtime API started on 0.0.0.0:8080
-t11:31:40.066 [DefaultDispatcher-worker-1 @call-context#171] INFO  ktor.test - Application started in 0.016 seconds.
-º11:31:40.066 [DefaultDispatcher-worker-1 @call-context#171] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=100, pollInterval=100ms, idleInterval=1000ms]
-j11:31:40.066 [DefaultDispatcher-worker-1 @call-context#171] INFO  ktor.test - OutboxPollingWorker started
-s11:31:40.066 [DefaultDispatcher-worker-5 @coroutine#174] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
-m11:31:40.066 [DefaultDispatcher-worker-4 @coroutine#173] INFO  ktor.test - Responding at http://localhost:80
-o11:31:40.066 [DefaultDispatcher-worker-4 @coroutine#173] INFO  ktor.test - Responding at https://localhost:443
-…11:31:40.076 [pool-1-thread-1 @coroutine#182] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=10000ms)
-q11:31:41.070 [DefaultDispatcher-worker-4 @coroutine#174] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
-“11:31:41.070 [pool-1-thread-1 @coroutine#182] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=1]
-g11:31:41.070 [pool-1-thread-1 @coroutine#182] INFO  ktor.test - OutboxPollingWorker stopped gracefully
+©16:59:45.014 [pool-1-thread-1 @coroutine#495] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=10, pollInterval=50ms, idleInterval=100ms]
+}16:59:45.017 [pool-1-thread-1 @coroutine#495] WARN  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker is already running
+s16:59:45.017 [DefaultDispatcher-worker-1 @coroutine#496] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+„16:59:45.017 [pool-1-thread-1 @coroutine#495] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=1000ms)
+q16:59:45.017 [DefaultDispatcher-worker-1 @coroutine#496] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“16:59:45.017 [pool-1-thread-1 @coroutine#495] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=0, polls=0]
+y16:59:45.017 [pool-1-thread-1 @coroutine#495] WARN  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker is not running
+€16:59:45.022 [pool-1-thread-1 @coroutine#497] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker is disabled by config
+©16:59:45.052 [pool-1-thread-1 @coroutine#498] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=10, pollInterval=50ms, idleInterval=100ms]
+s16:59:45.053 [DefaultDispatcher-worker-1 @coroutine#499] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+~16:59:45.053 [DefaultDispatcher-worker-1 @coroutine#499] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing 1 pending entries
+¸16:59:45.064 [DefaultDispatcher-worker-1 @coroutine#499] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-polling-1#test-1, payloadVersion=1.0
+µ16:59:45.070 [DefaultDispatcher-worker-1 @coroutine#499] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-polling-1:PRODUCT#tenant-polling-1#test-1 v1, slices=1
+16:59:45.071 [DefaultDispatcher-worker-1 @coroutine#499] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Marked 1 entries as processed
+„16:59:45.356 [pool-1-thread-1 @coroutine#498] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=1000ms)
+q16:59:45.439 [DefaultDispatcher-worker-1 @coroutine#499] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“16:59:45.440 [pool-1-thread-1 @coroutine#498] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=1, failed=0, polls=4]
+©16:59:45.458 [pool-1-thread-1 @coroutine#500] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=10, pollInterval=50ms, idleInterval=100ms]
+s16:59:45.458 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+~16:59:45.458 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing 5 pending entries
+´16:59:45.459 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-batch#item-0, payloadVersion=1.0
+­16:59:45.459 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-batch:PRODUCT#tenant-batch#item-0 v1, slices=1
+´16:59:45.459 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-batch#item-1, payloadVersion=1.0
+­16:59:45.470 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-batch:PRODUCT#tenant-batch#item-1 v2, slices=1
+´16:59:45.471 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-batch#item-2, payloadVersion=1.0
+­16:59:45.471 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-batch:PRODUCT#tenant-batch#item-2 v3, slices=1
+´16:59:45.471 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-batch#item-3, payloadVersion=1.0
+­16:59:45.471 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-batch:PRODUCT#tenant-batch#item-3 v4, slices=1
+´16:59:45.471 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-batch#item-4, payloadVersion=1.0
+­16:59:45.471 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-batch:PRODUCT#tenant-batch#item-4 v5, slices=1
+16:59:45.472 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Marked 5 entries as processed
+„16:59:45.959 [pool-1-thread-1 @coroutine#500] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=1000ms)
+q16:59:46.044 [DefaultDispatcher-worker-1 @coroutine#501] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“16:59:46.044 [pool-1-thread-1 @coroutine#500] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=5, failed=0, polls=6]
+©16:59:46.046 [pool-1-thread-1 @coroutine#502] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=10, pollInterval=50ms, idleInterval=100ms]
+s16:59:46.046 [DefaultDispatcher-worker-1 @coroutine#503] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+~16:59:46.046 [DefaultDispatcher-worker-1 @coroutine#503] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing 1 pending entries
+‰16:59:46.048 [DefaultDispatcher-worker-1 @coroutine#503] ERROR c.o.i.p.o.a.OutboxPollingWorker - Failed to process entry a955a5f1-c3f6-4b20-a9f3-9d8024e8e650: Failed to parse payload: Fields [tenantId, entityKey, version] are required for type with serial name 'com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker.RawDataIngestedPayload', but they were missing at path: $
+„16:59:46.349 [pool-1-thread-1 @coroutine#502] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=1000ms)
+q16:59:46.359 [DefaultDispatcher-worker-1 @coroutine#503] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“16:59:46.359 [pool-1-thread-1 @coroutine#502] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=1, polls=3]
+©16:59:46.363 [pool-1-thread-1 @coroutine#504] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=10, pollInterval=50ms, idleInterval=100ms]
+s16:59:46.363 [DefaultDispatcher-worker-1 @coroutine#505] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+~16:59:46.363 [DefaultDispatcher-worker-1 @coroutine#505] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing 1 pending entries
+¶16:59:46.363 [DefaultDispatcher-worker-1 @coroutine#505] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-no-raw#missing, payloadVersion=1.0
+€16:59:46.364 [DefaultDispatcher-worker-1 @coroutine#505] ERROR c.o.i.p.o.a.OutboxPollingWorker - Failed to process entry c4e4fa12-d2af-47d8-92d0-aec067074197: Slicing failed: NotFoundError(entity=RawData, key=tenant-no-raw|PRODUCT#tenant-no-raw#missing|1)
+„16:59:46.668 [pool-1-thread-1 @coroutine#504] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=1000ms)
+q16:59:46.671 [DefaultDispatcher-worker-1 @coroutine#505] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“16:59:46.671 [pool-1-thread-1 @coroutine#504] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=0, failed=1, polls=3]
+©16:59:46.674 [pool-1-thread-1 @coroutine#506] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=10, pollInterval=50ms, idleInterval=100ms]
+s16:59:46.674 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+16:59:46.674 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing 10 pending entries
+·16:59:46.675 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-0, payloadVersion=1.0
+³16:59:46.675 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-0 v1, slices=1
+·16:59:46.675 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-1, payloadVersion=1.0
+³16:59:46.675 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-1 v2, slices=1
+·16:59:46.675 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-2, payloadVersion=1.0
+³16:59:46.675 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-2 v3, slices=1
+·16:59:46.675 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-3, payloadVersion=1.0
+³16:59:46.676 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-3 v4, slices=1
+·16:59:46.676 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-4, payloadVersion=1.0
+³16:59:46.676 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-4 v5, slices=1
+·16:59:46.676 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-5, payloadVersion=1.0
+³16:59:46.676 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-5 v6, slices=1
+·16:59:46.676 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-6, payloadVersion=1.0
+³16:59:46.676 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-6 v7, slices=1
+·16:59:46.676 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-7, payloadVersion=1.0
+³16:59:46.677 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-7 v8, slices=1
+·16:59:46.677 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-8, payloadVersion=1.0
+³16:59:46.677 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-8 v9, slices=1
+·16:59:46.677 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing RawDataIngested: entity=PRODUCT#tenant-shutdown#item-9, payloadVersion=1.0
+´16:59:46.677 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Slicing completed for tenant-shutdown:PRODUCT#tenant-shutdown#item-9 v10, slices=1
+€16:59:46.677 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Marked 10 entries as processed
+„16:59:46.775 [pool-1-thread-1 @coroutine#506] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=5000ms)
+q16:59:46.831 [DefaultDispatcher-worker-1 @coroutine#507] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+”16:59:46.832 [pool-1-thread-1 @coroutine#506] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=10, failed=0, polls=2]
+
+©16:59:46.833 [pool-1-thread-1 @coroutine#509] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=10, pollInterval=50ms, idleInterval=100ms]
+
+s16:59:46.834 [DefaultDispatcher-worker-1 @coroutine#510] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+
+~16:59:46.834 [DefaultDispatcher-worker-1 @coroutine#510] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing 1 pending entries
+
+½16:59:46.834 [DefaultDispatcher-worker-1 @coroutine#510] DEBUG c.o.i.p.o.a.OutboxPollingWorker$DefaultEventHandler - SliceEvent received (no-op in v1): ad6cb5d9-40b9-4044-905e-630e90e9397e
+
+16:59:46.834 [DefaultDispatcher-worker-1 @coroutine#510] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Marked 1 entries as processed
+
+„16:59:47.135 [pool-1-thread-1 @coroutine#509] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=1000ms)
+
+q16:59:47.199 [DefaultDispatcher-worker-1 @coroutine#510] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+
+“16:59:47.199 [pool-1-thread-1 @coroutine#509] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=1, failed=0, polls=4]
+©16:59:47.200 [pool-1-thread-1 @coroutine#511] INFO  c.o.i.p.o.a.OutboxPollingWorker - Starting OutboxPollingWorker [batchSize=10, pollInterval=50ms, idleInterval=100ms]
+s16:59:47.201 [DefaultDispatcher-worker-1 @coroutine#512] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop started
+~16:59:47.201 [DefaultDispatcher-worker-1 @coroutine#512] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Processing 1 pending entries
+Á16:59:47.201 [DefaultDispatcher-worker-1 @coroutine#512] DEBUG c.o.i.p.o.a.OutboxPollingWorker$DefaultEventHandler - ChangeSetEvent received (no-op in v1): 9809f78c-e824-42e8-8461-5611ea3b1d0c
+16:59:47.201 [DefaultDispatcher-worker-1 @coroutine#512] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Marked 1 entries as processed
+„16:59:47.506 [pool-1-thread-1 @coroutine#511] INFO  c.o.i.p.o.a.OutboxPollingWorker - Stopping OutboxPollingWorker (timeout=1000ms)
+q16:59:47.564 [DefaultDispatcher-worker-1 @coroutine#512] DEBUG c.o.i.p.o.a.OutboxPollingWorker - Poll loop ended
+“16:59:47.564 [pool-1-thread-1 @coroutine#511] INFO  c.o.i.p.o.a.OutboxPollingWorker - OutboxPollingWorker stopped [processed=1, failed=0, polls=4]

@@ -5,6 +5,18 @@ RawData → Snapshot/ChangeSet → Slice → Virtual View → (v4.1) CDC → Sin
 
 ## Quickstart
 
+### 0) AWS 자격 증명 설정 (SOTA급 자동 설정) ⭐
+
+```bash
+# .env 파일 자동 생성 및 환경 변수 로드
+source scripts/load-env.sh
+
+# 또는 환경 변수 자동 로드 후 애플리케이션 실행
+./scripts/run-with-env.sh ./gradlew run
+```
+
+> 💡 **자세한 설정 방법**: [AWS 자격 증명 설정 가이드](./docs/aws-credentials-setup.md) 참고
+
 ### 1) 인프라 시작
 ```bash
 # PostgreSQL + DynamoDB + Kafka + Debezium 시작
@@ -26,8 +38,9 @@ docker-compose up -d
 
 ### 3) 빌드 & 테스트
 ```bash
-./gradlew test
-./gradlew run --args="validate-contracts src/main/resources/contracts/v1"
+# 환경 변수 자동 로드 후 실행 (권장)
+./scripts/run-with-env.sh ./gradlew test
+./scripts/run-with-env.sh ./gradlew run --args="validate-contracts src/main/resources/contracts/v1"
 ```
 
 ## Structure (RFC-V4-010: Orchestration-First Entry + Domain-Only Meaning)

@@ -9,6 +9,7 @@ import java.time.Instant
 import java.util.UUID
 import kotlin.test.assertEquals
 import kotlin.test.assertFalse
+import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
@@ -32,8 +33,31 @@ class OutboxEntryTest {
         assertEquals("RawDataIngested", entry.eventType)
         assertEquals(0, entry.retryCount)
         assertNull(entry.processedAt)
+        assertNull(entry.failureReason)
         assertNotNull(entry.id)
         assertNotNull(entry.createdAt)
+        assertNotNull(entry.idempotencyKey)
+        assertTrue(entry.idempotencyKey.startsWith("idem_"))
+    }
+    
+    @Test
+    fun `idempotencyKey - 동일 입력으로 결정적 생성`() {
+        val entry1 = OutboxEntry.create(
+            aggregateType = AggregateType.RAW_DATA,
+            aggregateId = "tenant-1:product-123",
+            eventType = "RawDataIngested",
+            payload = """{"key":"value"}""",
+        )
+        val entry2 = OutboxEntry.create(
+            aggregateType = AggregateType.RAW_DATA,
+            aggregateId = "tenant-1:product-123",
+            eventType = "RawDataIngested",
+            payload = """{"key":"value"}""",
+        )
+        
+        // ID는 다르지만 idempotencyKey는 동일
+        assertNotEquals(entry1.id, entry2.id)
+        assertEquals(entry1.idempotencyKey, entry2.idempotencyKey)
     }
 
     @Test
@@ -43,6 +67,7 @@ class OutboxEntryTest {
 
         val entry = OutboxEntry(
             id = id,
+            idempotencyKey = "idem_test_key_12345",
             aggregateType = AggregateType.SLICE,
             aggregateId = "tenant-2:order-456",
             eventType = "SliceCreated",
@@ -117,6 +142,7 @@ class OutboxEntryTest {
         val ex = assertThrows<IllegalArgumentException> {
             OutboxEntry(
                 id = UUID.randomUUID(),
+                idempotencyKey = "idem_test",
                 aggregateType = AggregateType.RAW_DATA,
                 aggregateId = "t:e",
                 eventType = "Test",
@@ -149,7 +175,23 @@ class OutboxEntryTest {
     }
 
     @Test
-    fun `markFailed - retryCount 증가`() {
+    fun `markFailed - retryCount 증가 및 reason 기록`() {
+        val entry = OutboxEntry.create(
+            aggregateType = AggregateType.RAW_DATA,
+            aggregateId = "t:e",
+            eventType = "Test",
+            payload = "{}",
+        )
+
+        val failed = entry.markFailed("Connection timeout")
+
+        assertEquals(OutboxStatus.FAILED, failed.status)
+        assertEquals(1, failed.retryCount)
+        assertEquals("Connection timeout", failed.failureReason)
+    }
+    
+    @Test
+    fun `markFailed - reason 없이 호출 가능`() {
         val entry = OutboxEntry.create(
             aggregateType = AggregateType.RAW_DATA,
             aggregateId = "t:e",
@@ -161,6 +203,7 @@ class OutboxEntryTest {
 
         assertEquals(OutboxStatus.FAILED, failed.status)
         assertEquals(1, failed.retryCount)
+        assertNull(failed.failureReason)
     }
 
     @Test
@@ -183,6 +226,7 @@ class OutboxEntryTest {
     fun `canRetry - MAX_RETRY_COUNT 미만이면 true`() {
         val entry = OutboxEntry(
             id = UUID.randomUUID(),
+            idempotencyKey = "idem_test",
             aggregateType = AggregateType.RAW_DATA,
             aggregateId = "t:e",
             eventType = "Test",
@@ -199,6 +243,7 @@ class OutboxEntryTest {
     fun `canRetry - MAX_RETRY_COUNT 이상이면 false`() {
         val entry = OutboxEntry(
             id = UUID.randomUUID(),
+            idempotencyKey = "idem_test",
             aggregateType = AggregateType.RAW_DATA,
             aggregateId = "t:e",
             eventType = "Test",
@@ -215,6 +260,7 @@ class OutboxEntryTest {
     fun `resetToPending - 재시도 가능하면 PENDING으로 전환`() {
         val entry = OutboxEntry(
             id = UUID.randomUUID(),
+            idempotencyKey = "idem_test",
             aggregateType = AggregateType.RAW_DATA,
             aggregateId = "t:e",
             eventType = "Test",
@@ -234,6 +280,7 @@ class OutboxEntryTest {
     fun `resetToPending - MAX_RETRY_COUNT 초과시 예외`() {
         val entry = OutboxEntry(
             id = UUID.randomUUID(),
+            idempotencyKey = "idem_test",
             aggregateType = AggregateType.RAW_DATA,
             aggregateId = "t:e",
             eventType = "Test",

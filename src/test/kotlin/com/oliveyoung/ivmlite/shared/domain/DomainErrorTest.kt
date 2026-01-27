@@ -18,6 +18,7 @@ class DomainErrorTest {
             DomainError.ContractIntegrityError("contract-1", "abc", "def"),
             DomainError.ContractStatusError("contract-2", ContractStatus.DRAFT),
             DomainError.ValidationError("field", "msg"),
+            DomainError.ConfigError("config validation failed"),
             DomainError.NotFoundError("Entity", "key-1"),
             DomainError.IdempotencyViolation("duplicate"),
             DomainError.StorageError("db error"),
@@ -158,6 +159,7 @@ class DomainErrorTest {
             DomainError.ContractIntegrityError("c-1", "abc", "def"),
             DomainError.ContractStatusError("c-2", ContractStatus.ARCHIVED),
             DomainError.ValidationError("f", "m"),
+            DomainError.ConfigError("config error"),
             DomainError.NotFoundError("e", "k"),
             DomainError.IdempotencyViolation("i"),
             DomainError.StorageError("s"),
@@ -171,6 +173,7 @@ class DomainErrorTest {
                 is DomainError.ContractIntegrityError -> "CONTRACT_INTEGRITY"
                 is DomainError.ContractStatusError -> "CONTRACT_STATUS"
                 is DomainError.ValidationError -> "VALIDATION"
+                is DomainError.ConfigError -> "CONFIG"
                 is DomainError.NotFoundError -> "NOT_FOUND"
                 is DomainError.IdempotencyViolation -> "IDEMPOTENCY"
                 is DomainError.StorageError -> "STORAGE"

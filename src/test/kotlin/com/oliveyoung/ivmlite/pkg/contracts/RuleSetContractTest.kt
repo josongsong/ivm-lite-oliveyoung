@@ -9,6 +9,7 @@ import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockk
@@ -514,6 +515,320 @@ class RuleSetContractTest : StringSpec({
         result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
         val contract = (result as ContractRegistryPort.Result.Ok).value
         contract.impactMap shouldBe emptyMap()
+    }
+
+    // ==================== RFC-IMPL-013: indexes 파싱 테스트 ====================
+
+    "DynamoDB - indexes 파싱 검증 (type, selector)" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
+            "indexes": [
+                {"type": "brand", "selector": "$.brand"},
+                {"type": "category", "selector": "$.categoryId"}
+            ]
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        val contract = (result as ContractRegistryPort.Result.Ok).value
+        contract.indexes.size shouldBe 2
+        contract.indexes[0].type shouldBe "brand"
+        contract.indexes[0].selector shouldBe "$.brand"
+        contract.indexes[1].type shouldBe "category"
+        contract.indexes[1].selector shouldBe "$.categoryId"
+    }
+
+    "DynamoDB - indexes.references 파싱 검증 (역방향 인덱스용)" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
+            "indexes": [
+                {"type": "brand", "selector": "$.brand", "references": "BRAND"},
+                {"type": "tag", "selector": "$.tags[*]"}
+            ]
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        val contract = (result as ContractRegistryPort.Result.Ok).value
+        contract.indexes.size shouldBe 2
+        
+        // references가 있는 인덱스 → 역방향 인덱스 자동 생성
+        contract.indexes[0].references shouldBe "BRAND"
+        
+        // references가 없는 인덱스 → 정방향만 생성
+        contract.indexes[1].references shouldBe null
+    }
+
+    "DynamoDB - indexes.maxFanout 파싱 검증 (기본값 포함)" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
+            "indexes": [
+                {"type": "brand", "selector": "$.brand", "references": "BRAND", "maxFanout": 5000},
+                {"type": "category", "selector": "$.categoryId", "references": "CATEGORY"}
+            ]
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        val contract = (result as ContractRegistryPort.Result.Ok).value
+        contract.indexes.size shouldBe 2
+        
+        // 명시적 maxFanout
+        contract.indexes[0].maxFanout shouldBe 5000
+        
+        // 기본값 (10000)
+        contract.indexes[1].maxFanout shouldBe 10000
+    }
+
+    "DynamoDB - indexes 배열이 잘못된 형식 (객체가 아닌 문자열) → ContractError" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
+            "indexes": "invalid"  // 배열이 아닌 문자열
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+    }
+
+    "DynamoDB - indexes의 필수 필드 누락 (type 없음) → ContractError" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
+            "indexes": [
+                {"selector": "$.brand"}  // type 누락
+            ]
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+    }
+
+    "DynamoDB - indexes의 필수 필드 누락 (selector 없음) → ContractError" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
+            "indexes": [
+                {"type": "brand"}  // selector 누락
+            ]
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+    }
+
+    "DynamoDB - indexes.maxFanout이 음수 → 파싱은 성공하지만 런타임 검증 필요" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
+            "indexes": [
+                {"type": "brand", "selector": "$.brand", "maxFanout": -1}
+            ]
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        // 파싱은 성공 (음수도 int로 파싱 가능)
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        val contract = (result as ContractRegistryPort.Result.Ok).value
+        contract.indexes.size shouldBe 1
+        // 음수 값이 그대로 저장됨 (런타임 검증은 FanoutConfig에서 수행)
+        contract.indexes[0].maxFanout shouldBe -1
+    }
+
+    "DynamoDB - indexes 빈 배열 → 정상 로드 (빈 리스트)" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
+            "indexes": []
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        val contract = (result as ContractRegistryPort.Result.Ok).value
+        contract.indexes shouldBe emptyList()
+    }
+
+    "DynamoDB - indexes 필드 없음 → 기본값 (빈 리스트)" {
+        val dataJson = """{
+            "entityType": "PRODUCT",
+            "impactMap": {},
+            "joins": [],
+            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
+        }"""
+
+        val responseItem = mapOf(
+            "id" to attr("ruleset.v1"),
+            "version" to attr("1.0.0"),
+            "kind" to attr("RULESET"),
+            "status" to attr("ACTIVE"),
+            "data" to attr(dataJson),
+        )
+
+        val mockClient = createMockClient(responseItem)
+        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
+        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        val contract = (result as ContractRegistryPort.Result.Ok).value
+        contract.indexes shouldBe emptyList()
+    }
+
+    "LocalYaml - indexes.references 파싱 검증" {
+        val adapter = LocalYamlContractRegistryAdapter()
+        val ref = ContractRef("ruleset.core.v1", SemVer.parse("1.0.0"))
+
+        val result = adapter.loadRuleSetContract(ref)
+
+        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        val contract = (result as ContractRegistryPort.Result.Ok).value
+        
+        // ruleset.v1.yaml에 정의된 indexes 확인
+        contract.indexes.isNotEmpty() shouldBe true
+        
+        // brand 인덱스: references=BRAND
+        val brandIndex = contract.indexes.firstOrNull { it.type == "brand" }
+        brandIndex shouldNotBe null
+        brandIndex!!.references shouldBe "BRAND"
+        brandIndex.maxFanout shouldBe 10000
+        
+        // category 인덱스: references=CATEGORY
+        val categoryIndex = contract.indexes.firstOrNull { it.type == "category" }
+        categoryIndex shouldNotBe null
+        categoryIndex!!.references shouldBe "CATEGORY"
+        categoryIndex.maxFanout shouldBe 50000
+        
+        // tag 인덱스: references=null (검색용만)
+        val tagIndex = contract.indexes.firstOrNull { it.type == "tag" }
+        tagIndex shouldNotBe null
+        tagIndex!!.references shouldBe null
     }
 
     "DynamoDB - 알 수 없는 SliceType → ContractError" {

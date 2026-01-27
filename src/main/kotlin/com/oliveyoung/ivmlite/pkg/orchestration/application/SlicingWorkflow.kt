@@ -49,11 +49,17 @@ class SlicingWorkflow(
 
     /**
      * FULL 슬라이싱: 전체 Slice 재생성
+     * 
+     * @param tenantId 테넌트 ID
+     * @param entityKey 엔티티 키
+     * @param version 데이터 버전
+     * @param ruleSetRef RuleSet 참조 (기본값: V1_RULESET_REF)
      */
     suspend fun execute(
         tenantId: TenantId,
         entityKey: EntityKey,
         version: Long,
+        ruleSetRef: ContractRef = V1_RULESET_REF,
     ): Result<List<SliceRepositoryPort.SliceKey>> {
         return tracer.withSpanSuspend(
             "SlicingWorkflow.execute",
@@ -62,6 +68,7 @@ class SlicingWorkflow(
                 "entity_key" to entityKey.value,
                 "version" to version.toString(),
                 "mode" to "FULL",
+                "ruleset_ref" to ruleSetRef.id,
             ),
         ) {
             val raw = when (val r = rawRepo.get(tenantId, entityKey, version)) {
@@ -70,7 +77,7 @@ class SlicingWorkflow(
             }
 
             // RFC-IMPL-010 D-3: SlicingEngine을 사용하여 RuleSet 기반 슬라이싱
-            val slicingResult: SlicingEngine.SlicingResult = when (val r = slicingEngine.slice(raw, V1_RULESET_REF)) {
+            val slicingResult: SlicingEngine.SlicingResult = when (val r = slicingEngine.slice(raw, ruleSetRef)) {
                 is SlicingEngine.Result.Ok -> r.value
                 is SlicingEngine.Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
@@ -141,7 +148,7 @@ class SlicingWorkflow(
         ) {
             // 1. 첫 버전이면 무조건 FULL (이전 버전 없음)
             if (version <= 1L) {
-                return@withSpanSuspend execute(tenantId, entityKey, version)
+                return@withSpanSuspend execute(tenantId, entityKey, version, ruleSetRef)
             }
 
             // 2. 이전 버전(version-1) 존재 여부 확인
@@ -159,7 +166,7 @@ class SlicingWorkflow(
             if (hasPreviousVersion) {
                 executeIncremental(tenantId, entityKey, fromVersion, version, ruleSetRef)
             } else {
-                execute(tenantId, entityKey, version)
+                execute(tenantId, entityKey, version, ruleSetRef)
             }
         }
     }
@@ -245,25 +252,35 @@ class SlicingWorkflow(
             }
 
             // 7. 기존 Slice 중 영향 없는 것 버전 올려서 유지
+            // NOTE: NotFoundError는 첫 버전일 때 발생 가능 - emptyList로 처리
+            // 다른 에러(StorageError 등)는 전파해야 함
             val existingSlices = when (val r = sliceRepo.getByVersion(tenantId, entityKey, fromVersion)) {
                 is SliceRepositoryPort.Result.Ok -> r.value
-                is SliceRepositoryPort.Result.Err -> emptyList()
+                is SliceRepositoryPort.Result.Err -> when (r.error) {
+                    is DomainError.NotFoundError -> emptyList()
+                    else -> return@withSpanSuspend Result.Err(r.error)
+                }
             }
             val unchangedSlices = existingSlices
                 .filter { it.sliceType !in impactedTypes }
                 .map { it.copy(version = toVersion) }
 
             // 8. tombstone 처리: impactedTypes에 있지만 newSlices에 없는 경우
+            // RFC-IMPL-010 D-1: tombstone의 hash는 결정적이어야 함 (version + type 기반)
             val newTypes = slicingResult.slices.map { it.sliceType }.toSet()
             val tombstoneTypes = impactedTypes - newTypes
             val tombstones = tombstoneTypes.map { type ->
+                // tombstone hash: 결정적 생성 (version + sliceType + entityKey)
+                val tombstoneHash = com.oliveyoung.ivmlite.shared.domain.determinism.Hashing.sha256Tagged(
+                    "TOMBSTONE:${entityKey.value}:${type.name}:v$toVersion"
+                )
                 com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord(
                     tenantId = tenantId,
                     entityKey = entityKey,
                     version = toVersion,
                     sliceType = type,
-                    data = "",
-                    hash = "",
+                    data = "{\"__tombstone\":true}",  // 빈 데이터 대신 마커
+                    hash = tombstoneHash,
                     ruleSetId = ruleSet.meta.id,
                     ruleSetVersion = ruleSet.meta.version,
                     tombstone = Tombstone.create(toVersion, DeleteReason.VALIDATION_FAIL),
@@ -278,7 +295,10 @@ class SlicingWorkflow(
             }
 
             // 10. Inverted Indexes 저장
-            when (val r = invertedIndexRepo.putAllIdempotent(slicingResult.indexes)) {
+            // NOTE: tombstone slice의 index는 InvertedIndexBuilder에서 tombstone=true로 생성됨
+            // (slice.tombstone?.isDeleted ?: false 참조)
+            val allIndexes = slicingResult.indexes
+            when (val r = invertedIndexRepo.putAllIdempotent(allIndexes)) {
                 is InvertedIndexRepositoryPort.Result.Ok -> Unit
                 is InvertedIndexRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }

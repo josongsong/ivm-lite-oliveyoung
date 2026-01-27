@@ -16,10 +16,10 @@ import kotlinx.serialization.json.JsonObject
  * Ivm.query("product.pdp").key("SKU-001").get()
  * 
  * // ViewRef 사용 (타입 세이프)
- * Ivm.query(Views.Product.pdp).key("SKU-001").get()
+ * Ivm.query(Views.Product.Pdp).key("SKU-001").get()
  * 
  * // 더 간결하게
- * Views.Product.pdp.query().key("SKU-001").get()
+ * Views.Product.Pdp.query().key("SKU-001").get()
  * ```
  * 
  * @param T 이 View의 결과 타입 (TypedViewResult<T>로 사용)
@@ -43,7 +43,7 @@ open class ViewRef<T : Any>(
      * 
      * @example
      * ```kotlin
-     * Views.Product.pdp.query()
+     * Views.Product.Pdp.query()
      *     .key("SKU-001")
      *     .get()
      * ```
@@ -72,7 +72,7 @@ open class ViewRef<T : Any>(
      * 
      * @example
      * ```kotlin
-     * val view = Views.Product.pdp["SKU-001"]
+     * val view = Views.Product.Pdp["SKU-001"]
      * ```
      */
     operator fun get(entityKey: String): QueryBuilder {
@@ -91,19 +91,9 @@ open class ViewRef<T : Any>(
 }
 
 /**
- * 타입 세이프하지 않은 간단한 View 참조 (String viewId만)
- */
-class SimpleViewRef(viewId: String) : ViewRef<JsonObject>(viewId)
-
-/**
  * View 참조 생성 헬퍼
  */
 object ViewRefs {
-    /**
-     * 문자열에서 ViewRef 생성
-     */
-    fun of(viewId: String): ViewRef<JsonObject> = SimpleViewRef(viewId)
-    
     /**
      * 타입 세이프한 ViewRef 생성
      */

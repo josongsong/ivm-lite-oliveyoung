@@ -1,5 +1,13 @@
 import org.jooq.meta.jaxb.Logging
 
+buildscript {
+    repositories { mavenCentral() }
+    dependencies {
+        classpath("org.flywaydb:flyway-database-postgresql:10.10.0")
+        classpath("org.postgresql:postgresql:42.7.3")
+    }
+}
+
 plugins {
     kotlin("jvm") version "1.9.25"
     kotlin("plugin.serialization") version "1.9.25"
@@ -26,7 +34,7 @@ val testcontainersVersion = "1.21.3"
 // ============================================
 // Database Configuration (로컬 개발용)
 // ============================================
-val dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/ivmlite"
+val dbUrl = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5433/ivmlite"
 val dbUser = System.getenv("DB_USER") ?: "ivm"
 val dbPassword = System.getenv("DB_PASSWORD") ?: "ivm_local_dev"
 
@@ -43,6 +51,9 @@ dependencies {
     // Jackson (for CanonicalJson - RFC8785 compatibility)
     implementation("com.fasterxml.jackson.core:jackson-databind:2.17.2")
     implementation("com.fasterxml.jackson.module:jackson-module-kotlin:2.17.2")
+
+    // TSID Creator (Snowflake-like ID generation - SOTA)
+    implementation("com.github.f4b6a3:tsid-creator:5.2.6")
 
     // ============================================
     // HTTP Server (Ktor) - RFC-IMPL-009: Netty 고정
@@ -324,6 +335,14 @@ application {
     mainClass.set("com.oliveyoung.ivmlite.apps.runtimeapi.ApplicationKt")
 }
 
+// Playground 실행용
+tasks.register<JavaExec>("runPlayground") {
+    group = "application"
+    description = "Run RawdataToSliceToOpenSearchPlayground"
+    mainClass.set("com.oliveyoung.ivmlite.apps.playground.RawdataToSliceToOpenSearchPlaygroundKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+}
+
 // Detekt configuration
 detekt {
     buildUponDefaultConfig = true
@@ -352,4 +371,9 @@ tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
 tasks.withType<JavaCompile> {
     sourceCompatibility = "17"
     targetCompatibility = "17"
+}
+
+// Application 설정
+application {
+    mainClass.set("com.oliveyoung.ivmlite.apps.opscli.OpsCliAppKt")
 }

@@ -473,15 +473,10 @@ class QueryBuilder internal constructor(
         sortOrder: SortOrder,
         options: QueryOptions
     ): QueryResultPage {
-        // TODO: Range query는 SliceRepositoryPort.findByKeyPrefix 등 추가 구현 필요
-        // 현재는 스텁
-        return QueryResultPage(
-            items = emptyList(),
-            totalCount = 0,
-            hasMore = false,
-            nextCursor = null,
-            queryTimeMs = 1L
-        )
+        // 동기 버전: blocking으로 실행 (deprecated, async 사용 권장)
+        return kotlinx.coroutines.runBlocking {
+            executeRangeQueryAsync(tenantId, rangeSpec, limit, cursor, sortOrder, options)
+        }
     }
 
     private suspend fun executeRangeQueryAsync(
@@ -492,7 +487,71 @@ class QueryBuilder internal constructor(
         sortOrder: SortOrder,
         options: QueryOptions
     ): QueryResultPage {
-        return executeRangeQuery(tenantId, rangeSpec, limit, cursor, sortOrder, options)
+        val startTime = System.currentTimeMillis()
+        
+        val workflow = com.oliveyoung.ivmlite.sdk.Ivm.getQueryWorkflow()
+        if (workflow == null) {
+            // Workflow 없으면 빈 결과 반환
+            return QueryResultPage(
+                items = emptyList(),
+                totalCount = 0,
+                hasMore = false,
+                nextCursor = null,
+                queryTimeMs = System.currentTimeMillis() - startTime
+            )
+        }
+        
+        val keyPrefix = rangeSpec?.keyPrefix ?: ""
+        val sliceType = options.projections.firstOrNull()?.let { 
+            try { 
+                com.oliveyoung.ivmlite.shared.domain.types.SliceType.fromDbValue(it) 
+            } catch (e: Exception) { 
+                null 
+            }
+        }
+        
+        val result = workflow.executeRange(
+            tenantId = com.oliveyoung.ivmlite.shared.domain.types.TenantId(tenantId),
+            keyPrefix = keyPrefix,
+            sliceType = sliceType,
+            limit = limit,
+            cursor = cursor
+        )
+        
+        return when (result) {
+            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Ok -> {
+                val rangeResult = result.value
+                QueryResultPage(
+                    items = rangeResult.items.map { item ->
+                        ViewResult(
+                            success = true,
+                            viewId = viewId,
+                            tenantId = tenantId,
+                            entityKey = item.entityKey,
+                            version = item.version,
+                            data = try {
+                                kotlinx.serialization.json.Json.parseToJsonElement(item.data).jsonObject
+                            } catch (e: Exception) {
+                                buildJsonObject { }
+                            }
+                        )
+                    },
+                    totalCount = rangeResult.totalCount,
+                    hasMore = rangeResult.hasMore,
+                    nextCursor = rangeResult.nextCursor,
+                    queryTimeMs = System.currentTimeMillis() - startTime
+                )
+            }
+            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Err -> {
+                QueryResultPage(
+                    items = emptyList(),
+                    totalCount = 0,
+                    hasMore = false,
+                    nextCursor = null,
+                    queryTimeMs = System.currentTimeMillis() - startTime
+                )
+            }
+        }
     }
 
     private fun executeCount(
@@ -500,8 +559,38 @@ class QueryBuilder internal constructor(
         rangeSpec: RangeSpec?,
         options: QueryOptions
     ): Long {
-        // TODO: SliceRepositoryPort.count 추가 구현 필요
-        return 0L
+        return kotlinx.coroutines.runBlocking {
+            executeCountAsync(tenantId, rangeSpec, options)
+        }
+    }
+    
+    private suspend fun executeCountAsync(
+        tenantId: String,
+        rangeSpec: RangeSpec?,
+        options: QueryOptions
+    ): Long {
+        val workflow = com.oliveyoung.ivmlite.sdk.Ivm.getQueryWorkflow()
+            ?: return 0L
+        
+        val keyPrefix = rangeSpec?.keyPrefix
+        val sliceType = options.projections.firstOrNull()?.let {
+            try {
+                com.oliveyoung.ivmlite.shared.domain.types.SliceType.fromDbValue(it)
+            } catch (e: Exception) {
+                null
+            }
+        }
+        
+        val result = workflow.executeCount(
+            tenantId = com.oliveyoung.ivmlite.shared.domain.types.TenantId(tenantId),
+            keyPrefix = keyPrefix,
+            sliceType = sliceType
+        )
+        
+        return when (result) {
+            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Ok -> result.value
+            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Err -> 0L
+        }
     }
 }
 

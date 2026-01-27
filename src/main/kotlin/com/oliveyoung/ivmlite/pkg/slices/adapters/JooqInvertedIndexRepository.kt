@@ -224,7 +224,91 @@ class JooqInvertedIndexRepository(
     }
 
     /**
-     * 인덱스 타입 및 값으로 조회
+     * RFC-IMPL-012: Fanout을 위한 역참조 조회
+     */
+    override suspend fun queryByIndexType(
+        tenantId: TenantId,
+        indexType: String,
+        indexValue: String,
+        limit: Int,
+        cursor: String?,
+    ): InvertedIndexRepositoryPort.Result<com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult> = withContext(Dispatchers.IO) {
+        try {
+            // 조건 구성
+            var condition = TENANT_ID.eq(tenantId.value)
+                .and(INDEX_TYPE.eq(indexType))
+                .and(INDEX_VALUE.eq(indexValue.lowercase()))
+                .and(IS_TOMBSTONE.eq(false).or(IS_TOMBSTONE.isNull))
+            
+            // 커서 기반 페이지네이션
+            if (cursor != null) {
+                condition = condition.and(ENTITY_KEY.gt(cursor))
+            }
+            
+            val rows = dsl.selectFrom(TABLE)
+                .where(condition)
+                .orderBy(ENTITY_KEY, SLICE_VERSION)
+                .limit(limit + 1)  // +1 for next cursor detection
+                .fetch()
+            
+            val hasMore = rows.size > limit
+            val resultRows = if (hasMore) rows.dropLast(1) else rows
+            
+            val entries = resultRows.mapNotNull { row ->
+                try {
+                    val entityKeyValue = row.get(ENTITY_KEY) ?: return@mapNotNull null
+                    val refVersionValue = row.get(SLICE_VERSION) ?: row.get(REF_VERSION) ?: return@mapNotNull null
+                    
+                    com.oliveyoung.ivmlite.pkg.slices.ports.FanoutTarget(
+                        entityKey = EntityKey(entityKeyValue),
+                        currentVersion = refVersionValue,
+                    )
+                } catch (e: Exception) {
+                    null
+                }
+            }.distinctBy { it.entityKey.value }
+            
+            val nextCursor = if (hasMore) entries.lastOrNull()?.entityKey?.value else null
+            
+            InvertedIndexRepositoryPort.Result.Ok(
+                com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult(entries, nextCursor)
+            )
+        } catch (e: Exception) {
+            logger.error("Failed to queryByIndexType", e)
+            InvertedIndexRepositoryPort.Result.Err(
+                DomainError.StorageError("Failed to queryByIndexType: ${e.message}")
+            )
+        }
+    }
+
+    /**
+     * RFC-IMPL-012: Fanout 대상 수 조회
+     */
+    override suspend fun countByIndexType(
+        tenantId: TenantId,
+        indexType: String,
+        indexValue: String,
+    ): InvertedIndexRepositoryPort.Result<Long> = withContext(Dispatchers.IO) {
+        try {
+            val count = dsl.selectCount()
+                .from(TABLE)
+                .where(TENANT_ID.eq(tenantId.value))
+                .and(INDEX_TYPE.eq(indexType))
+                .and(INDEX_VALUE.eq(indexValue.lowercase()))
+                .and(IS_TOMBSTONE.eq(false).or(IS_TOMBSTONE.isNull))
+                .fetchOne(0, Long::class.java) ?: 0L
+            
+            InvertedIndexRepositoryPort.Result.Ok(count)
+        } catch (e: Exception) {
+            logger.error("Failed to countByIndexType", e)
+            InvertedIndexRepositoryPort.Result.Err(
+                DomainError.StorageError("Failed to countByIndexType: ${e.message}")
+            )
+        }
+    }
+
+    /**
+     * 인덱스 타입 및 값으로 조회 (레거시 호환)
      */
     suspend fun queryByIndex(
         tenantId: TenantId,

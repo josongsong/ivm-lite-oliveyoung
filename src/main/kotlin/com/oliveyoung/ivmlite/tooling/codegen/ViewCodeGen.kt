@@ -218,6 +218,8 @@ object ViewCodeGen {
     
     /**
      * GeneratedViews.kt 파일 내용 생성
+     * 
+     * 모든 View는 대문자로 시작하며 타입 세이프한 결과를 반환합니다.
      */
     private fun generateViewsObject(contracts: List<ViewContractInfo>, packageName: String): String {
         val groupedByDomain = contracts.groupBy { it.domain }
@@ -235,12 +237,16 @@ object ViewCodeGen {
             appendLine("/**")
             appendLine(" * Auto-generated View references from Contract YAML")
             appendLine(" * ")
+            appendLine(" * 모든 View는 대문자로 시작하며 타입 세이프한 결과를 반환합니다.")
+            appendLine(" * ")
             appendLine(" * @example")
             appendLine(" * ```kotlin")
             appendLine(" * // 타입 세이프 조회")
-            appendLine(" * val view = Ivm.query(GeneratedViews.Product.pdp)")
+            appendLine(" * val product: ProductPdpData = Ivm.query(GeneratedViews.Product.Pdp)")
             appendLine(" *     .key(\"SKU-001\")")
             appendLine(" *     .get()")
+            appendLine(" * ")
+            appendLine(" * println(product.name)  // IDE 자동완성 지원")
             appendLine(" * ```")
             appendLine(" */")
             appendLine("object GeneratedViews {")
@@ -251,18 +257,22 @@ object ViewCodeGen {
                 
                 domainContracts.forEach { contract ->
                     val slicesLiteral = contract.allSlices.joinToString(", ") { "\"$it\"" }
+                    val viewClassName = contract.viewName.capitalize()
+                    val dataClassName = "${domain.capitalize()}${viewClassName}Data"
+                    
                     appendLine("        /**")
-                    appendLine("         * ${contract.viewName.capitalize()} View")
+                    appendLine("         * $viewClassName View")
                     appendLine("         * ")
                     appendLine("         * - ID: ${contract.id}")
                     appendLine("         * - Version: ${contract.version}")
                     appendLine("         * - Slices: ${contract.allSlices.joinToString(", ")}")
                     appendLine("         * - Source: ${contract.sourceFile}")
                     appendLine("         */")
-                    appendLine("        val ${contract.viewName} = ViewRef<JsonObject>(")
+                    appendLine("        object $viewClassName : ViewRef<$dataClassName>(")
                     appendLine("            viewId = \"${contract.domain}.${contract.viewName}\",")
                     appendLine("            slices = listOf($slicesLiteral),")
-                    appendLine("            description = \"${contract.viewName.capitalize()} View (auto-generated)\"")
+                    appendLine("            description = \"$viewClassName View (auto-generated)\",")
+                    appendLine("            resultParser = { json -> $dataClassName.fromJson(json) }")
                     appendLine("        )")
                     appendLine()
                 }
@@ -276,7 +286,7 @@ object ViewCodeGen {
             appendLine("    val all: List<ViewRef<*>> = listOf(")
             contracts.forEachIndexed { index, contract ->
                 val comma = if (index < contracts.size - 1) "," else ""
-                appendLine("        ${contract.domain.capitalize()}.${contract.viewName}$comma")
+                appendLine("        ${contract.domain.capitalize()}.${contract.viewName.capitalize()}$comma")
             }
             appendLine("    )")
             appendLine()

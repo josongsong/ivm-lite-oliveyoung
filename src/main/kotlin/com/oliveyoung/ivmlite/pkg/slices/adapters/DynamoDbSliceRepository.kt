@@ -12,6 +12,7 @@ import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import kotlinx.coroutines.future.await
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.*
+import software.amazon.awssdk.services.dynamodb.model.Select
 
 /**
  * DynamoDB 기반 Slice Repository
@@ -247,6 +248,134 @@ class DynamoDbSliceRepository(
             throw DomainError.StorageError("Invalid SliceType or SemVer in DynamoDB item: ${e.message}")
         } catch (e: Exception) {
             throw DomainError.StorageError("Failed to parse SliceRecord from DynamoDB item: ${e.message}")
+        }
+    }
+
+    override suspend fun findByKeyPrefix(
+        tenantId: TenantId,
+        keyPrefix: String,
+        sliceType: SliceType?,
+        limit: Int,
+        cursor: String?
+    ): SliceRepositoryPort.Result<SliceRepositoryPort.RangeQueryResult> {
+        return try {
+            val pkPrefix = "TENANT#${tenantId.value}#ENTITY#$keyPrefix"
+            
+            val requestBuilder = QueryRequest.builder()
+                .tableName(tableName)
+                .keyConditionExpression("begins_with(PK, :pk)")
+                .expressionAttributeValues(
+                    mapOf(":pk" to AttributeValue.builder().s(pkPrefix).build())
+                )
+                .limit(limit + 1)
+            
+            cursor?.let { 
+                // 간단한 커서 파싱 (실제로는 lastEvaluatedKey 사용)
+                requestBuilder.exclusiveStartKey(mapOf(
+                    "PK" to AttributeValue.builder().s(it.split("|")[0]).build(),
+                    "SK" to AttributeValue.builder().s(it.split("|").getOrElse(1) { "" }).build()
+                ))
+            }
+            
+            val response = dynamoClient.query(requestBuilder.build()).await()
+            
+            val items = response.items().mapNotNull { item ->
+                try {
+                    val record = parseSliceRecord(item)
+                    if (sliceType == null || record.sliceType == sliceType) {
+                        if (record.tombstone == null) record else null
+                    } else null
+                } catch (e: Exception) { null }
+            }
+            
+            val hasMore = items.size > limit
+            val resultItems = if (hasMore) items.take(limit) else items
+            val nextCursor = if (hasMore && resultItems.isNotEmpty()) {
+                val last = response.lastEvaluatedKey()
+                "${last["PK"]?.s()}|${last["SK"]?.s()}"
+            } else null
+            
+            SliceRepositoryPort.Result.Ok(SliceRepositoryPort.RangeQueryResult(
+                items = resultItems,
+                nextCursor = nextCursor,
+                hasMore = hasMore
+            ))
+        } catch (e: Exception) {
+            SliceRepositoryPort.Result.Err(DomainError.StorageError("DynamoDB findByKeyPrefix failed: ${e.message}"))
+        }
+    }
+
+    override suspend fun count(
+        tenantId: TenantId,
+        keyPrefix: String?,
+        sliceType: SliceType?
+    ): SliceRepositoryPort.Result<Long> {
+        return try {
+            val pkPattern = if (keyPrefix != null) {
+                "TENANT#${tenantId.value}#ENTITY#$keyPrefix"
+            } else {
+                "TENANT#${tenantId.value}#ENTITY#"
+            }
+            
+            val response = dynamoClient.query {
+                it.tableName(tableName)
+                it.keyConditionExpression("begins_with(PK, :pk)")
+                it.expressionAttributeValues(
+                    mapOf(":pk" to AttributeValue.builder().s(pkPattern).build())
+                )
+                it.select(Select.COUNT)
+            }.await()
+            
+            SliceRepositoryPort.Result.Ok(response.count().toLong())
+        } catch (e: Exception) {
+            SliceRepositoryPort.Result.Err(DomainError.StorageError("DynamoDB count failed: ${e.message}"))
+        }
+    }
+
+    override suspend fun getLatestVersion(
+        tenantId: TenantId,
+        entityKey: EntityKey,
+        sliceType: SliceType?
+    ): SliceRepositoryPort.Result<List<SliceRecord>> {
+        return try {
+            val pk = buildPK(tenantId, entityKey)
+            
+            // SK 역순으로 조회하여 최신 버전 가져오기
+            val response = dynamoClient.query {
+                it.tableName(tableName)
+                it.keyConditionExpression("PK = :pk AND begins_with(SK, :sk)")
+                it.expressionAttributeValues(
+                    mapOf(
+                        ":pk" to AttributeValue.builder().s(pk).build(),
+                        ":sk" to AttributeValue.builder().s("SLICE#").build()
+                    )
+                )
+                it.scanIndexForward(false)  // 역순
+                it.limit(10)  // 최대 10개 SliceType
+            }.await()
+            
+            if (response.items().isEmpty()) {
+                return SliceRepositoryPort.Result.Ok(emptyList())
+            }
+            
+            val allSlices = response.items().mapNotNull { item ->
+                try {
+                    val record = parseSliceRecord(item)
+                    if (record.tombstone == null) record else null
+                } catch (e: Exception) { null }
+            }
+            
+            if (allSlices.isEmpty()) {
+                return SliceRepositoryPort.Result.Ok(emptyList())
+            }
+            
+            val latestVersion = allSlices.maxOf { it.version }
+            val result = allSlices.filter { it.version == latestVersion }
+                .filter { sliceType == null || it.sliceType == sliceType }
+            
+            SliceRepositoryPort.Result.Ok(result)
+        } catch (e: Exception) {
+            SliceRepositoryPort.Result.Err(DomainError.StorageError("DynamoDB getLatestVersion failed: ${e.message}"))
         }
     }
 

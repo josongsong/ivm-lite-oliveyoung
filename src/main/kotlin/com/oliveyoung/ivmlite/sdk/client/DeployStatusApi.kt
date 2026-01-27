@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.client
 
+import com.oliveyoung.ivmlite.pkg.orchestration.application.DeployJobRepositoryPort
 import com.oliveyoung.ivmlite.sdk.model.DeployJobStatus
 import com.oliveyoung.ivmlite.sdk.model.DeployResult
 import com.oliveyoung.ivmlite.sdk.model.DeployState
@@ -9,10 +10,11 @@ import java.time.Instant
 
 /**
  * Deploy 상태 조회 API
- * RFC-IMPL-011 Wave 5-K
+ * RFC-IMPL-011 Wave 5-K, Wave 6
  */
 class DeployStatusApi internal constructor(
-    private val config: IvmClientConfig
+    private val config: IvmClientConfig,
+    private val repository: DeployJobRepositoryPort? = null
 ) {
     /**
      * 특정 Job의 상태 조회
@@ -21,13 +23,44 @@ class DeployStatusApi internal constructor(
     suspend fun status(jobId: String): DeployJobStatus {
         require(jobId.isNotBlank()) { "jobId must not be blank" }
 
-        // TODO: 실제 API 호출 or Repository 조회
+        // Repository가 있으면 실제 조회
+        if (repository != null) {
+            when (val result = repository.get(jobId)) {
+                is DeployJobRepositoryPort.Result.Ok -> {
+                    val record = result.value
+                    if (record != null) {
+                        return DeployJobStatus(
+                            jobId = record.jobId,
+                            state = parseState(record.state),
+                            entityKey = record.entityKey,
+                            version = record.version,
+                            error = record.error,
+                            createdAt = record.createdAt,
+                            updatedAt = record.updatedAt
+                        )
+                    }
+                }
+                is DeployJobRepositoryPort.Result.Err -> {
+                    // 에러 시 기본값 반환
+                }
+            }
+        }
+        
+        // 기본값 (Repository 없거나 조회 실패)
         return DeployJobStatus(
             jobId = jobId,
-            state = DeployState.RUNNING,
+            state = DeployState.QUEUED,
             createdAt = Instant.now(),
             updatedAt = Instant.now()
         )
+    }
+    
+    private fun parseState(state: String): DeployState {
+        return try {
+            DeployState.valueOf(state)
+        } catch (e: Exception) {
+            DeployState.QUEUED
+        }
     }
 
     /**

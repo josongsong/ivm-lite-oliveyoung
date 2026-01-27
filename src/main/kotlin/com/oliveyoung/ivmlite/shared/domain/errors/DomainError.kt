@@ -39,6 +39,12 @@ sealed class DomainError(message: String) : RuntimeException(message) {
         override fun toHttpStatus(): Int = 400
     }
 
+    /** 설정 검증 실패 (SOTA급 설정 검증) */
+    data class ConfigError(val msg: String) : DomainError("Configuration validation failed: $msg") {
+        override val errorCode: String = "ERR_CONFIG"
+        override fun toHttpStatus(): Int = 500
+    }
+
     // ==================== 저장소 ====================
 
     /** 엔티티 조회 실패 */

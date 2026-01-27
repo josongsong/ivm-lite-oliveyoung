@@ -56,6 +56,90 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
         return SliceRepositoryPort.Result.Ok(result)
     }
 
+    override suspend fun findByKeyPrefix(
+        tenantId: TenantId,
+        keyPrefix: String,
+        sliceType: SliceType?,
+        limit: Int,
+        cursor: String?,
+    ): SliceRepositoryPort.Result<SliceRepositoryPort.RangeQueryResult> {
+        // 커서 파싱 (형식: entityKey|version)
+        val startKey = cursor?.let {
+            val parts = it.split("|")
+            if (parts.size >= 2) Pair(parts[0], parts[1].toLongOrNull() ?: 0L) else null
+        }
+        
+        val filtered = store.values
+            .filter { it.tenantId == tenantId }
+            .filter { it.entityKey.value.startsWith(keyPrefix) }
+            .filter { sliceType == null || it.sliceType == sliceType }
+            .filter { !it.isDeleted }
+            .sortedWith(compareBy({ it.entityKey.value }, { it.version }))
+            .let { list ->
+                if (startKey != null) {
+                    list.dropWhile { 
+                        it.entityKey.value < startKey.first || 
+                        (it.entityKey.value == startKey.first && it.version <= startKey.second) 
+                    }
+                } else {
+                    list
+                }
+            }
+        
+        val items = filtered.take(limit + 1)
+        val hasMore = items.size > limit
+        val resultItems = if (hasMore) items.dropLast(1) else items
+        
+        val nextCursor = if (hasMore && resultItems.isNotEmpty()) {
+            val last = resultItems.last()
+            "${last.entityKey.value}|${last.version}"
+        } else {
+            null
+        }
+        
+        return SliceRepositoryPort.Result.Ok(SliceRepositoryPort.RangeQueryResult(
+            items = resultItems,
+            nextCursor = nextCursor,
+            hasMore = hasMore
+        ))
+    }
+
+    override suspend fun count(
+        tenantId: TenantId,
+        keyPrefix: String?,
+        sliceType: SliceType?,
+    ): SliceRepositoryPort.Result<Long> {
+        val count = store.values
+            .filter { it.tenantId == tenantId }
+            .filter { keyPrefix == null || it.entityKey.value.startsWith(keyPrefix) }
+            .filter { sliceType == null || it.sliceType == sliceType }
+            .filter { !it.isDeleted }
+            .count()
+            .toLong()
+        
+        return SliceRepositoryPort.Result.Ok(count)
+    }
+
+    override suspend fun getLatestVersion(
+        tenantId: TenantId,
+        entityKey: EntityKey,
+        sliceType: SliceType?,
+    ): SliceRepositoryPort.Result<List<SliceRecord>> {
+        val allSlices = store.values
+            .filter { it.tenantId == tenantId && it.entityKey == entityKey }
+            .filter { sliceType == null || it.sliceType == sliceType }
+            .filter { !it.isDeleted }
+        
+        if (allSlices.isEmpty()) {
+            return SliceRepositoryPort.Result.Ok(emptyList())
+        }
+        
+        val latestVersion = allSlices.maxOf { it.version }
+        val result = allSlices.filter { it.version == latestVersion }
+        
+        return SliceRepositoryPort.Result.Ok(result)
+    }
+
     private fun key(t: TenantId, e: EntityKey, v: Long, st: SliceType): String =
         "${t.value}|${e.value}|$v|${st.toDbValue()}"
 
@@ -66,4 +150,7 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
     }
 
     fun size(): Int = store.size
+    
+    fun getAllByTenant(tenantId: TenantId): List<SliceRecord> =
+        store.values.filter { it.tenantId == tenantId }
 }

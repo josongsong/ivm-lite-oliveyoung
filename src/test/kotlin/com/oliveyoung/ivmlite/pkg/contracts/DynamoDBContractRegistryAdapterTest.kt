@@ -100,7 +100,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
         contract.meta.id shouldBe "join-spec.v1"
         contract.maxJoinDepth shouldBe 3
         contract.maxFanout shouldBe 5000
-        contract.invertedIndexRef.id shouldBe "inverted-index.v1"
+        // invertedIndexRef는 deprecated이므로 nullable 체크
+        contract.invertedIndexRef?.id shouldBe "inverted-index.v1"
     }
 
     "loadInvertedIndexContract - 성공" {

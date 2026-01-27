@@ -109,7 +109,14 @@ class DynamoDBContractRegistryAdapter(
         return result
     }
 
+    /**
+     * @deprecated InvertedIndexContract는 더 이상 사용되지 않습니다.
+     * RuleSet.indexes의 IndexSpec.references로 통합되었습니다.
+     */
+    @Deprecated("Use IndexSpec.references in RuleSet instead")
+    @Suppress("DEPRECATION")
     override suspend fun loadInvertedIndexContract(ref: ContractRef): ContractRegistryPort.Result<InvertedIndexContract> {
+        log.warn("loadInvertedIndexContract is deprecated. Use IndexSpec.references in RuleSet instead. ref={}", ref)
         val cacheKey = ContractCachePort.key("INVERTED_INDEX", ref.id, ref.version.toString())
 
         // 캐시 hit → 즉시 반환
@@ -495,7 +502,7 @@ class DynamoDBContractRegistryAdapter(
                 slices.add(SliceDefinition(type, buildRules, sliceJoins))
             }
 
-            // RFC-IMPL-010 Phase D-9: indexes 파싱 (GAP-C 해결)
+            // RFC-IMPL-010 Phase D-9: indexes 파싱 (통합 버전 - references/maxFanout 추가)
             val indexesJson = data["indexes"]?.jsonArray ?: emptyList()
             val indexes = mutableListOf<IndexSpec>()
             for (indexElement in indexesJson) {
@@ -510,7 +517,16 @@ class DynamoDBContractRegistryAdapter(
                     return err("index selector must start with '$': $selector for ${ref.id}")
                 }
 
-                indexes.add(IndexSpec(type = type, selector = selector))
+                // 통합 버전: references 및 maxFanout 파싱 (옵션)
+                val references = indexObj["references"]?.jsonPrimitive?.contentOrNull
+                val maxFanout = indexObj["maxFanout"]?.jsonPrimitive?.intOrNull ?: 10000
+
+                indexes.add(IndexSpec(
+                    type = type,
+                    selector = selector,
+                    references = references,
+                    maxFanout = maxFanout,
+                ))
             }
 
             ContractRegistryPort.Result.Ok(
@@ -837,6 +853,30 @@ class DynamoDBContractRegistryAdapter(
         )
     }
 
+    suspend fun saveChangeSetContract(
+        contract: ChangeSetContract
+    ): ContractRegistryPort.Result<Unit> {
+        return saveContract(
+            kind = "CHANGESET",
+            id = contract.meta.id,
+            version = contract.meta.version.toString(),
+            status = contract.meta.status,
+            data = buildChangeSetData(contract)
+        )
+    }
+
+    suspend fun saveJoinSpecContract(
+        contract: JoinSpecContract
+    ): ContractRegistryPort.Result<Unit> {
+        return saveContract(
+            kind = "JOIN_SPEC",
+            id = contract.meta.id,
+            version = contract.meta.version.toString(),
+            status = contract.meta.status,
+            data = buildJoinSpecData(contract)
+        )
+    }
+
     private suspend fun saveContract(
         kind: String,
         id: String,
@@ -962,6 +1002,45 @@ class DynamoDBContractRegistryAdapter(
                     }
                 })
             }
+        }.toString()
+    }
+
+    private fun buildChangeSetData(contract: ChangeSetContract): String {
+        return buildJsonObject {
+            put("identity", buildJsonObject {
+                put("entityKeyFormat", contract.entityKeyFormat)
+            })
+            put("payload", buildJsonObject {
+                put("externalizationPolicy", buildJsonObject {
+                    put("thresholdBytes", contract.externalizeThresholdBytes)
+                    put("prefer", "S3")
+                })
+            })
+            put("fanout", buildJsonObject {
+                put("enabled", contract.fanoutEnabled)
+            })
+        }.toString()
+    }
+
+    private fun buildJoinSpecData(contract: JoinSpecContract): String {
+        return buildJsonObject {
+            put("constraints", buildJsonObject {
+                put("allowedJoinTypes", buildJsonArray { add("LOOKUP") })
+                put("maxJoinDepth", contract.maxJoinDepth)
+                put("forbidJoinChain", true)
+                put("forbidCycles", true)
+                put("forbidNMJoin", true)
+                put("sourceCardinality", "SINGLE")
+                put("maxJoinTargetsPerSource", 1)
+                put("requireDeterministicResolution", true)
+            })
+            put("fanout", buildJsonObject {
+                put("invertedIndex", buildJsonObject {
+                    put("required", false)
+                    put("maxFanout", contract.maxFanout)
+                })
+                put("joinDepReason", "JOIN_DEP")
+            })
         }.toString()
     }
 }

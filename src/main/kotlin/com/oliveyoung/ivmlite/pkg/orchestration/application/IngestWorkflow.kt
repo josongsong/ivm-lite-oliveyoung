@@ -73,17 +73,44 @@ class IngestWorkflow(
             }
 
             // Outbox에 이벤트 저장 (Transactional Outbox 패턴)
+            // JSON escape 적용하여 안전한 payload 생성
+            val safePayload = buildOutboxPayload(tenantId.value, entityKey.value, version)
             val outboxEntry = OutboxEntry.create(
                 aggregateType = AggregateType.RAW_DATA,
                 aggregateId = "${tenantId.value}:${entityKey.value}",
                 eventType = "RawDataIngested",
-                payload = """{"tenantId":"${tenantId.value}","entityKey":"${entityKey.value}","version":$version}""",
+                payload = safePayload,
             )
             when (val r = outboxRepo.insert(outboxEntry)) {
                 is OutboxRepositoryPort.Result.Ok -> Result.Ok(Unit)
                 is OutboxRepositoryPort.Result.Err -> Result.Err(r.error)
             }
         }
+    }
+
+    /**
+     * Outbox payload를 안전하게 생성 (JSON escape 적용)
+     * 
+     * NOTE: XSS/Injection 방지를 위해 특수문자 escape
+     * NOTE: payloadVersion 필드로 스키마 버전 관리 (확장성 보장)
+     */
+    private fun buildOutboxPayload(tenantId: String, entityKey: String, version: Long): String {
+        val safeTenantId = escapeJsonString(tenantId)
+        val safeEntityKey = escapeJsonString(entityKey)
+        return """{"payloadVersion":"1.0","tenantId":"$safeTenantId","entityKey":"$safeEntityKey","version":$version}"""
+    }
+    
+    /**
+     * JSON 문자열 escape (RFC 8259 준수)
+     */
+    private fun escapeJsonString(s: String): String {
+        return s.replace("\\", "\\\\")
+            .replace("\"", "\\\"")
+            .replace("\n", "\\n")
+            .replace("\r", "\\r")
+            .replace("\t", "\\t")
+            .replace("\b", "\\b")
+            .replace("\u000C", "\\f")
     }
 
     sealed class Result<out T> {

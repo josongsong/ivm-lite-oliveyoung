@@ -18,7 +18,7 @@ services:
       POSTGRES_PASSWORD: ivm_local_dev
       POSTGRES_DB: ivmlite
     ports:
-      - "5432:5432"
+      - "5433:5432"  # 5433으로 변경 (기존 PostgreSQL과 충돌 방지)
     volumes:
       - postgres_data:/var/lib/postgresql/data
       - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
@@ -40,14 +40,13 @@ services:
     container_name: ivm-dynamodb
     ports:
       - "8000:8000"
-    command: "-jar DynamoDBLocal.jar -sharedDb -dbPath /data"
-    volumes:
-      - dynamodb_data:/data
+    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
     healthcheck:
       test: ["CMD-SHELL", "curl -s http://localhost:8000 || exit 1"]
       interval: 5s
       timeout: 5s
       retries: 5
+    # Note: -inMemory 모드 사용으로 재시작 시 데이터 소실됨 (로컬 테스트용)
 
   # ============================================
   # Kafka (KRaft mode - Zookeeper 없음)
@@ -123,10 +122,59 @@ services:
       - kafka
       - debezium
 
+  # ============================================
+  # OpenSearch - Slice Sink (검색 엔진)
+  # ============================================
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: ivm-opensearch
+    environment:
+      # Single-node mode (로컬 개발용)
+      discovery.type: single-node
+      # Disable security for local development
+      DISABLE_SECURITY_PLUGIN: "true"
+      # JVM heap size (최소 512MB 필요)
+      OPENSEARCH_JAVA_OPTS: "-Xms512m -Xmx512m"
+      # Disable performance analyzer
+      DISABLE_INSTALL_DEMO_CONFIG: "true"
+    ports:
+      - "9200:9200"  # HTTP API
+      - "9600:9600"  # Performance Analyzer (optional)
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    # OpenSearch는 메모리를 많이 사용하므로, 필요시 메모리 제한 설정
+    # mem_limit: 1g
+
+  # ============================================
+  # OpenSearch Dashboards (Optional - UI)
+  # ============================================
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    container_name: ivm-opensearch-dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      OPENSEARCH_HOSTS: '["http://opensearch:9200"]'
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "true"
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
 volumes:
   postgres_data:
   dynamodb_data:
   kafka_data:
+  opensearch_data:
 
 networks:
   default:
