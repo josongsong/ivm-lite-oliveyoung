@@ -43,32 +43,6 @@ class DeployableContextAxisCombinationTest {
     // ========================================
 
     @Test
-    fun `Axis - compile_sync + ship_sync + cutover_ready`() {
-        val context = DeployableContext(testInput, testConfig)
-
-        val result = context.deploy {
-            compile.sync()
-            ship.sync { opensearch() }
-            cutover.ready()
-        }
-
-        assertTrue(result.success)
-    }
-
-    @Test
-    fun `Axis - compile_sync + ship_sync + cutover_done`() {
-        val context = DeployableContext(testInput, testConfig)
-
-        val result = context.deploy {
-            compile.sync()
-            ship.sync { opensearch() }
-            cutover.done()
-        }
-
-        assertTrue(result.success)
-    }
-
-    @Test
     fun `Axis - compile_sync + ship_async + cutover_ready`() {
         val context = DeployableContext(testInput, testConfig)
 
@@ -176,20 +150,8 @@ class DeployableContextAxisCombinationTest {
         assertTrue(result.success)
     }
 
-    @Test
-    fun `Axis - compile_async + ship_sync INVALID (차단됨)`() {
-        val context = DeployableContext(testInput, testConfig)
-
-        val exception = assertThrows<IllegalStateException> {
-            context.deploy {
-                compile.async()
-                ship.sync { opensearch() }
-                cutover.ready()
-            }
-        }
-
-        assertTrue(exception.message!!.contains("compile.async + ship.sync is not allowed"))
-    }
+    // ship.sync()는 제거되었으므로 이 테스트는 더 이상 필요 없음
+    // compile.async + ship.sync 조합은 컴파일 타임에 차단됨 (ship.sync() 메서드가 없음)
 
     // ========================================
     // Shortcut API Correctness (조합 검증)
@@ -208,7 +170,7 @@ class DeployableContextAxisCombinationTest {
 
     @Test
     fun `Shortcut - deployNowAndShipNow generates correct spec`() {
-        // deployNowAndShipNow = compile.sync + ship.sync + cutover.ready
+        // deployNowAndShipNow = compile.sync + ship.async + cutover.ready (ship.sync() 제거됨)
         val context = DeployableContext(testInput, testConfig)
 
         val result = context.deployNowAndShipNow { opensearch() }
@@ -266,16 +228,14 @@ class DeployableContextAxisCombinationTest {
     @Test
     fun `Math - All valid combinations tested`() {
         // This is a meta-test to ensure we've tested all combinations
-        // Total valid combinations: 10
-        // - compile.sync: 6 (3 ship modes × 2 cutover modes)
-        // - compile.async: 4 (2 ship modes × 2 cutover modes, excluding sync ship)
+        // Total valid combinations: 8 (ship.sync() 제거됨)
+        // - compile.sync: 4 (ship.async() + no_ship) × 2 cutover modes
+        // - compile.async: 4 (ship.async() + no_ship) × 2 cutover modes
 
         val context = DeployableContext(testInput, testConfig)
 
         // compile.sync combinations
         val syncCombinations = listOf(
-            { context.deploy { compile.sync(); ship.sync { opensearch() }; cutover.ready() } },
-            { context.deploy { compile.sync(); ship.sync { opensearch() }; cutover.done() } },
             { context.deploy { compile.sync(); ship.async { opensearch() }; cutover.ready() } },
             { context.deploy { compile.sync(); ship.async { opensearch() }; cutover.done() } },
             { context.deploy { compile.sync(); cutover.ready() } },
@@ -294,7 +254,7 @@ class DeployableContextAxisCombinationTest {
         syncCombinations.forEach { it().let { result -> assertTrue(result.success) } }
         asyncCombinations.forEach { it().let { result -> assertTrue(result.success) } }
 
-        // Total tested: 10 combinations
-        assertEquals(10, syncCombinations.size + asyncCombinations.size)
+        // Total tested: 8 combinations
+        assertEquals(8, syncCombinations.size + asyncCombinations.size)
     }
 }

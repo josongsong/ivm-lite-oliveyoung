@@ -127,6 +127,7 @@ out/
 *.kotlin_module
 *.class
 
-# Generated files
-generated/
+# Generated files (build 디렉토리의 생성 파일)
+# ⚠️ src/main/kotlin/**/generated/는 git 관리 (jOOQ 코드)
+!**/src/main/**/generated/
 gen/

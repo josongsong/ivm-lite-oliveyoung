@@ -1,6 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.rawdata.adapters
 
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
+import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxPage
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
@@ -91,6 +92,158 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
         return OutboxRepositoryPort.Result.Ok(pending)
     }
 
+    override suspend fun findFailed(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+        val failed = store.values
+            .filter { it.status == OutboxStatus.FAILED }
+            .sortedByDescending { it.createdAt }
+            .take(limit)
+        return OutboxRepositoryPort.Result.Ok(failed)
+    }
+
+    override suspend fun resetAllFailed(limit: Int): OutboxRepositoryPort.Result<Int> {
+        var count = 0
+        synchronized(claimLock) {
+            val failed = store.values
+                .filter { it.status == OutboxStatus.FAILED }
+                .take(limit)
+            for (entry in failed) {
+                val reset = entry.copy(
+                    status = OutboxStatus.PENDING,
+                    failureReason = null
+                )
+                store[entry.id] = reset
+                count++
+            }
+        }
+        return OutboxRepositoryPort.Result.Ok(count)
+    }
+
+    override suspend fun findPendingWithCursor(
+        limit: Int,
+        cursor: String?,
+        type: AggregateType?
+    ): OutboxRepositoryPort.Result<OutboxPage> {
+        // 커서 파싱
+        val (cursorTime, cursorId) = if (cursor != null) {
+            val parts = cursor.split("_", limit = 2)
+            if (parts.size == 2) {
+                val time = Instant.parse(parts[0])
+                val id = UUID.fromString(parts[1])
+                time to id
+            } else {
+                null to null
+            }
+        } else {
+            null to null
+        }
+
+        // 필터링 및 정렬
+        var filtered = store.values
+            .filter { it.status == OutboxStatus.PENDING }
+            .let { entries ->
+                if (type != null) entries.filter { it.aggregateType == type }
+                else entries
+            }
+            .sortedWith(compareBy({ it.createdAt }, { it.id }))
+
+        // 커서 이후 필터링
+        if (cursorTime != null && cursorId != null) {
+            filtered = filtered.filter { entry ->
+                entry.createdAt > cursorTime ||
+                    (entry.createdAt == cursorTime && entry.id.toString() > cursorId.toString())
+            }
+        }
+
+        // +1개 더 조회해서 hasMore 판단
+        val allEntries = filtered.take(limit + 1)
+        val entries = allEntries.take(limit)
+        val hasMore = allEntries.size > limit
+
+        // 다음 커서 생성
+        val nextCursor = if (hasMore && entries.isNotEmpty()) {
+            val lastEntry = entries.last()
+            "${lastEntry.createdAt}_${lastEntry.id}"
+        } else {
+            null
+        }
+
+        return OutboxRepositoryPort.Result.Ok(OutboxPage(entries, nextCursor, hasMore))
+    }
+
+    // claim을 위한 락
+    private val claimLock = Any()
+
+    override suspend fun claim(
+        limit: Int,
+        type: AggregateType?,
+        workerId: String?
+    ): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+        if (limit <= 0) return OutboxRepositoryPort.Result.Ok(emptyList())
+        
+        val now = Instant.now()
+        val claimed = mutableListOf<OutboxEntry>()
+        
+        synchronized(claimLock) {
+            val pending = store.values
+                .filter { it.status == OutboxStatus.PENDING }
+                .let { entries ->
+                    if (type != null) entries.filter { it.aggregateType == type }
+                    else entries
+                }
+                .sortedWith(compareBy({ it.createdAt }, { it.id }))
+                .take(limit)
+            
+            for (entry in pending) {
+                val claimedEntry = entry.markClaimed(workerId, now)
+                store[entry.id] = claimedEntry
+                claimed.add(claimedEntry)
+            }
+        }
+        
+        return OutboxRepositoryPort.Result.Ok(claimed)
+    }
+
+    override suspend fun claimOne(
+        type: AggregateType?,
+        workerId: String?
+    ): OutboxRepositoryPort.Result<OutboxEntry?> {
+        return when (val result = claim(1, type, workerId)) {
+            is OutboxRepositoryPort.Result.Ok -> 
+                OutboxRepositoryPort.Result.Ok(result.value.firstOrNull())
+            is OutboxRepositoryPort.Result.Err -> result
+        }
+    }
+
+    override suspend fun recoverStaleProcessing(
+        olderThanSeconds: Long
+    ): OutboxRepositoryPort.Result<Int> {
+        val cutoff = Instant.now().minusSeconds(olderThanSeconds)
+        var recovered = 0
+        
+        synchronized(claimLock) {
+            val stale = store.values
+                .filter { 
+                    it.status == OutboxStatus.PROCESSING &&
+                    it.claimedAt != null &&
+                    it.claimedAt.isBefore(cutoff) &&
+                    it.retryCount < OutboxEntry.MAX_RETRY_COUNT
+                }
+            
+            for (entry in stale) {
+                val reset = entry.copy(
+                    status = OutboxStatus.PENDING,
+                    claimedAt = null,
+                    claimedBy = null,
+                    retryCount = entry.retryCount + 1
+                )
+                store[entry.id] = reset
+                recovered++
+            }
+        }
+        
+        return OutboxRepositoryPort.Result.Ok(recovered)
+    }
+
     override suspend fun markProcessed(ids: List<UUID>): OutboxRepositoryPort.Result<Int> {
         if (ids.isEmpty()) {
             return OutboxRepositoryPort.Result.Ok(0)
@@ -110,14 +263,19 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
     }
 
     override suspend fun markFailed(id: UUID, reason: String): OutboxRepositoryPort.Result<OutboxEntry> {
-        val entry = store[id]
-            ?: return OutboxRepositoryPort.Result.Err(
+        var result: OutboxEntry? = null
+        store.compute(id) { _, entry ->
+            if (entry != null) {
+                result = entry.markFailed(reason)
+                result
+            } else {
+                null
+            }
+        }
+        return result?.let { OutboxRepositoryPort.Result.Ok(it) }
+            ?: OutboxRepositoryPort.Result.Err(
                 DomainError.NotFoundError("OutboxEntry", id.toString()),
             )
-
-        val failed = entry.markFailed(reason)
-        store[id] = failed
-        return OutboxRepositoryPort.Result.Ok(failed)
     }
 
     override suspend fun resetToPending(id: UUID): OutboxRepositoryPort.Result<OutboxEntry> {
@@ -137,11 +295,172 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
         }
     }
 
+    // ==================== Tier 1: Visibility Timeout ====================
+
+    override suspend fun releaseExpiredClaims(visibilityTimeoutSeconds: Long): OutboxRepositoryPort.Result<Int> {
+        val cutoff = Instant.now().minusSeconds(visibilityTimeoutSeconds)
+        var released = 0
+
+        synchronized(claimLock) {
+            val expired = store.values.filter {
+                it.status == OutboxStatus.PROCESSING &&
+                it.claimedAt != null &&
+                it.claimedAt.isBefore(cutoff)
+            }
+
+            for (entry in expired) {
+                val reset = entry.copy(
+                    status = OutboxStatus.PENDING,
+                    claimedAt = null,
+                    claimedBy = null
+                    // retryCount는 증가시키지 않음 (Visibility Timeout은 재시도가 아님)
+                )
+                store[entry.id] = reset
+                released++
+            }
+        }
+
+        return OutboxRepositoryPort.Result.Ok(released)
+    }
+
+    // ==================== Tier 1: Dead Letter Queue ====================
+
+    private val dlqStore = mutableMapOf<UUID, OutboxEntry>()
+
+    override suspend fun moveToDlq(maxRetryCount: Int): OutboxRepositoryPort.Result<Int> {
+        var moved = 0
+
+        synchronized(claimLock) {
+            val toMove = store.values.filter {
+                it.status == OutboxStatus.FAILED &&
+                it.retryCount > maxRetryCount
+            }
+
+            for (entry in toMove) {
+                dlqStore[entry.id] = entry
+                store.remove(entry.id)
+                moved++
+            }
+        }
+
+        return OutboxRepositoryPort.Result.Ok(moved)
+    }
+
+    override suspend fun findDlq(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+        val entries = dlqStore.values
+            .sortedBy { it.createdAt }
+            .take(limit)
+        return OutboxRepositoryPort.Result.Ok(entries)
+    }
+
+    override suspend fun replayFromDlq(id: UUID): OutboxRepositoryPort.Result<Boolean> {
+        val entry = dlqStore[id] ?: return OutboxRepositoryPort.Result.Ok(false)
+
+        synchronized(claimLock) {
+            // DLQ에서 제거
+            dlqStore.remove(id)
+
+            // 원본 테이블에 PENDING으로 복귀 (retryCount 리셋)
+            val reset = entry.copy(
+                status = OutboxStatus.PENDING,
+                claimedAt = null,
+                claimedBy = null,
+                processedAt = null,
+                retryCount = 0,
+                failureReason = null
+            )
+            store[id] = reset
+        }
+
+        return OutboxRepositoryPort.Result.Ok(true)
+    }
+
+    // ==================== Tier 1: Priority Queue ====================
+
+    override suspend fun claimByPriority(limit: Int, workerId: String?): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+        if (limit <= 0) return OutboxRepositoryPort.Result.Ok(emptyList())
+
+        val now = Instant.now()
+        val claimed = mutableListOf<OutboxEntry>()
+
+        synchronized(claimLock) {
+            val pending = store.values
+                .filter { it.status == OutboxStatus.PENDING }
+                // 우선순위 순 (낮은 값 = 높은 우선순위), 같으면 createdAt 순
+                .sortedWith(compareBy({ it.priority }, { it.createdAt }, { it.id }))
+                .take(limit)
+
+            for (entry in pending) {
+                val updated = entry.copy(
+                    status = OutboxStatus.PROCESSING,
+                    claimedAt = now,
+                    claimedBy = workerId
+                )
+                store[entry.id] = updated
+                claimed.add(updated)
+            }
+        }
+
+        return OutboxRepositoryPort.Result.Ok(claimed)
+    }
+
+    // ==================== Tier 1: Entity-Level Ordering ====================
+
+    override suspend fun claimWithOrdering(limit: Int, workerId: String?): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+        if (limit <= 0) return OutboxRepositoryPort.Result.Ok(emptyList())
+
+        val now = Instant.now()
+        val claimed = mutableListOf<OutboxEntry>()
+
+        synchronized(claimLock) {
+            // 1. PROCESSING 중인 entity들 찾기 (같은 entity의 다른 버전 claim 불가)
+            val processingEntities = store.values
+                .filter { it.status == OutboxStatus.PROCESSING }
+                .map { it.aggregateId }
+                .toSet()
+
+            // 2. entity별로 가장 낮은 entityVersion을 가진 PENDING 엔트리만 선택
+            val candidatesByEntity = store.values
+                .filter { it.status == OutboxStatus.PENDING }
+                .filter { it.aggregateId !in processingEntities }  // PROCESSING 중인 entity 제외
+                .groupBy { it.aggregateId }
+
+            val candidates = candidatesByEntity.values
+                .mapNotNull { entries ->
+                    // 각 entity에서 가장 낮은 버전만 (없으면 createdAt 순)
+                    entries.minWithOrNull(
+                        compareBy(
+                            { it.entityVersion ?: Long.MAX_VALUE },
+                            { it.createdAt }
+                        )
+                    )
+                }
+                .sortedWith(compareBy({ it.createdAt }, { it.id }))
+                .take(limit)
+
+            // 3. claim
+            for (entry in candidates) {
+                val updated = entry.copy(
+                    status = OutboxStatus.PROCESSING,
+                    claimedAt = now,
+                    claimedBy = workerId
+                )
+                store[entry.id] = updated
+                claimed.add(updated)
+            }
+        }
+
+        return OutboxRepositoryPort.Result.Ok(claimed)
+    }
+
     // ==================== 테스트 헬퍼 ====================
 
     fun clear() {
         store.clear()
+        dlqStore.clear()
     }
 
     fun size(): Int = store.size
+
+    fun dlqSize(): Int = dlqStore.size
 }

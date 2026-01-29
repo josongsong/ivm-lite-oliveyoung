@@ -86,7 +86,7 @@ class RfcGoldenTest : StringSpec({
 
         val result = context.deploy {
             compile.sync()
-            ship.sync {
+            ship.async {
                 opensearch {
                     index("products")
                 }

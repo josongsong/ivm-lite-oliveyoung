@@ -8,6 +8,9 @@ import kotlinx.serialization.Serializable
  * - CORE: 단일 엔티티 기반 (RawData -> Slice)
  * - JOINED: 여러 엔티티 조인 (N:M)
  * - DERIVED: 다른 Slice에서 파생 계산
+ * - INDEX: 검색/필터용 파생 필드 (검색 인덱싱, 필터 facet, 정렬 기준)
+ * - SUMMARY: 경량 참조용 슬라이스 (RFC-006 RefIndexSlice)
+ * - ENRICHED: 외부 엔티티 JOIN 결과 포함 (RFC-006 RefIndexSlice)
  * - PRICE, INVENTORY, MEDIA, CATEGORY, PROMOTION, REVIEW, CUSTOM: 비즈니스 슬라이스
  */
 @Serializable
@@ -15,6 +18,9 @@ enum class SliceType {
     CORE,
     JOINED,
     DERIVED,
+    INDEX,
+    SUMMARY,
+    ENRICHED,
     PRICE,
     INVENTORY,
     MEDIA,

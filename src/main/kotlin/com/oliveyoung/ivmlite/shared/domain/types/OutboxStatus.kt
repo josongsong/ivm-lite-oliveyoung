@@ -6,12 +6,14 @@ import kotlinx.serialization.Serializable
 /**
  * Outbox 엔트리 처리 상태
  * - PENDING: 처리 대기 중
+ * - PROCESSING: 처리 중 (worker가 claim함)
  * - PROCESSED: 처리 완료
  * - FAILED: 처리 실패 (재시도 대상)
  */
 @Serializable
 enum class OutboxStatus {
     PENDING,
+    PROCESSING,
     PROCESSED,
     FAILED;
 

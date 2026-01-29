@@ -1,11 +1,8 @@
+@file:Suppress("unused")
 package com.oliveyoung.ivmlite.sdk.model
 
 /**
- * 실행 스텝
- * RFC-IMPL-011 Wave 1-B
+ * Re-export from shared for backward compatibility
+ * 실제 정의는 shared.domain.deploy 패키지에 있음
  */
-data class ExecutionStep(
-    val stepNumber: Int,
-    val sliceRef: String,
-    val dependencies: List<String>
-)
+typealias ExecutionStep = com.oliveyoung.ivmlite.shared.domain.deploy.ExecutionStep

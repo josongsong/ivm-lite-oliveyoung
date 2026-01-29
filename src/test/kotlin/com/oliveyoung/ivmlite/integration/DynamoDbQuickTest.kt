@@ -11,14 +11,20 @@ import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import java.net.URI
 
 /**
- * DynamoDB Local 빠른 연결 테스트 (타임아웃 없음)
+ * DynamoDB endpoint override 빠른 연결 테스트
+ *
+ * Remote-only 정책: 기본 테스트에서는 실행되지 않도록 IntegrationTag + endpoint opt-in.
  */
-class DynamoDbQuickTest : StringSpec({
+class DynamoDbQuickTest : StringSpec(init@{
+    tags(IntegrationTag)
+
+    val endpoint = System.getenv("DYNAMODB_ENDPOINT") ?: ""
+    if (endpoint.isBlank()) return@init
 
     "DynamoDB Local 연결만 확인 (5초 타임아웃)".config(timeout = kotlin.time.Duration.parse("5s")) {
         val client = DynamoDbAsyncClient.builder()
-            .endpointOverride(URI.create("http://localhost:8000"))
-            .region(Region.AP_NORTHEAST_2)
+            .endpointOverride(URI.create(endpoint))
+            .region(Region.of(System.getenv("AWS_REGION") ?: "ap-northeast-2"))
             .credentialsProvider(
                 StaticCredentialsProvider.create(
                     AwsBasicCredentials.create("dummy", "dummy")

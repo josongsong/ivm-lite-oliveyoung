@@ -1,9 +1,9 @@
 package com.oliveyoung.ivmlite.pkg.orchestration.adapters
 
-import com.oliveyoung.ivmlite.sdk.model.DeployPlan
-import com.oliveyoung.ivmlite.sdk.model.DependencyGraph
-import com.oliveyoung.ivmlite.sdk.model.ExecutionStep
-import com.oliveyoung.ivmlite.sdk.model.GraphNode
+import com.oliveyoung.ivmlite.shared.domain.deploy.DeployPlan
+import com.oliveyoung.ivmlite.shared.domain.deploy.DependencyGraph
+import com.oliveyoung.ivmlite.shared.domain.deploy.ExecutionStep
+import com.oliveyoung.ivmlite.shared.domain.deploy.GraphNode
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap

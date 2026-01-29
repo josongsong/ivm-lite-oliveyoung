@@ -1,37 +1,94 @@
-# EditorConfig is awesome: https://EditorConfig.org
+# EditorConfig for ivm-lite
+# https://editorconfig.org
+# Kotlin 스타일 가이드 준수
 
 root = true
 
+# 모든 파일 기본 설정
 [*]
 charset = utf-8
 end_of_line = lf
-insert_final_newline = true
-trim_trailing_whitespace = true
-
-[*.{kt,kts}]
 indent_style = space
 indent_size = 4
-max_line_length = 120
+insert_final_newline = true
+trim_trailing_whitespace = true
+max_line_length = 140
 
+# Kotlin 파일
+[*.kt]
+indent_size = 4
+max_line_length = 140
+
+# ktlint 호환 설정
+ktlint_standard = enabled
+ktlint_experimental = enabled
+
+# 와일드카드 import 설정 (ktlint_standard_no-wildcard-imports)
+ktlint_standard_no-wildcard-imports = disabled
+
+# 최대 빈 줄
+ktlint_standard_no-consecutive-blank-lines = enabled
+
+# 트레일링 콤마
+ktlint_standard_trailing-comma-on-call-site = enabled
+ktlint_standard_trailing-comma-on-declaration-site = enabled
+
+# 함수 시그니처
+ktlint_standard_function-signature = enabled
+
+# Import 순서
+ktlint_standard_import-ordering = enabled
+
+# Kotlin Script 파일
+[*.kts]
+indent_size = 4
+max_line_length = 140
+
+# Gradle 파일
+[*.gradle]
+indent_size = 4
+
+# YAML 파일
 [*.{yml,yaml}]
-indent_style = space
 indent_size = 2
 
-[*.{json,json5}]
-indent_style = space
+# JSON 파일
+[*.json]
 indent_size = 2
 
+# Markdown 파일
 [*.md]
 trim_trailing_whitespace = false
 max_line_length = off
 
-[*.{gradle,gradle.kts}]
-indent_style = space
-indent_size = 4
-
-[*.{sql}]
-indent_style = space
+# Shell 스크립트
+[*.sh]
 indent_size = 2
 
+# Properties 파일
+[*.properties]
+indent_size = 4
+
+# SQL 파일
+[*.sql]
+indent_size = 2
+
+# XML 파일
+[*.xml]
+indent_size = 2
+
+# TypeScript/JavaScript (Admin UI)
+[*.{ts,tsx,js,jsx}]
+indent_size = 2
+
+# CSS
+[*.{css,scss,less}]
+indent_size = 2
+
+# HTML
+[*.html]
+indent_size = 2
+
+# Makefile
 [Makefile]
 indent_style = tab

@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
@@ -8,6 +10,7 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.DynamoDbRawDataRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
+import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DynamoDbInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DynamoDbSliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
@@ -45,12 +48,17 @@ import kotlinx.coroutines.delay
  * - DynamoDB Local 실행: docker-compose up dynamodb
  * - 테이블 생성: ./infra/dynamodb/create-data-tables.sh
  */
-class DynamoDbE2ETest : StringSpec({
+class DynamoDbE2ETest : StringSpec(init@{
+    tags(IntegrationTag)
+
+    // Remote-only 정책: endpoint override가 명시된 경우에만 실행 (AWS 기본 엔드포인트로는 절대 실행 금지)
+    val endpoint = System.getenv("DYNAMODB_ENDPOINT") ?: ""
+    if (endpoint.isBlank()) return@init
 
     // DynamoDB Local 클라이언트
     val dynamoClient = DynamoDbAsyncClient.builder()
-        .endpointOverride(URI.create("http://localhost:8000"))
-        .region(Region.AP_NORTHEAST_2)
+        .endpointOverride(URI.create(endpoint))
+        .region(Region.of(System.getenv("AWS_REGION") ?: "ap-northeast-2"))
         .credentialsProvider(
             StaticCredentialsProvider.create(
                 AwsBasicCredentials.create("dummy", "dummy")
@@ -129,10 +137,10 @@ class DynamoDbE2ETest : StringSpec({
     // Contract Registry (LocalYaml)
     val contractRegistry = LocalYamlContractRegistryAdapter()
     val joinExecutor = JoinExecutor(rawDataRepo)
-    val slicingEngine = SlicingEngine(contractRegistry, joinExecutor)
+    val slicingEngine = DefaultSlicingEngineAdapter(SlicingEngine(contractRegistry, joinExecutor))
 
-    val changeSetBuilder = ChangeSetBuilder()
-    val impactCalculator = ImpactCalculator()
+    val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
+    val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
 
     // Workflow 생성
     val ingestWorkflow = IngestWorkflow(rawDataRepo, outboxRepo)

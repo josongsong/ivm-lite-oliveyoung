@@ -62,10 +62,10 @@ val infraModule = module {
         }
         builder.credentialsProvider(credentialsProvider)
         
-        // 로컬 개발용 endpoint override
-        config.dynamodb.endpoint?.let { endpoint ->
-            builder.endpointOverride(URI.create(endpoint))
-        }
+        // endpoint override는 opt-in (기본은 AWS 엔드포인트 사용)
+        config.dynamodb.endpoint
+            ?.takeIf { it.isNotBlank() }
+            ?.let { endpoint -> builder.endpointOverride(URI.create(endpoint)) }
         
         builder.build()
     }

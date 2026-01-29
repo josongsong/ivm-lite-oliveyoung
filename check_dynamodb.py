@@ -1,15 +1,20 @@
 #!/usr/bin/env python3
+import os
 import boto3
 from botocore.exceptions import ClientError
 
-# DynamoDB Local 연결
-dynamodb = boto3.client(
-    'dynamodb',
-    endpoint_url='http://localhost:8000',
-    region_name='ap-northeast-2',
-    aws_access_key_id='dummy',
-    aws_secret_access_key='dummy'
-)
+# DynamoDB 연결 (Remote-only: 기본은 AWS 엔드포인트, endpoint override는 opt-in)
+endpoint = os.getenv("DYNAMODB_ENDPOINT", "")
+region = os.getenv("AWS_REGION", "ap-northeast-2")
+
+client_kwargs = {
+    "service_name": "dynamodb",
+    "region_name": region,
+}
+if endpoint:
+    client_kwargs["endpoint_url"] = endpoint
+
+dynamodb = boto3.client(**client_kwargs)
 
 try:
     # 테이블 목록 확인

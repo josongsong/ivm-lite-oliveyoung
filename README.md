@@ -124,7 +124,7 @@ docker-compose up -d
 | 서비스 | 용도 | 포트 |
 |--------|------|------|
 | **PostgreSQL** | 비즈니스 데이터 + Outbox (ACID) | 5432 |
-| **DynamoDB Local** | Schema Registry | 8000 |
+| **DynamoDB (Remote)** | Schema Registry | (AWS) |
 | **Kafka** (KRaft) | 이벤트 스트리밍 | 9094 |
 | **Debezium** | PostgreSQL CDC → Kafka | 8083 |
 | **Kafka UI** | 디버깅용 UI | 8080 |

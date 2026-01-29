@@ -1,12 +1,8 @@
+@file:Suppress("unused")
 package com.oliveyoung.ivmlite.sdk.model
 
 /**
- * Deploy 실행 계획
- * RFC-IMPL-011 Wave 1-B
+ * Re-export from shared for backward compatibility
+ * 실제 정의는 shared.domain.deploy 패키지에 있음
  */
-data class DeployPlan(
-    val deployId: String,
-    val graph: DependencyGraph,
-    val activatedRules: List<String>,
-    val executionSteps: List<ExecutionStep>
-)
+typealias DeployPlan = com.oliveyoung.ivmlite.shared.domain.deploy.DeployPlan

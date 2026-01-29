@@ -1,0 +1,35 @@
+# RFC-IMPL-016: ENRICHED 슬라이스 추가로 Brand 정보 포함
+kind: VIEW_DEFINITION
+id: view.product.detail.v1
+version: 1.1.0
+status: ACTIVE
+
+viewName: PRODUCT_DETAIL
+entityType: PRODUCT
+description: "상품 상세 - 전체 정보 조합 (Brand 정보 포함)"
+
+requiredSlices:
+  - CORE
+  - PRICE
+  - MEDIA
+
+optionalSlices:
+  - INVENTORY
+  - CATEGORY
+  - INDEX
+  - ENRICHED  # RFC-IMPL-016: Brand 정보 (optional - Brand 없어도 View 생성 가능)
+
+missingPolicy: FAIL_CLOSED
+
+partialPolicy:
+  allowed: true
+  optionalOnly: true
+  responseMeta:
+    includeMissingSlices: true
+    includeUsedContracts: true
+
+fallbackPolicy: NONE
+
+ruleSetRef:
+  id: ruleset.product.doc001.v1
+  version: 1.0.0

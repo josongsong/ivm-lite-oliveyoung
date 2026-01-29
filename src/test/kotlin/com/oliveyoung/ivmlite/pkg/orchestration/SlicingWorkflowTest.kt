@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
 
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
@@ -8,8 +10,10 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
+import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
+import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
 import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
@@ -35,9 +39,10 @@ class SlicingWorkflowTest : StringSpec({
     val invertedIndexRepo = InMemoryInvertedIndexRepository()
     val ingestWorkflow = IngestWorkflow(rawDataRepo, outboxRepo, testTracer)
     val contractRegistry = LocalYamlContractRegistryAdapter()
-    val slicingEngine = SlicingEngine(contractRegistry)
-    val changeSetBuilder = ChangeSetBuilder()
-    val impactCalculator = ImpactCalculator()
+    val joinExecutor = JoinExecutor(rawDataRepo)
+    val slicingEngine = DefaultSlicingEngineAdapter(SlicingEngine(contractRegistry, joinExecutor))
+    val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
+    val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
     val slicingWorkflow = SlicingWorkflow(
         rawDataRepo,
         sliceRepo,
@@ -53,6 +58,12 @@ class SlicingWorkflowTest : StringSpec({
     val entityKey = EntityKey("PRODUCT#tenant-1#slice-test")
     val schemaId = "product.v1"
     val schemaVersion = SemVer.parse("1.0.0")
+
+    // 테스트 격리: 각 테스트 전에 repository 초기화
+    beforeTest {
+        sliceRepo.clear()
+        invertedIndexRepo.clear()
+    }
 
     "성공: RawData → CORE slice 생성" {
         // 먼저 RawData 저장

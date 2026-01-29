@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.contracts.domain
 
+import com.oliveyoung.ivmlite.shared.domain.types.SliceKind
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 
 /**
@@ -38,12 +39,18 @@ enum class JoinCardinality {
 }
 
 /**
- * 슬라이스 정의 (RFC-IMPL-010 Phase D-4: joins 추가)
+ * 슬라이스 정의 (RFC-IMPL-010 Phase D-4: joins 추가, RFC-IMPL-016: sliceKind 추가)
+ *
+ * @param type 슬라이스 타입 (CORE, SUMMARY, ENRICHED 등)
+ * @param buildRules 빌드 규칙 (PassThrough, MapFields)
+ * @param joins JOIN 스펙 목록 (ENRICHMENT 슬라이스에서 사용)
+ * @param sliceKind 슬라이스 용도 (STANDARD, REF_INDEX, ENRICHMENT) - 기본값: STANDARD
  */
 data class SliceDefinition(
     val type: SliceType,
     val buildRules: SliceBuildRules,
     val joins: List<com.oliveyoung.ivmlite.pkg.slices.domain.JoinSpec> = emptyList(),
+    val sliceKind: SliceKind = SliceKind.STANDARD,
 )
 
 /**

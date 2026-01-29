@@ -446,14 +446,9 @@ suspend fun <T : EntityInput> executeSync(input: T, spec: DeploySpec): DeployRes
         }
     }
     
-    // 3. Ship
-    when (shipSpec.mode) {
-        ShipMode.Sync -> {
-            shipWorkflow.executeToMultipleSinks(...)  // 직접 실행
-        }
-        ShipMode.Async -> {
-            outboxRepository.insert(ShipRequested)  // Outbox 저장
-        }
+    // 3. Ship (항상 Outbox를 통해 비동기 처리)
+    shipSpec.sinks.forEach { sink ->
+        outboxRepository.insert(ShipRequested)  // 항상 Outbox 저장
     }
 }
 ```
@@ -462,10 +457,10 @@ suspend fun <T : EntityInput> executeSync(input: T, spec: DeploySpec): DeployRes
 
 | Compile | Ship | 허용 | 설명 |
 |---------|------|------|------|
-| sync | sync | ⭕ | 즉시 실행 |
-| sync | async | ⭕ | Compile 즉시, Ship 비동기 |
-| async | async | ⭕ | 모두 비동기 |
-| async | sync | ❌ | 불가능 (산출물 준비 전) |
+| sync | async | ⭕ | Compile 즉시, Ship은 항상 Outbox 경유 |
+| async | async | ⭕ | 모두 비동기 (Outbox 경유) |
+
+**중요**: Ship은 `ship.sync()`/`ship.async()` 구분 없이 **항상 Outbox를 통해 비동기로 처리**됩니다.
 
 ---
 
@@ -1022,8 +1017,7 @@ object VersionGenerator {
 |------|------|----------------|----------|
 | **Compile** | `compile.sync()` | ❌ | - |
 | **Compile** | `compile.async()` | ✅ | Ingest 완료 후 즉시 |
-| **Ship** | `ship.sync()` | ❌ | - |
-| **Ship** | `ship.async()` | ✅ | **Compile 완료 후** |
+| **Ship** | `ship.sync()` / `ship.async()` | ✅ | **항상 Outbox 저장** (Compile 완료 후) |
 
 ### 11-5. 데이터 흐름 요약
 

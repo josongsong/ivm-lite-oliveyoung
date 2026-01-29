@@ -1,0 +1,76 @@
+kind: RULESET
+id: brand.v1
+version: 1.0.0
+status: ACTIVE
+
+# RFC-IMPL-016: Brand RefIndexSlice Pattern
+#
+# Brand 엔티티는 Product가 참조하는 upstream 엔티티.
+# Brand 변경 시 → Product 자동 재슬라이싱 (Fanout)
+#
+# ## Slice 구조
+# - CORE: Brand 자체 데이터만 (brand_id, brand_name, brand_desc, ...)
+# - ENRICHED: CORE + upstream Category 정보 (optional)
+#
+# ## Fanout 메커니즘
+# - Brand 변경 → EntityUpdated 이벤트 → Outbox
+# - FanoutEventHandler가 indexes.references 확인
+# - Product ruleset의 "product_by_brand" 역인덱스 조회
+# - 연관 Product 전체 재슬라이싱
+
+entityType: BRAND
+
+# RFC-IMPL-010 ImpactMap: 필드 변경 시 영향받는 슬라이스 타입
+impactMap:
+  CORE:
+    - "/brandId"
+    - "/brandName"
+    - "/brandDesc"
+    - "/logoUrl"
+    - "/status"
+    - "/ranking"
+  JOINED:
+    - "/categoryId"
+    - "/categoryName"
+    - "/categoryPath"
+
+# RFC-IMPL-010 JOIN: 최상위 joins는 사용하지 않음 (슬라이스별 joins 사용)
+joins: []
+
+# RFC-IMPL-010 Slice 정의
+slices:
+  # 1. CORE Slice: Brand 자체 데이터만
+  # upstream 변경과 무관 → 안정적, 캐시 가능
+  - type: CORE
+    buildRules:
+      type: PassThrough
+      fields:
+        - "*"
+    joins: []  # CORE는 JOIN 없음
+
+  # 2. JOINED Slice: CORE + upstream Category 정보
+  # Category 변경 시 JOINED만 재빌드 (CORE는 그대로)
+  - type: JOINED
+    buildRules:
+      type: PassThrough
+      fields:
+        - "*"
+    joins:
+      - name: brandCategory
+        type: LOOKUP
+        sourceFieldPath: categoryId
+        targetEntityType: CATEGORY
+        targetKeyPattern: CATEGORY#{tenantId}#{value}
+        required: false  # Category 없어도 슬라이싱 진행
+        mergeStrategy: SHALLOW  # Category 정보를 payload에 병합
+
+# RFC-IMPL-013: Inverted Index 정의 (역방향 fanout용)
+# Product가 Brand를 참조하므로, Brand 측에서는 fanout 정의 불필요
+# (역인덱스는 Product ruleset.v1.yaml의 indexes.brand.references: BRAND에 의해 생성됨)
+#
+# Brand가 Category를 참조하는 경우 (optional):
+indexes:
+  - type: category
+    selector: $.categoryId
+    references: CATEGORY     # Category 변경 시 → 연관 Brand 재슬라이싱
+    maxFanout: 1000         # 카테고리당 브랜드는 많지 않음

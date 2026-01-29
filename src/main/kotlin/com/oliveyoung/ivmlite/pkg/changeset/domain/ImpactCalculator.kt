@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.changeset.domain
 
+import com.oliveyoung.ivmlite.pkg.changeset.ports.ImpactCalculatorPort
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 
@@ -12,7 +13,7 @@ import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
  * - 결정성: 동일 ChangeSet + RuleSet → 동일 ImpactMap
  * - Contract is Law: RuleSet.impactMap이 영향 범위의 SSOT
  */
-class ImpactCalculator {
+class ImpactCalculator : ImpactCalculatorPort {
 
     /**
      * ChangeSet과 RuleSet을 기반으로 ImpactMap 계산
@@ -22,7 +23,7 @@ class ImpactCalculator {
      * @return ImpactMap (SliceType → ImpactDetail)
      * @throws DomainError.UnmappedChangePathError 매핑되지 않은 변경 경로가 있을 경우
      */
-    fun calculate(
+    override fun calculate(
         changeSet: ChangeSet,
         ruleSet: RuleSetContract,
     ): Map<String, ImpactDetail> {

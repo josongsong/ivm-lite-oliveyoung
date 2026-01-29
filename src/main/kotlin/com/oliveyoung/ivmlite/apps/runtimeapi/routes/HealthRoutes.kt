@@ -1,16 +1,19 @@
 package com.oliveyoung.ivmlite.apps.runtimeapi.routes
 
+import com.oliveyoung.ivmlite.shared.config.MetricsConfig
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
+import io.micrometer.core.instrument.MeterRegistry
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.withTimeoutOrNull
 import kotlinx.serialization.Serializable
+import org.koin.ktor.ext.getKoin
 import org.slf4j.LoggerFactory
 
 private val log = LoggerFactory.getLogger("HealthRoutes")
@@ -20,12 +23,14 @@ private val log = LoggerFactory.getLogger("HealthRoutes")
  *
  * - GET /health: Liveness probe (프로세스 실행 여부)
  * - GET /ready: Readiness probe (어댑터 동적 체크)
+ * - GET /metrics: Prometheus metrics (RFC-IMPL-009)
  *
  * fail-closed: 어댑터 장애 시 503 → K8s가 트래픽 차단
  */
 fun Route.healthRoutes(
     adapters: List<HealthCheckable> = emptyList(),
     healthCheckTimeoutMs: Long = 5000,
+    meterRegistry: io.micrometer.core.instrument.MeterRegistry? = null,
 ) {
     // 입력 검증
     require(healthCheckTimeoutMs >= 0) { "healthCheckTimeoutMs must be non-negative" }
@@ -61,6 +66,23 @@ fun Route.healthRoutes(
                 checks = checks,
             ),
         )
+    }
+
+    // Prometheus Metrics (RFC-IMPL-009)
+    get("/metrics") {
+        val registry = meterRegistry ?: call.application.getKoin().getOrNull<MeterRegistry>()
+
+        if (registry != null) {
+            val prometheusText = MetricsConfig.scrape(registry)
+            if (prometheusText.isNotEmpty()) {
+                call.response.header(HttpHeaders.ContentType, "text/plain; version=0.0.4; charset=utf-8")
+                call.respondText(prometheusText)
+            } else {
+                call.respond(HttpStatusCode.NotImplemented, "Metrics not enabled")
+            }
+        } else {
+            call.respond(HttpStatusCode.NotImplemented, "Metrics registry not available")
+        }
     }
 }
 

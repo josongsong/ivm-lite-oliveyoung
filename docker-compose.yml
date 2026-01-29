@@ -1,52 +1,30 @@
 version: '3.8'
 
 # ivm-lite 로컬 개발 인프라
-# - PostgreSQL: 비즈니스 데이터 + Outbox (ACID 트랜잭션)
-# - DynamoDB Local: Schema Registry
+# - PostgreSQL: jOOQ codegen & 개발용 DB
 # - Kafka: 이벤트 스트리밍
-# - Debezium: PostgreSQL CDC → Kafka (Outbox 패턴)
+# - OpenSearch: Slice Sink (검색 엔진)
 
 services:
   # ============================================
-  # PostgreSQL - 비즈니스 데이터 + Outbox
+  # PostgreSQL - 개발용 DB
   # ============================================
   postgres:
     image: postgres:16-alpine
     container_name: ivm-postgres
+    ports:
+      - "5433:5432"
     environment:
       POSTGRES_USER: ivm
-      POSTGRES_PASSWORD: ivm_local_dev
+      POSTGRES_PASSWORD: ivm
       POSTGRES_DB: ivmlite
-    ports:
-      - "5433:5432"  # 5433으로 변경 (기존 PostgreSQL과 충돌 방지)
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./infra/postgres/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
-    command:
-      - "postgres"
-      - "-c"
-      - "wal_level=logical"  # Debezium CDC 필수
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ivm -d ivmlite"]
       interval: 5s
       timeout: 5s
-      retries: 5
-
-  # ============================================
-  # DynamoDB Local - Schema Registry
-  # ============================================
-  dynamodb:
-    image: amazon/dynamodb-local:latest
-    container_name: ivm-dynamodb
-    ports:
-      - "8000:8000"
-    command: "-jar DynamoDBLocal.jar -sharedDb -inMemory"
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:8000 || exit 1"]
-      interval: 5s
-      timeout: 5s
-      retries: 5
-    # Note: -inMemory 모드 사용으로 재시작 시 데이터 소실됨 (로컬 테스트용)
+      retries: 10
 
   # ============================================
   # Kafka (KRaft mode - Zookeeper 없음)
@@ -76,51 +54,6 @@ services:
       interval: 10s
       timeout: 10s
       retries: 5
-
-  # ============================================
-  # Debezium Connect - PostgreSQL CDC → Kafka
-  # ============================================
-  debezium:
-    image: debezium/connect:2.5
-    container_name: ivm-debezium
-    ports:
-      - "8083:8083"
-    environment:
-      BOOTSTRAP_SERVERS: kafka:9092
-      GROUP_ID: ivm-debezium-connect
-      CONFIG_STORAGE_TOPIC: debezium_configs
-      OFFSET_STORAGE_TOPIC: debezium_offsets
-      STATUS_STORAGE_TOPIC: debezium_statuses
-      CONFIG_STORAGE_REPLICATION_FACTOR: 1
-      OFFSET_STORAGE_REPLICATION_FACTOR: 1
-      STATUS_STORAGE_REPLICATION_FACTOR: 1
-    depends_on:
-      kafka:
-        condition: service_healthy
-      postgres:
-        condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "curl -s http://localhost:8083/connectors || exit 1"]
-      interval: 10s
-      timeout: 10s
-      retries: 10
-
-  # ============================================
-  # Kafka UI (Optional - 디버깅용)
-  # ============================================
-  kafka-ui:
-    image: provectuslabs/kafka-ui:latest
-    container_name: ivm-kafka-ui
-    ports:
-      - "8080:8080"
-    environment:
-      KAFKA_CLUSTERS_0_NAME: ivm-local
-      KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS: kafka:9092
-      KAFKA_CLUSTERS_0_KAFKACONNECT_0_NAME: debezium
-      KAFKA_CLUSTERS_0_KAFKACONNECT_0_ADDRESS: http://debezium:8083
-    depends_on:
-      - kafka
-      - debezium
 
   # ============================================
   # OpenSearch - Slice Sink (검색 엔진)
@@ -170,9 +103,28 @@ services:
       timeout: 5s
       retries: 10
 
+  # ============================================
+  # Jaeger All-in-One (OpenTelemetry Tracing)
+  # ============================================
+  jaeger:
+    image: jaegertracing/all-in-one:1.55
+    container_name: ivm-jaeger
+    ports:
+      - "16686:16686"  # Jaeger UI
+      - "4317:4317"    # OTLP gRPC receiver
+      - "4318:4318"    # OTLP HTTP receiver
+      - "14250:14250"  # Jaeger gRPC
+      - "14268:14268"  # Jaeger HTTP
+    environment:
+      COLLECTOR_OTLP_ENABLED: "true"
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:16686/ || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   postgres_data:
-  dynamodb_data:
   kafka_data:
   opensearch_data:
 

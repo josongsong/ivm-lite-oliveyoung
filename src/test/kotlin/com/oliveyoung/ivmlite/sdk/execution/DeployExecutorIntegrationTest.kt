@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.sdk.execution
 
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
@@ -11,6 +13,7 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkAdapter
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
+import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
@@ -66,9 +69,9 @@ class DeployExecutorIntegrationTest : StringSpec({
     }
 
     val joinExecutor = JoinExecutor(rawDataRepo)
-    val slicingEngine = SlicingEngine(mockContractRegistry, joinExecutor)
-    val changeSetBuilder = ChangeSetBuilder()
-    val impactCalculator = ImpactCalculator()
+    val slicingEngine = DefaultSlicingEngineAdapter(SlicingEngine(mockContractRegistry, joinExecutor))
+    val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
+    val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
 
     val ingestWorkflow = IngestWorkflow(rawDataRepo, outboxRepo)
     val slicingWorkflow = SlicingWorkflow(

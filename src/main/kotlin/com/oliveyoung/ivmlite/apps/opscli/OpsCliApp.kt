@@ -10,8 +10,9 @@ import com.github.ajalt.clikt.parameters.options.default
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import kotlinx.coroutines.runBlocking
-import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
+import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
+import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import java.io.File
@@ -44,22 +45,37 @@ private class ValidateContractsCmd : CliktCommand(name = "validate-contracts") {
 }
 
 private class SeedContractsToDynamoCmd : CliktCommand(name = "seed-contracts-to-dynamo") {
-    private val tableName by option("--table", help = "DynamoDB table name").default("ivm-lite-schema-registry-local")
+    private val tableName by option("--table", help = "DynamoDB table name")
+        .default(System.getenv("DYNAMODB_TABLE") ?: "")
     private val dirPath by option("--dir", help = "contracts directory path").default("src/main/resources/contracts/v1")
-    private val endpoint by option("--endpoint", help = "DynamoDB endpoint URL").default("http://localhost:8000")
+    private val endpoint by option("--endpoint", help = "DynamoDB endpoint URL (optional; default uses AWS endpoint)")
+        .default(System.getenv("DYNAMODB_ENDPOINT") ?: "")
     private val dryRun by option("--dry-run", help = "Dry run mode (no changes)").flag()
 
     override fun run() {
         try {
-            val dynamoClient = DynamoDbAsyncClient.builder()
-                .endpointOverride(URI.create(endpoint))
-                .region(Region.AP_NORTHEAST_2)
-                .credentialsProvider(
+            if (tableName.isBlank()) {
+                echo("ERROR: DynamoDB table name is required. Set DYNAMODB_TABLE or pass --table.")
+                exitProcess(1)
+            }
+
+            val builder = DynamoDbAsyncClient.builder()
+                .region(Region.of(System.getenv("AWS_REGION") ?: "ap-northeast-2"))
+
+            if (endpoint.isNotBlank()) {
+                // Local/override mode (endpoint provided): dummy credentials are OK
+                builder.endpointOverride(URI.create(endpoint))
+                builder.credentialsProvider(
                     StaticCredentialsProvider.create(
                         AwsBasicCredentials.create("dummy", "dummy")
                     )
                 )
-                .build()
+            } else {
+                // Remote AWS mode: use default credentials chain (env, ~/.aws, IAM role, ...)
+                builder.credentialsProvider(DefaultCredentialsProvider.create())
+            }
+
+            val dynamoClient = builder.build()
 
             val contractsDir = File(dirPath)
             if (!contractsDir.exists()) {
@@ -70,7 +86,7 @@ private class SeedContractsToDynamoCmd : CliktCommand(name = "seed-contracts-to-
             echo("📦 Seeding contracts to DynamoDB...")
             echo("   Table: $tableName")
             echo("   Directory: $dirPath")
-            echo("   Endpoint: $endpoint")
+            echo("   Endpoint: ${if (endpoint.isBlank()) "(AWS default)" else endpoint}")
             if (dryRun) {
                 echo("   Mode: DRY RUN")
             }

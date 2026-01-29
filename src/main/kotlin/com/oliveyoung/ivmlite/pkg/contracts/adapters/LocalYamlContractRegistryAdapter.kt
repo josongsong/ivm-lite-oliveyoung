@@ -5,6 +5,7 @@ import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractError
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
+import com.oliveyoung.ivmlite.shared.domain.types.SliceKind
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import org.yaml.snakeyaml.Yaml
@@ -45,13 +46,43 @@ class LocalYamlContractRegistryAdapter(
     }
 
     override suspend fun loadRuleSetContract(ref: ContractRef): ContractRegistryPort.Result<RuleSetContract> {
-        val map = loadYaml("ruleset.v1.yaml") ?: return err("ruleset.v1.yaml not found")
-        return parseRuleSet(map)
+        // ID 기반 파일 찾기: ruleset.product.doc001.v1 -> ruleset-product-doc001.v1.yaml
+        // fallback: ruleset.v1.yaml
+        val filename = when {
+            ref.id != "ruleset.core.v1" -> {
+                // ruleset.product.doc001.v1 -> ruleset-product-doc001.v1.yaml
+                val idPart = ref.id.replace(".v1", "").replace(".", "-")
+                "$idPart.v1.yaml"
+            }
+            else -> "ruleset.v1.yaml"
+        }
+        val map = loadYaml(filename) ?: loadYaml("ruleset.v1.yaml") ?: return err("ruleset contract not found: $filename or ruleset.v1.yaml")
+        val parsed = parseRuleSet(map)
+        // ID 검증 (fail-closed)
+        if (parsed is ContractRegistryPort.Result.Ok && parsed.value.meta.id != ref.id) {
+            return err("RuleSet ID mismatch: expected ${ref.id}, got ${parsed.value.meta.id}")
+        }
+        return parsed
     }
 
     override suspend fun loadViewDefinitionContract(ref: ContractRef): ContractRegistryPort.Result<ViewDefinitionContract> {
-        val map = loadYaml("view-definition.v1.yaml") ?: return err("view-definition.v1.yaml not found")
-        return parseViewDefinition(map)
+        // ID 기반 파일 찾기: view.product.core.v1 -> view-product-core.v1.yaml
+        // fallback: view-definition.v1.yaml
+        val filename = when {
+            ref.id != "view.product.pdp.v1" -> {
+                // view.product.core.v1 -> view-product-core.v1.yaml
+                val idPart = ref.id.replace(".v1", "").replace(".", "-")
+                "$idPart.v1.yaml"
+            }
+            else -> "view-definition.v1.yaml"
+        }
+        val map = loadYaml(filename) ?: loadYaml("view-definition.v1.yaml") ?: return err("view definition contract not found: $filename or view-definition.v1.yaml")
+        val parsed = parseViewDefinition(map)
+        // ID 검증 (fail-closed)
+        if (parsed is ContractRegistryPort.Result.Ok && parsed.value.meta.id != ref.id) {
+            return err("ViewDefinition ID mismatch: expected ${ref.id}, got ${parsed.value.meta.id}")
+        }
+        return parsed
     }
 
     private fun loadYaml(filename: String): Map<String, Any?>? {
@@ -205,6 +236,19 @@ class LocalYamlContractRegistryAdapter(
                 } catch (e: IllegalArgumentException) {
                     return err("invalid SliceType '$sliceTypeStr' in slice")
                 }
+
+                // RFC-IMPL-016: sliceKind 파싱 (옵셔널, 기본값: STANDARD)
+                val sliceKindStr = s["sliceKind"]?.toString()?.uppercase()
+                val sliceKind = if (sliceKindStr != null) {
+                    try {
+                        SliceKind.valueOf(sliceKindStr)
+                    } catch (e: IllegalArgumentException) {
+                        return err("invalid SliceKind '$sliceKindStr' in slice")
+                    }
+                } else {
+                    SliceKind.STANDARD
+                }
+
                 @Suppress("UNCHECKED_CAST")
                 val buildRulesRaw = s["buildRules"] as? Map<String, Any?>
                 val buildRulesType = buildRulesRaw?.get("type")?.toString()?.lowercase()
@@ -216,7 +260,22 @@ class LocalYamlContractRegistryAdapter(
                     }
                     "mapfields" -> {
                         @Suppress("UNCHECKED_CAST")
-                        val mappings = buildRulesRaw["mappings"] as? Map<String, String> ?: emptyMap()
+                        val mappingsRaw = buildRulesRaw["mappings"]
+                        val mappings: Map<String, String> = when (mappingsRaw) {
+                            // 기존 방식: { from: to } 형태
+                            is Map<*, *> -> mappingsRaw.mapNotNull { (k, v) ->
+                                if (k != null && v != null) k.toString() to v.toString() else null
+                            }.toMap()
+                            // RFC-IMPL-016 신규 방식: [{ from: x, to: y }] 배열 형태
+                            is List<*> -> mappingsRaw.mapNotNull { item ->
+                                @Suppress("UNCHECKED_CAST")
+                                val m = item as? Map<String, Any?> ?: return@mapNotNull null
+                                val from = m["from"]?.toString() ?: return@mapNotNull null
+                                val to = m["to"]?.toString() ?: return@mapNotNull null
+                                from to to
+                            }.toMap()
+                            else -> emptyMap()
+                        }
                         SliceBuildRules.MapFields(mappings)
                     }
                     else -> return err("unknown buildRules type: $buildRulesType")
@@ -242,7 +301,7 @@ class LocalYamlContractRegistryAdapter(
                     )
                 }
 
-                SliceDefinition(sliceType, buildRules, sliceJoins)
+                SliceDefinition(sliceType, buildRules, sliceJoins, sliceKind)
             }
         } catch (e: IllegalArgumentException) {
             return err("invalid SliceDefinition: ${e.message}")

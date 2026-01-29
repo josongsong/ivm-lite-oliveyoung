@@ -1,14 +1,11 @@
 package com.oliveyoung.ivmlite.pkg.orchestration.application
 
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPort
+import com.oliveyoung.ivmlite.pkg.slices.domain.SliceMerger
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonObject
-import kotlinx.serialization.json.buildJsonObject
-import kotlinx.serialization.json.put
 import org.slf4j.LoggerFactory
 
 /**
@@ -27,11 +24,6 @@ class ShipWorkflow(
     private val sinks: Map<String, SinkPort>
 ) {
     private val logger = LoggerFactory.getLogger(javaClass)
-    
-    private val json = Json {
-        prettyPrint = false
-        encodeDefaults = true
-    }
     
     /**
      * 특정 Sink로 Ship 실행
@@ -63,8 +55,8 @@ class ShipWorkflow(
             return Result.Err(DomainError.NotFoundError("slice", entityKey.value))
         }
         
-        // 3. Slice들을 하나의 문서로 병합
-        val mergedPayload = mergeSlices(slices)
+        // 3. Slice들을 하나의 문서로 병합 (SOLID: SliceMerger로 분리)
+        val mergedPayload = SliceMerger.merge(slices)
         
         // 4. Sink로 Ship
         return when (val shipResult = sink.ship(tenantId, entityKey, version, mergedPayload)) {
@@ -109,7 +101,7 @@ class ShipWorkflow(
             return Result.Err(DomainError.NotFoundError("slice", entityKey.value))
         }
         
-        val mergedPayload = mergeSlices(slices)
+        val mergedPayload = SliceMerger.merge(slices)
         
         // 2. 각 Sink로 Ship
         val results = mutableListOf<SingleSinkResult>()
@@ -185,7 +177,7 @@ class ShipWorkflow(
             SinkPort.ShipItem(
                 entityKey = entity.entityKey,
                 version = entity.version,
-                payload = mergeSlices(slices)
+                payload = SliceMerger.merge(slices)
             )
         }
         
@@ -215,31 +207,6 @@ class ShipWorkflow(
                 Result.Err(result.error)
             }
         }
-    }
-    
-    /**
-     * Slice들을 하나의 JSON 문서로 병합
-     */
-    private fun mergeSlices(slices: List<com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord>): String {
-        val merged = buildJsonObject {
-            slices.forEach { slice ->
-                // Tombstone이 아닌 Slice만 포함
-                if (slice.tombstone == null) {
-                    try {
-                        val sliceJson = json.parseToJsonElement(slice.data)
-                        if (sliceJson is JsonObject) {
-                            sliceJson.forEach { (key, value) ->
-                                put(key, value)
-                            }
-                        }
-                    } catch (e: Exception) {
-                        // JSON 파싱 실패 시 raw data 포함
-                        put(slice.sliceType.name.lowercase(), slice.data)
-                    }
-                }
-            }
-        }
-        return json.encodeToString(JsonObject.serializer(), merged)
     }
     
     // ===== Result Types =====

@@ -128,4 +128,12 @@ sealed class DomainError(message: String) : RuntimeException(message) {
         override val errorCode: String = "ERR_NOT_SUPPORTED"
         override fun toHttpStatus(): Int = 501
     }
+
+    // ==================== 일반 에러 ====================
+
+    /** 내부 에러 (일반적인 에러) */
+    data class InternalError(val msg: String) : DomainError(msg) {
+        override val errorCode: String = "ERR_INTERNAL"
+        override fun toHttpStatus(): Int = 500
+    }
 }

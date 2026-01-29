@@ -2,24 +2,27 @@ package com.oliveyoung.ivmlite.pkg.changeset.domain
 
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
+import com.oliveyoung.ivmlite.pkg.changeset.ports.ChangeSetBuilderPort
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
+import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 
 /**
  * v4 초기: JSON Pointer 수준의 간단 diff로 ChangeSet을 만든다.
  * - 정확한 RFC6901 전수 diff가 필요하면 v4.1+에서 별도 엔진으로 교체한다.
- * 
+ *
  * 결정성(Determinism): 동일 입력 → 동일 ChangeSet (ID 포함)
  * - changeSetId는 입력값의 hash로 결정적 생성
  * - UUID.randomUUID() 사용 금지
  */
 class ChangeSetBuilder(
     private val om: ObjectMapper = ObjectMapper(),
-) {
+) : ChangeSetBuilderPort {
 
-    fun build(
-        tenantId: com.oliveyoung.ivmlite.shared.domain.types.TenantId,
+    override fun build(
+        tenantId: TenantId,
         entityType: String,
-        entityKey: com.oliveyoung.ivmlite.shared.domain.types.EntityKey,
+        entityKey: EntityKey,
         fromVersion: Long,
         toVersion: Long,
         fromPayload: String?,

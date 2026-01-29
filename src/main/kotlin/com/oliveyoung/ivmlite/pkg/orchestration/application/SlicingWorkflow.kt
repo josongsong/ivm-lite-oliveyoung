@@ -1,15 +1,15 @@
 package com.oliveyoung.ivmlite.pkg.orchestration.application
 
-import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
-import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
+import com.oliveyoung.ivmlite.pkg.changeset.ports.ChangeSetBuilderPort
+import com.oliveyoung.ivmlite.pkg.changeset.ports.ImpactCalculatorPort
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.pkg.slices.domain.DeleteReason
-import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
 import com.oliveyoung.ivmlite.pkg.slices.domain.Tombstone
 import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
+import com.oliveyoung.ivmlite.pkg.slices.ports.SlicingEnginePort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
@@ -33,10 +33,10 @@ import io.opentelemetry.api.trace.Tracer
 class SlicingWorkflow(
     private val rawRepo: RawDataRepositoryPort,
     private val sliceRepo: SliceRepositoryPort,
-    private val slicingEngine: SlicingEngine,
+    private val slicingEngine: SlicingEnginePort,
     private val invertedIndexRepo: InvertedIndexRepositoryPort,
-    private val changeSetBuilder: ChangeSetBuilder,
-    private val impactCalculator: ImpactCalculator,
+    private val changeSetBuilder: ChangeSetBuilderPort,
+    private val impactCalculator: ImpactCalculatorPort,
     private val contractRegistry: ContractRegistryPort,
     private val tracer: Tracer = OpenTelemetry.noop().getTracer("slicing"),
 ) {
@@ -49,7 +49,7 @@ class SlicingWorkflow(
 
     /**
      * FULL 슬라이싱: 전체 Slice 재생성
-     * 
+     *
      * @param tenantId 테넌트 ID
      * @param entityKey 엔티티 키
      * @param version 데이터 버전
@@ -77,9 +77,9 @@ class SlicingWorkflow(
             }
 
             // RFC-IMPL-010 D-3: SlicingEngine을 사용하여 RuleSet 기반 슬라이싱
-            val slicingResult: SlicingEngine.SlicingResult = when (val r = slicingEngine.slice(raw, ruleSetRef)) {
-                is SlicingEngine.Result.Ok -> r.value
-                is SlicingEngine.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+            val slicingResult: SlicingEnginePort.SlicingResult = when (val r = slicingEngine.slice(raw, ruleSetRef)) {
+                is SlicingEnginePort.Result.Ok -> r.value
+                is SlicingEnginePort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             val put = sliceRepo.putAllIdempotent(slicingResult.slices)
@@ -247,8 +247,8 @@ class SlicingWorkflow(
 
             // 6. 영향받는 Slice만 재생성
             val slicingResult = when (val r = slicingEngine.slicePartial(toRaw, ruleSetRef, impactedTypes)) {
-                is SlicingEngine.Result.Ok -> r.value
-                is SlicingEngine.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is SlicingEnginePort.Result.Ok -> r.value
+                is SlicingEnginePort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             // 7. 기존 Slice 중 영향 없는 것 버전 올려서 유지

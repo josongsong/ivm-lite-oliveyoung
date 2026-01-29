@@ -13,6 +13,7 @@ import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
 import org.slf4j.LoggerFactory
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
+import com.oliveyoung.ivmlite.shared.domain.types.SliceKind
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import kotlinx.serialization.json.*
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
@@ -449,6 +450,19 @@ class DynamoDBContractRegistryAdapter(
                 } catch (e: IllegalArgumentException) {
                     return err("invalid SliceType '$typeStr' in slice for ${ref.id}")
                 }
+
+                // RFC-IMPL-016: sliceKind 파싱 (옵셔널, 기본값: STANDARD)
+                val sliceKindStr = sliceObj["sliceKind"]?.jsonPrimitive?.contentOrNull
+                val sliceKind = if (sliceKindStr != null) {
+                    try {
+                        SliceKind.valueOf(sliceKindStr.uppercase())
+                    } catch (e: IllegalArgumentException) {
+                        return err("invalid SliceKind '$sliceKindStr' in slice for ${ref.id}")
+                    }
+                } else {
+                    SliceKind.STANDARD
+                }
+
                 val buildRulesObj = sliceObj["buildRules"]?.jsonObject
                     ?: return err("missing buildRules in slice for ${ref.id}")
                 val buildRulesType = buildRulesObj["type"]?.jsonPrimitive?.content?.lowercase()
@@ -458,9 +472,20 @@ class DynamoDBContractRegistryAdapter(
                         SliceBuildRules.PassThrough(fields)
                     }
                     "mapfields" -> {
-                        val mappings = buildRulesObj["mappings"]?.jsonObject?.mapNotNull { (k, v) ->
-                            v.jsonPrimitive.contentOrNull?.let { k to it }
-                        }?.toMap() ?: emptyMap()
+                        // RFC-IMPL-016: 배열 형태와 객체 형태 모두 지원
+                        val mappingsElement = buildRulesObj["mappings"]
+                        val mappings: Map<String, String> = when {
+                            mappingsElement is JsonObject -> mappingsElement.mapNotNull { (k, v) ->
+                                v.jsonPrimitive.contentOrNull?.let { k to it }
+                            }.toMap()
+                            mappingsElement is JsonArray -> mappingsElement.mapNotNull { item ->
+                                val obj = item.jsonObject
+                                val from = obj["from"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                                val to = obj["to"]?.jsonPrimitive?.contentOrNull ?: return@mapNotNull null
+                                from to to
+                            }.toMap()
+                            else -> emptyMap()
+                        }
                         SliceBuildRules.MapFields(mappings)
                     }
                     else -> return err("unknown buildRules type '$buildRulesType' in slice for ${ref.id}")
@@ -499,7 +524,7 @@ class DynamoDBContractRegistryAdapter(
                     )
                 }
 
-                slices.add(SliceDefinition(type, buildRules, sliceJoins))
+                slices.add(SliceDefinition(type, buildRules, sliceJoins, sliceKind))
             }
 
             // RFC-IMPL-010 Phase D-9: indexes 파싱 (통합 버전 - references/maxFanout 추가)

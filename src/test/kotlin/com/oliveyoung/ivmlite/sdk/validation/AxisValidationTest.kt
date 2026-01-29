@@ -12,7 +12,9 @@ import kotlin.test.assertTrue
 class AxisValidationTest {
 
     @Test
-    fun `compile_async + ship_sync 조합은 에러 반환`() {
+    @Suppress("DEPRECATION")
+    fun `RFC-IMPL-013 이후 모든 ship 조합은 정상 (ship_sync deprecated)`() {
+        // RFC-IMPL-013: ship.sync 제거됨, validator에서 검증 불필요
         val spec = DeploySpec(
             compileMode = CompileMode.Async,
             shipSpec = ShipSpec(ShipMode.Sync, emptyList()),
@@ -21,8 +23,8 @@ class AxisValidationTest {
 
         val errors = AxisValidator.validate(spec)
 
-        assertEquals(1, errors.size)
-        assertEquals("compile.async + ship.sync is not allowed", errors[0])
+        // RFC-IMPL-013: 모든 ship은 outbox를 통해 처리되므로 에러 없음
+        assertTrue(errors.isEmpty())
     }
 
     @Test

@@ -64,12 +64,12 @@ $env:AWS_REGION="ap-northeast-2"
 dynamodb:
   endpoint: ${DYNAMODB_ENDPOINT:-}
   region: ${AWS_REGION:-ap-northeast-2}
-  tableName: ${DYNAMODB_TABLE:-ivm-lite-schema-registry-local}
-  accessKeyId: ${AWS_ACCESS_KEY_ID:-YOUR_AWS_ACCESS_KEY_ID}
-  secretAccessKey: ${AWS_SECRET_ACCESS_KEY:-YOUR_AWS_SECRET_ACCESS_KEY}
+  tableName: ${DYNAMODB_TABLE}
+  accessKeyId: ${AWS_ACCESS_KEY_ID:-}
+  secretAccessKey: ${AWS_SECRET_ACCESS_KEY:-}
 ```
 
-> 💡 **권장**: 환경 변수를 사용하세요. `application.yaml`의 기본값은 로컬 개발용으로만 사용하세요.
+> 💡 **권장**: 환경 변수를 사용하세요. (remote-only: 로컬 기본값 없음)
 
 ---
 
@@ -117,7 +117,7 @@ echo $env:AWS_SECRET_ACCESS_KEY
 # DynamoDB 테이블 목록 조회
 aws dynamodb list-tables \
   --region ap-northeast-2 \
-  --endpoint-url http://localhost:8000  # 로컬 DynamoDB인 경우
+  # endpoint override(DYNAMODB_ENDPOINT)는 기본 비움 (=AWS 기본 엔드포인트)
 ```
 
 ---
@@ -166,4 +166,3 @@ AccessDeniedException: User is not authorized to perform: dynamodb:Query
 ## 참고
 
 - [AWS SDK for Java v2 - 자격 증명](https://docs.aws.amazon.com/sdk-for-java/latest/developer-guide/credentials.html)
-- [DynamoDB Local 사용 가이드](./local-development.md)

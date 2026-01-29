@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
@@ -10,6 +12,7 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
+import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
@@ -68,9 +71,9 @@ class E2EIntegrationTest : StringSpec({
             ContractRegistryPort.Result.Err(DomainError.NotFoundError("ViewDefinition", ref.id))
     }
 
-    val slicingEngine = SlicingEngine(mockContractRegistry)
-    val changeSetBuilder = ChangeSetBuilder()
-    val impactCalculator = ImpactCalculator()
+    val slicingEngine = DefaultSlicingEngineAdapter(SlicingEngine(mockContractRegistry))
+    val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
+    val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
 
     val ingestWorkflow = IngestWorkflow(rawDataRepo, outboxRepo)
     val slicingWorkflow = SlicingWorkflow(
@@ -86,13 +89,13 @@ class E2EIntegrationTest : StringSpec({
 
     val workerConfig = WorkerConfig(
         enabled = true,
-        pollIntervalMs = 20,
-        idlePollIntervalMs = 50,
+        pollIntervalMs = 5,      // 20 → 5 (테스트 속도 개선)
+        idlePollIntervalMs = 10, // 50 → 10
         batchSize = 10,
-        maxBackoffMs = 200,
+        maxBackoffMs = 50,       // 200 → 50
         backoffMultiplier = 2.0,
         jitterFactor = 0.0,
-        shutdownTimeoutMs = 500,
+        shutdownTimeoutMs = 100, // 500 → 100
     )
 
     val worker = OutboxPollingWorker(
@@ -136,7 +139,7 @@ class E2EIntegrationTest : StringSpec({
 
         // Step 3: Worker 시작 → Polling → Slicing 자동 실행
         worker.start()
-        delay(150) // Polling 여유 시간
+        delay(30) // Polling 여유 시간 (150 → 30)
 
         // Step 4: Outbox 처리 완료 확인 (PENDING → PROCESSED)
         val pendingAfter = outboxRepo.findPending(10)
@@ -188,7 +191,7 @@ class E2EIntegrationTest : StringSpec({
 
         // Step 3: Worker 시작 → 배치 처리
         worker.start()
-        delay(300) // 배치 처리 여유 시간
+        delay(50) // 배치 처리 여유 시간 (300 → 50)
 
         // Step 4: 모든 Outbox 처리 완료 확인
         val pendingAfter = outboxRepo.findPending(20)
@@ -276,7 +279,7 @@ class E2EIntegrationTest : StringSpec({
 
         // Worker 실행
         worker.start()
-        delay(150)
+        delay(30)  // 150 → 30
 
         // Query 성공 (한 번만 처리됨)
         val queryResult = queryViewWorkflow.execute(
@@ -330,7 +333,7 @@ class E2EIntegrationTest : StringSpec({
 
         // Worker로 모두 처리
         worker.start()
-        delay(300)
+        delay(50)  // 300 → 50
 
         // 각 버전 독립 Query 가능
         versions.forEach { (version, _) ->
@@ -377,7 +380,7 @@ class E2EIntegrationTest : StringSpec({
         )
 
         worker.start()
-        delay(200)
+        delay(30)  // 200 → 30
 
         // Tenant A Query → A 데이터만
         val resultA = queryViewWorkflow.execute(
@@ -432,7 +435,7 @@ class E2EIntegrationTest : StringSpec({
         )
 
         worker.start()
-        delay(200)
+        delay(30)  // 200 → 30
 
         // 두 Slice의 Hash 비교 (batchGet 사용)
         val key1 = SliceRepositoryPort.SliceKey(tenantId, entityKey1, 1L, SliceType.CORE)
@@ -477,7 +480,7 @@ class E2EIntegrationTest : StringSpec({
 
         // Worker 시작 → 미처리 항목 자동 처리
         worker.start()
-        delay(300)
+        delay(50)  // 300 → 50
 
         // 모든 Outbox 처리 완료
         val afterRecovery = outboxRepo.findPending(10)
