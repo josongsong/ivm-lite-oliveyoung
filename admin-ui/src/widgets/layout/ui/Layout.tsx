@@ -14,6 +14,7 @@ import {
   Zap
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
+import { APP_INFO } from '@/shared/config'
 import './Layout.css'
 
 interface LayoutProps {
@@ -133,7 +134,7 @@ export function Layout({ children }: LayoutProps) {
           </button>
           <div className="version-info">
             <span className="version-label">Version</span>
-            <span className="version-value">1.0.0</span>
+            <span className="version-value">{APP_INFO.VERSION}</span>
           </div>
         </div>
       </aside>

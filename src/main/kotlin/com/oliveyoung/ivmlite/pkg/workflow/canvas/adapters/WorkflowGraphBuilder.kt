@@ -43,6 +43,10 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
         val entityTypes = mutableSetOf<String>()
         var entityIndex = 0
 
+        // 중복 방지를 위한 생성된 노드/엣지 ID 추적
+        val createdNodeIds = mutableSetOf<String>()
+        val createdEdgeIds = mutableSetOf<String>()
+
         for (schema in entitySchemas) {
             val entityType = schema.entityType ?: continue
             entityTypes.add(entityType)
@@ -51,6 +55,7 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
             // Layer 0: RawData 노드
             val rawDataNode = createRawDataNode(schema, baseX, 0)
             nodes.add(rawDataNode)
+            createdNodeIds.add(rawDataNode.id)
 
             // Layer 1: RuleSet 노드 (작은 규칙 노드)
             val ruleSet = ruleSets.find { it.entityType == entityType }
@@ -59,6 +64,7 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
             if (ruleSet != null) {
                 val ruleSetNode = createRuleSetNode(ruleSet, baseX, 1)
                 nodes.add(ruleSetNode)
+                createdNodeIds.add(ruleSetNode.id)
                 edges.add(WorkflowEdge.create(rawDataNode.id, ruleSetNode.id))
 
                 // Layer 2: Slice 노드들
@@ -66,6 +72,7 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
                     val sliceX = baseX + (idx - slices.size / 2.0) * NODE_GAP_X
                     val sliceNode = createSliceNode(entityType, sliceType, sliceX, 2)
                     nodes.add(sliceNode)
+                    createdNodeIds.add(sliceNode.id)
                     edges.add(WorkflowEdge.animated(ruleSetNode.id, sliceNode.id))
                 }
             }
@@ -78,6 +85,7 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
                 // ViewDef 중간 노드 (여러 ViewDefinition을 하나의 규칙 노드로 대표)
                 val viewDefNode = createViewDefNode(entityType, baseX, 3)
                 nodes.add(viewDefNode)
+                createdNodeIds.add(viewDefNode.id)
 
                 // Slice → ViewDef 엣지
                 slices.forEach { sliceType ->
@@ -90,6 +98,7 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
                     val viewX = baseX + (idx - relatedViews.size / 2.0) * NODE_GAP_X
                     val viewNode = createViewNode(viewDef, viewX, 4)
                     nodes.add(viewNode)
+                    createdNodeIds.add(viewNode.id)
                     edges.add(WorkflowEdge.create(viewDefNode.id, viewNode.id))
                 }
             }
@@ -104,20 +113,33 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
                 relatedSinks.forEachIndexed { idx, sinkRule ->
                     val sinkX = baseX + (idx - relatedSinks.size / 2.0) * NODE_GAP_X
 
-                    // SinkRule 노드
-                    val sinkRuleNode = createSinkRuleNode(sinkRule, sinkX, 5)
-                    nodes.add(sinkRuleNode)
+                    // SinkRule 노드 (중복 방지)
+                    val sinkRuleNodeId = "sinkrule_${sinkRule.id}"
+                    if (sinkRuleNodeId !in createdNodeIds) {
+                        val sinkRuleNode = createSinkRuleNode(sinkRule, sinkX, 5)
+                        nodes.add(sinkRuleNode)
+                        createdNodeIds.add(sinkRuleNodeId)
 
-                    // View → SinkRule 엣지 (모든 View에서 연결)
-                    relatedViews.forEach { viewDef ->
-                        val viewNodeId = "view_${viewDef.viewName}"
-                        edges.add(WorkflowEdge.create(viewNodeId, sinkRuleNode.id))
+                        // Sink 노드 (중복 방지)
+                        val sinkNodeId = "sink_${sinkRule.id}"
+                        val sinkNode = createSinkNode(sinkRule, sinkX, 6)
+                        nodes.add(sinkNode)
+                        createdNodeIds.add(sinkNodeId)
+
+                        val sinkEdge = WorkflowEdge.animated(sinkRuleNodeId, sinkNodeId)
+                        edges.add(sinkEdge)
+                        createdEdgeIds.add(sinkEdge.id)
                     }
 
-                    // Sink 노드
-                    val sinkNode = createSinkNode(sinkRule, sinkX, 6)
-                    nodes.add(sinkNode)
-                    edges.add(WorkflowEdge.animated(sinkRuleNode.id, sinkNode.id))
+                    // View → SinkRule 엣지 (모든 View에서 연결, 중복 방지)
+                    relatedViews.forEach { viewDef ->
+                        val viewNodeId = "view_${viewDef.viewName}"
+                        val edgeId = "edge_${viewNodeId}_$sinkRuleNodeId"
+                        if (edgeId !in createdEdgeIds) {
+                            edges.add(WorkflowEdge.create(viewNodeId, sinkRuleNodeId))
+                            createdEdgeIds.add(edgeId)
+                        }
+                    }
                 }
             }
 

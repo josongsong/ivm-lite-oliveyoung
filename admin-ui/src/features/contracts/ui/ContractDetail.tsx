@@ -18,21 +18,18 @@ import './ContractDetail.css'
 
 export function ContractDetail() {
   const { kind, id } = useParams<{ kind: string; id: string }>()
+  const decodedId = decodeURIComponent(id ?? '')
 
-  const { data: contractsData } = useQuery({
+  // 단일 API 호출로 전체 목록 조회 (캐시 활용)
+  const { data: contractsData, isLoading, error } = useQuery({
     queryKey: ['contracts'],
     queryFn: () => fetchApi<ContractListResponse>('/contracts'),
   })
 
-  const { data, isLoading, error } = useQuery({
-    queryKey: ['contract', kind, id],
-    queryFn: async () => {
-      const response = await fetchApi<ContractListResponse>('/contracts')
-      return response.contracts.find(
-        c => c.kind === kind && c.id === decodeURIComponent(id ?? '')
-      )
-    },
-  })
+  // 캐시된 데이터에서 현재 contract 추출
+  const data = contractsData?.contracts.find(
+    c => c.kind === kind && c.id === decodedId
+  )
 
   const handleCopy = () => {
     if (data?.content) {

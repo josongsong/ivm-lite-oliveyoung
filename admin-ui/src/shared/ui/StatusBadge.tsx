@@ -1,13 +1,39 @@
-import { AlertTriangle, CheckCircle2, Clock, Loader2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, Loader2, XCircle } from 'lucide-react'
 
 interface StatusBadgeProps {
   status: string
   showIcon?: boolean
 }
 
+// 상태값을 badge 클래스로 매핑
+const statusClassMap: Record<string, string> = {
+  // Health 상태
+  healthy: 'success',
+  degraded: 'warning',
+  unhealthy: 'error',
+  unknown: 'warning',
+  // 일반 상태
+  pending: 'pending',
+  processing: 'processing',
+  processed: 'processed',
+  completed: 'completed',
+  failed: 'failed',
+  running: 'running',
+  paused: 'paused',
+  cancelled: 'cancelled',
+}
+
 export function StatusBadge({ status, showIcon = true }: StatusBadgeProps) {
-  const statusClass = status.toLowerCase()
+  const statusLower = status.toLowerCase()
+  const badgeClass = statusClassMap[statusLower] || statusLower
+
   const icon = showIcon ? {
+    // Health 상태 아이콘
+    healthy: <CheckCircle2 size={12} />,
+    degraded: <AlertTriangle size={12} />,
+    unhealthy: <XCircle size={12} />,
+    unknown: <AlertTriangle size={12} />,
+    // 일반 상태 아이콘
     pending: <Clock size={12} />,
     processing: <Loader2 size={12} className="spin" />,
     processed: <CheckCircle2 size={12} />,
@@ -16,10 +42,10 @@ export function StatusBadge({ status, showIcon = true }: StatusBadgeProps) {
     running: <Loader2 size={12} className="spin" />,
     paused: <Clock size={12} />,
     cancelled: <AlertTriangle size={12} />,
-  }[statusClass] || null : null
+  }[statusLower] || null : null
 
   return (
-    <span className={`badge badge-${statusClass}`}>
+    <span className={`badge badge-${badgeClass}`}>
       {icon}
       {status}
     </span>

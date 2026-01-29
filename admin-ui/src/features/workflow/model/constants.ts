@@ -54,13 +54,13 @@ export const STATUS_COLORS: Record<string, string> = {
 }
 
 export const NODE_DIMENSIONS: Record<string, { width: number; height: number }> = {
-  rawdata: { width: 160, height: 80 },
-  slice: { width: 120, height: 60 },
-  view: { width: 140, height: 70 },
-  sink: { width: 140, height: 70 },
-  ruleset: { width: 100, height: 40 },
-  viewdef: { width: 100, height: 40 },
-  view_def: { width: 100, height: 40 },
-  sinkrule: { width: 100, height: 40 },
-  sink_rule: { width: 100, height: 40 }
+  rawdata: { width: 100, height: 65 },
+  slice: { width: 100, height: 55 },
+  view: { width: 130, height: 60 },
+  sink: { width: 130, height: 60 },
+  ruleset: { width: 80, height: 32 },
+  viewdef: { width: 80, height: 32 },
+  view_def: { width: 80, height: 32 },
+  sinkrule: { width: 80, height: 32 },
+  sink_rule: { width: 80, height: 32 }
 }

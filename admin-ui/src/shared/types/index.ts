@@ -21,6 +21,11 @@ export type {
   RawDataStats,
   SliceStats,
   OutboxPipelineStats,
+  RawDataItem,
+  SliceItem,
+  SliceDetailResponse,
+  RawDataDetailResponse,
+  EntityFlowResponse,
 } from './pipeline'
 
 // Outbox types
@@ -31,6 +36,10 @@ export type {
   OutboxEntryDto,
   RetryResponse,
   BatchRetryResponse,
+  StaleOutboxItem,
+  StaleResponse,
+  FailedOutboxItem,
+  FailedResponse,
 } from './outbox'
 
 // Health types

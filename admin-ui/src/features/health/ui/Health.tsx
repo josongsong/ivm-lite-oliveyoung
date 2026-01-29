@@ -13,6 +13,7 @@ import {
   Zap
 } from 'lucide-react'
 import { fetchApi } from '@/shared/api'
+import { QUERY_CONFIG } from '@/shared/config'
 import type { ComponentHealth, HealthResponse, HealthStatus } from '@/shared/types'
 import { fadeInUp, formatUptime, Loading, PageHeader, staggerContainer } from '@/shared/ui'
 import './Health.css'
@@ -90,7 +91,7 @@ export function Health() {
   const { data: health, isLoading } = useQuery({
     queryKey: ['health'],
     queryFn: () => fetchApi<HealthResponse>('/health'),
-    refetchInterval: 10000, // 10초마다 갱신
+    refetchInterval: QUERY_CONFIG.DASHBOARD_INTERVAL,
   })
 
   if (isLoading) return <Loading />

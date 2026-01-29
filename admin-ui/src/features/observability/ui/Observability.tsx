@@ -10,8 +10,9 @@ import {
   TrendingUp
 } from 'lucide-react'
 import { fetchApi } from '@/shared/api'
+import { QUERY_CONFIG } from '@/shared/config'
 import type { ObservabilityResponse } from '@/shared/types'
-import { fadeInUp, Loading, PageHeader, staggerContainer } from '@/shared/ui'
+import { fadeInUp, Loading, PageHeader, staggerContainer, StatusBadge } from '@/shared/ui'
 import './Observability.css'
 
 function LagTrendIcon({ trend }: { trend: string }) {
@@ -47,23 +48,11 @@ function QueueBar({ label, value, total, color }: { label: string; value: number
   )
 }
 
-function StatusBadge({ health }: { health: string }) {
-  const colorClass = health === 'HEALTHY' ? 'badge-success'
-    : health === 'DEGRADED' ? 'badge-warning'
-    : 'badge-error'
-
-  return (
-    <span className={`badge ${colorClass}`}>
-      {health}
-    </span>
-  )
-}
-
 export function Observability() {
   const { data, isLoading } = useQuery({
     queryKey: ['observability-dashboard'],
     queryFn: () => fetchApi<ObservabilityResponse>('/observability/dashboard'),
-    refetchInterval: 15000,
+    refetchInterval: QUERY_CONFIG.OBSERVABILITY_INTERVAL,
   })
 
   if (isLoading) return <Loading />
@@ -88,7 +77,7 @@ export function Observability() {
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
         >
-          <StatusBadge health={status.health} />
+          <StatusBadge status={status.health} />
           <span className="status-summary">{status.summary}</span>
           {status.issues.length > 0 && (
             <span className="status-issues">

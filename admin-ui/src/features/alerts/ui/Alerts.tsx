@@ -17,6 +17,7 @@ import {
   Repeat
 } from 'lucide-react'
 import { fetchApi, postApi } from '@/shared/api'
+import { QUERY_CONFIG } from '@/shared/config'
 import type { Alert, AlertRule, AlertSeverity, AlertsResponse } from '@/shared/types'
 import { fadeInLeft, formatTimeSince, Loading, PageHeader, staggerContainer } from '@/shared/ui'
 import './Alerts.css'
@@ -168,7 +169,7 @@ export function Alerts() {
   const { data, isLoading } = useQuery({
     queryKey: ['alerts'],
     queryFn: () => fetchApi<AlertsResponse>('/alerts'),
-    refetchInterval: 10000,
+    refetchInterval: QUERY_CONFIG.DASHBOARD_INTERVAL,
   })
 
   const acknowledgeMutation = useMutation({

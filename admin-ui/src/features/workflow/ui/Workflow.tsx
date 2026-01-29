@@ -11,6 +11,7 @@ import {
   RefreshCw
 } from 'lucide-react'
 import { fetchApi } from '@/shared/api'
+import { QUERY_CONFIG } from '@/shared/config'
 import { Loading, PageHeader } from '@/shared/ui'
 import { WorkflowCanvas } from './WorkflowCanvas'
 import { WorkflowDetailPanel } from './WorkflowDetailPanel'
@@ -28,7 +29,7 @@ export function Workflow() {
       const params = entityFilter ? `?entityType=${entityFilter}` : ''
       return fetchApi<WorkflowGraphResponse>(`/workflow/graph${params}`)
     },
-    refetchInterval: 30000
+    refetchInterval: QUERY_CONFIG.WORKFLOW_INTERVAL
   })
 
   // 노드 상세 정보 조회 (BE API)

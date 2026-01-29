@@ -1,1 +1,1 @@
-export { fetchApi, postApi } from './client'
+export { ApiError, fetchApi, postApi } from './client'
