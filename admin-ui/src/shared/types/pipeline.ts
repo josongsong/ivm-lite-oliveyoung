@@ -31,3 +31,46 @@ export interface OutboxPipelineStats {
   shipped: number
   failed: number
 }
+
+// Pipeline detail types
+export interface RawDataItem {
+  tenantId: string
+  entityKey: string
+  version: number
+  schemaId: string
+  createdAt: string | null
+}
+
+export interface SliceItem {
+  tenantId: string
+  entityKey: string
+  version: number
+  sliceType: string
+  hash: string
+  createdAt: string | null
+}
+
+export interface SliceDetailResponse {
+  stats: { total: number; byType: Record<string, number> }
+  byType: { type: string; count: number; lastCreated: string | null }[]
+  recent: SliceItem[]
+}
+
+export interface RawDataDetailResponse {
+  stats: { total: number; byTenant: Record<string, number>; bySchema: Record<string, number> }
+  recent: RawDataItem[]
+}
+
+export interface EntityFlowResponse {
+  entityKey: string
+  rawData: RawDataItem[]
+  slices: SliceItem[]
+  outbox: {
+    id: string
+    aggregateType: string
+    eventType: string
+    status: string
+    createdAt: string | null
+    processedAt: string | null
+  }[]
+}

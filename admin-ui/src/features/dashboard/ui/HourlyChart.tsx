@@ -13,14 +13,15 @@ import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import { TrendingUp } from 'lucide-react'
 import { fetchApi } from '@/shared/api'
+import { CHART_CONFIG, QUERY_CONFIG } from '@/shared/config'
 import type { HourlyStatsResponse } from '@/shared/types'
 import './HourlyChart.css'
 
 export function HourlyChart() {
   const { data, isLoading } = useQuery({
     queryKey: ['outbox-hourly-stats'],
-    queryFn: () => fetchApi<HourlyStatsResponse>('/outbox/stats/hourly?hours=24'),
-    refetchInterval: 60_000, // 1분마다 새로고침
+    queryFn: () => fetchApi<HourlyStatsResponse>(`/outbox/stats/hourly?hours=${CHART_CONFIG.HOURLY_STATS_HOURS}`),
+    refetchInterval: QUERY_CONFIG.CHART_INTERVAL,
   })
 
   const chartData = useMemo(() => {

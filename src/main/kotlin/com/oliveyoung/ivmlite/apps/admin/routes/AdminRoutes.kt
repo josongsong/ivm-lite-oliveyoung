@@ -1,25 +1,21 @@
 package com.oliveyoung.ivmlite.apps.admin.routes
 
-import com.oliveyoung.ivmlite.apps.admin.dto.ApiError
-import com.oliveyoung.ivmlite.apps.admin.dto.toKtorStatus
-import com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
-import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
-import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
-import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
+import com.oliveyoung.ivmlite.apps.admin.application.*
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
-import org.jooq.DSLContext
-import org.jooq.impl.DSL
 import org.koin.ktor.ext.inject
-import java.time.Instant
-import java.time.OffsetDateTime
 import java.util.UUID
 
 /**
  * Admin Routes (관리자 페이지용 API)
+ *
+ * SOTA 리팩토링:
+ * - Service 레이어로 비즈니스 로직 분리
+ * - StatusPages로 에러 처리 (try-catch 제거)
+ * - OutboxStatus enum 사용 (하드코딩 제거)
  *
  * GET /dashboard: 전체 대시보드 데이터
  * GET /outbox/stats: Outbox 통계
@@ -27,688 +23,292 @@ import java.util.UUID
  * GET /db/stats: 데이터베이스 통계
  * GET /outbox/recent: 최근 처리된 작업
  * GET /outbox/failed: 실패한 작업
+ * GET /outbox/{id}: 특정 Outbox 엔트리 상세
+ * GET /outbox/dlq: Dead Letter Queue
+ * POST /outbox/dlq/{id}/replay: DLQ 재처리
+ * POST /outbox/stale/release: Stale 엔트리 복구
+ * POST /outbox/{id}/retry: 실패 엔트리 재시도
+ * POST /outbox/failed/retry-all: 모든 실패 엔트리 재시도
+ * GET /outbox/stats/hourly: 시간대별 통계
+ * GET /outbox/stale: Stale 엔트리 조회
  */
 fun Route.adminRoutes() {
-    val outboxRepo by inject<OutboxRepositoryPort>()
-    val worker by inject<OutboxPollingWorker>()
-    val dsl by inject<DSLContext>()
+    val dashboardService by inject<AdminDashboardService>()
 
     /**
      * GET /dashboard
-     * 전체 대시보드 데이터 (한 번에 모든 정보)
+     * 전체 대시보드 데이터
      */
     get("/dashboard") {
-            try {
-                val outboxStats = getOutboxStats(dsl)
-                val workerStatus = getWorkerStatus(worker)
-                val dbStats = getDatabaseStats(dsl)
-
-                call.respond(
-                    HttpStatusCode.OK,
-                    DashboardResponse(
-                        outbox = outboxStats,
-                        worker = workerStatus,
-                        database = dbStats,
-                        timestamp = Instant.now().toString()
-                    )
-                )
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get dashboard data", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "DASHBOARD_ERROR",
-                        message = "Failed to get dashboard data: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.getDashboard()) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, result.value.toResponse())
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /outbox/stats
      * Outbox 통계
      */
     get("/outbox/stats") {
-            try {
-                val stats = getOutboxStats(dsl)
-                call.respond(HttpStatusCode.OK, stats)
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get outbox stats", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "OUTBOX_STATS_ERROR",
-                        message = "Failed to get outbox stats: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.getOutboxStats()) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, result.value.toResponse())
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /worker/status
-     * Worker 상태 및 메트릭
+     * Worker 상태
      */
     get("/worker/status") {
-            try {
-                val status = getWorkerStatus(worker)
-                call.respond(HttpStatusCode.OK, status)
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get worker status", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "WORKER_STATUS_ERROR",
-                        message = "Failed to get worker status: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.getWorkerStatus()) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, result.value.toResponse())
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /db/stats
      * 데이터베이스 통계
      */
     get("/db/stats") {
-            try {
-                val stats = getDatabaseStats(dsl)
-                call.respond(HttpStatusCode.OK, stats)
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get database stats", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "DB_STATS_ERROR",
-                        message = "Failed to get database stats: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.getDatabaseStats()) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, result.value.toResponse())
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /outbox/recent
-     * 최근 처리된 Outbox 엔트리
+     * 최근 Outbox 엔트리
      */
     get("/outbox/recent") {
-            try {
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
-                val recent = getRecentOutboxEntries(dsl, limit)
-                call.respond(HttpStatusCode.OK, recent)
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get recent outbox entries", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "RECENT_OUTBOX_ERROR",
-                        message = "Failed to get recent outbox entries: ${e.message}"
-                    )
-                )
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
+
+        when (val result = dashboardService.getRecentOutbox(limit)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, RecentOutboxResponse(
+                    items = result.value.map { it.toResponse() },
+                    count = result.value.size
+                ))
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /outbox/failed
      * 실패한 Outbox 엔트리
      */
     get("/outbox/failed") {
-            try {
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
-                val failed = getFailedOutboxEntries(dsl, limit)
-                call.respond(HttpStatusCode.OK, failed)
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get failed outbox entries", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "FAILED_OUTBOX_ERROR",
-                        message = "Failed to get failed outbox entries: ${e.message}"
-                    )
-                )
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
+
+        when (val result = dashboardService.getFailedOutbox(limit)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, FailedOutboxResponse(
+                    items = result.value.map { it.toResponse() },
+                    count = result.value.size
+                ))
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /outbox/{id}
-     * 특정 Outbox 엔트리 상세 조회
+     * 특정 Outbox 엔트리 상세
      */
     get("/outbox/{id}") {
-            try {
-                val idParam = call.parameters["id"] ?: run {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ApiError(code = "MISSING_ID", message = "ID parameter is required")
-                    )
-                    return@get
-                }
-                val id = try {
-                    UUID.fromString(idParam)
-                } catch (e: IllegalArgumentException) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ApiError(code = "INVALID_ID", message = "Invalid UUID format: $idParam")
-                    )
-                    return@get
-                }
+        val idParam = call.parameters["id"]
+            ?: throw IllegalArgumentException("ID parameter is required")
+        val id = try {
+            UUID.fromString(idParam)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid UUID format: $idParam")
+        }
 
-                val result = outboxRepo.findById(id)
-                when (result) {
-                    is OutboxRepositoryPort.Result.Ok -> {
-                        call.respond(HttpStatusCode.OK, result.value.toDto())
-                    }
-                    is OutboxRepositoryPort.Result.Err -> {
-                        call.respond(
-                            result.error.toKtorStatus(),
-                            ApiError.from(result.error)
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get outbox entry", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "OUTBOX_ENTRY_ERROR",
-                        message = "Failed to get outbox entry: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.getOutboxEntry(id)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, result.value.toResponse())
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /outbox/dlq
-     * Dead Letter Queue 조회
+     * Dead Letter Queue
      */
     get("/outbox/dlq") {
-            try {
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
-                val result = outboxRepo.findDlq(limit)
-                when (result) {
-                    is OutboxRepositoryPort.Result.Ok -> {
-                        call.respond(
-                            HttpStatusCode.OK,
-                            DlqResponse(
-                                items = result.value.map { it.toDto() },
-                                count = result.value.size
-                            )
-                        )
-                    }
-                    is OutboxRepositoryPort.Result.Err -> {
-                        call.respond(
-                            result.error.toKtorStatus(),
-                            ApiError.from(result.error)
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get DLQ entries", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "DLQ_ERROR",
-                        message = "Failed to get DLQ entries: ${e.message}"
-                    )
-                )
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
+
+        when (val result = dashboardService.getDlq(limit)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, DlqResponse(
+                    items = result.value.map { it.toResponse() },
+                    count = result.value.size
+                ))
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * POST /outbox/dlq/{id}/replay
-     * DLQ에서 특정 엔트리 재처리
+     * DLQ 재처리
      */
     post("/outbox/dlq/{id}/replay") {
-            try {
-                val idParam = call.parameters["id"] ?: run {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ApiError(code = "MISSING_ID", message = "ID parameter is required")
-                    )
-                    return@post
-                }
-                val id = try {
-                    UUID.fromString(idParam)
-                } catch (e: IllegalArgumentException) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ApiError(code = "INVALID_ID", message = "Invalid UUID format: $idParam")
-                    )
-                    return@post
-                }
+        val idParam = call.parameters["id"]
+            ?: throw IllegalArgumentException("ID parameter is required")
+        val id = try {
+            UUID.fromString(idParam)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid UUID format: $idParam")
+        }
 
-                val result = outboxRepo.replayFromDlq(id)
-                when (result) {
-                    is OutboxRepositoryPort.Result.Ok -> {
-                        call.respond(
-                            HttpStatusCode.OK,
-                            mapOf(
-                                "success" to result.value,
-                                "message" to if (result.value) "Replay successful" else "Replay failed"
-                            )
-                        )
-                    }
-                    is OutboxRepositoryPort.Result.Err -> {
-                        call.respond(
-                            result.error.toKtorStatus(),
-                            ApiError.from(result.error)
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                call.application.log.error("Failed to replay DLQ entry", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "DLQ_REPLAY_ERROR",
-                        message = "Failed to replay DLQ entry: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.replayDlq(id)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "success" to result.value,
+                    "message" to if (result.value) "Replay successful" else "Replay failed"
+                ))
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * POST /outbox/stale/release
-     * Stale PROCESSING 엔트리 복구 (Visibility Timeout)
+     * Stale PROCESSING 엔트리 복구
      */
     post("/outbox/stale/release") {
-            try {
-                val timeoutSeconds = call.request.queryParameters["timeout"]?.toLongOrNull() ?: 300L
-                val result = outboxRepo.releaseExpiredClaims(timeoutSeconds)
-                when (result) {
-                    is OutboxRepositoryPort.Result.Ok -> {
-                        call.respond(
-                            HttpStatusCode.OK,
-                            mapOf(
-                                "released" to result.value,
-                                "message" to "Released ${result.value} stale entries"
-                            )
-                        )
-                    }
-                    is OutboxRepositoryPort.Result.Err -> {
-                        call.respond(
-                            result.error.toKtorStatus(),
-                            ApiError.from(result.error)
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                call.application.log.error("Failed to release stale entries", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "STALE_RELEASE_ERROR",
-                        message = "Failed to release stale entries: ${e.message}"
-                    )
-                )
+        val timeoutSeconds = call.request.queryParameters["timeout"]?.toLongOrNull() ?: 300L
+
+        when (val result = dashboardService.releaseStale(timeoutSeconds)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, mapOf(
+                    "released" to result.value,
+                    "message" to "Released ${result.value} stale entries"
+                ))
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * POST /outbox/{id}/retry
-     * 실패한 Outbox 엔트리 재시도 (FAILED → PENDING)
+     * 실패한 엔트리 재시도
      */
     post("/outbox/{id}/retry") {
-            try {
-                val idParam = call.parameters["id"] ?: run {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ApiError(code = "MISSING_ID", message = "ID parameter is required")
-                    )
-                    return@post
-                }
-                val id = try {
-                    UUID.fromString(idParam)
-                } catch (e: IllegalArgumentException) {
-                    call.respond(
-                        HttpStatusCode.BadRequest,
-                        ApiError(code = "INVALID_ID", message = "Invalid UUID format: $idParam")
-                    )
-                    return@post
-                }
+        val idParam = call.parameters["id"]
+            ?: throw IllegalArgumentException("ID parameter is required")
+        val id = try {
+            UUID.fromString(idParam)
+        } catch (e: IllegalArgumentException) {
+            throw IllegalArgumentException("Invalid UUID format: $idParam")
+        }
 
-                val result = outboxRepo.resetToPending(id)
-                when (result) {
-                    is OutboxRepositoryPort.Result.Ok -> {
-                        call.respond(
-                            HttpStatusCode.OK,
-                            RetryResponse(
-                                success = true,
-                                message = "Entry reset to PENDING for retry",
-                                entry = result.value.toDto()
-                            )
-                        )
-                    }
-                    is OutboxRepositoryPort.Result.Err -> {
-                        call.respond(
-                            result.error.toKtorStatus(),
-                            ApiError.from(result.error)
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                call.application.log.error("Failed to retry outbox entry", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "RETRY_ERROR",
-                        message = "Failed to retry outbox entry: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.retryEntry(id)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, RetryResponse(
+                    success = true,
+                    message = "Entry reset to PENDING for retry",
+                    entry = result.value.toResponse()
+                ))
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * POST /outbox/failed/retry-all
-     * 모든 실패한 작업 일괄 재시도 (FAILED → PENDING)
+     * 모든 실패 엔트리 재시도
      */
     post("/outbox/failed/retry-all") {
-            try {
-                val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
+        val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
 
-                val result = outboxRepo.resetAllFailed(limit)
-                when (result) {
-                    is OutboxRepositoryPort.Result.Ok -> {
-                        call.respond(
-                            HttpStatusCode.OK,
-                            BatchRetryResponse(
-                                success = true,
-                                retriedCount = result.value,
-                                message = "Reset ${result.value} failed entries to PENDING"
-                            )
-                        )
-                    }
-                    is OutboxRepositoryPort.Result.Err -> {
-                        call.respond(
-                            result.error.toKtorStatus(),
-                            ApiError.from(result.error)
-                        )
-                    }
-                }
-            } catch (e: Exception) {
-                call.application.log.error("Failed to retry all failed entries", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "BATCH_RETRY_ERROR",
-                        message = "Failed to retry all failed entries: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.retryAllFailed(limit)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, BatchRetryResponse(
+                    success = true,
+                    retriedCount = result.value,
+                    message = "Reset ${result.value} failed entries to PENDING"
+                ))
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /outbox/stats/hourly
-     * 시간대별 처리량/에러율 통계 (최근 N시간)
+     * 시간대별 통계
      */
     get("/outbox/stats/hourly") {
-            try {
-                val hours = call.request.queryParameters["hours"]?.toIntOrNull() ?: 24
+        val hours = call.request.queryParameters["hours"]?.toIntOrNull() ?: 24
 
-                val stats = dsl.select(
-                    DSL.field("date_trunc('hour', created_at)").`as`("hour"),
-                    DSL.field("status"),
-                    DSL.count().`as`("count")
-                )
-                    .from(DSL.table("outbox"))
-                    .where(
-                        DSL.field("created_at").greaterThan(
-                            DSL.field("NOW() - INTERVAL '$hours hours'")
-                        )
-                    )
-                    .groupBy(
-                        DSL.field("date_trunc('hour', created_at)"),
-                        DSL.field("status")
-                    )
-                    .orderBy(DSL.field("hour").asc())
-                    .fetch()
-
-                val hourlyData = mutableMapOf<String, HourlyStatItem>()
-
-                stats.forEach { record ->
-                    val hour = record.get("hour", java.time.OffsetDateTime::class.java)
-                        ?.toInstant()?.toString() ?: return@forEach
-                    val status = record.get("status", String::class.java) ?: return@forEach
-                    val count = record.get("count", Long::class.java) ?: 0L
-
-                    val item = hourlyData.getOrPut(hour) {
-                        HourlyStatItem(
-                            hour = hour,
-                            pending = 0L,
-                            processing = 0L,
-                            processed = 0L,
-                            failed = 0L,
-                            total = 0L
-                        )
-                    }
-
-                    hourlyData[hour] = when (status) {
-                        "PENDING" -> item.copy(pending = count, total = item.total + count)
-                        "PROCESSING" -> item.copy(processing = count, total = item.total + count)
-                        "PROCESSED" -> item.copy(processed = count, total = item.total + count)
-                        "FAILED" -> item.copy(failed = count, total = item.total + count)
-                        else -> item.copy(total = item.total + count)
-                    }
-                }
-
-                call.respond(
-                    HttpStatusCode.OK,
-                    HourlyStatsResponse(
-                        items = hourlyData.values.toList().sortedBy { it.hour },
-                        hours = hours
-                    )
-                )
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get hourly stats", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "HOURLY_STATS_ERROR",
-                        message = "Failed to get hourly stats: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.getHourlyStats(hours)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, result.value.toResponse())
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
+    }
 
     /**
      * GET /outbox/stale
      * Stale PROCESSING 엔트리 조회
      */
     get("/outbox/stale") {
-            try {
-                val timeoutSeconds = call.request.queryParameters["timeout"]?.toLongOrNull() ?: 300L
-                // Stale 엔트리는 PROCESSING 상태이면서 claimed_at이 timeout 초과한 것들
-                // SQL: WHERE claimed_at < NOW() - INTERVAL '300 seconds'
-                val staleEntries = dsl.select()
-                    .from(DSL.table("outbox"))
-                    .where(DSL.field("status").eq("PROCESSING"))
-                    .and(DSL.field("claimed_at").isNotNull)
-                    .and(
-                        DSL.field("claimed_at").lessThan(
-                            DSL.field("NOW() - INTERVAL '{} seconds'", timeoutSeconds)
-                        )
-                    )
-                    .orderBy(DSL.field("claimed_at").asc())
-                    .limit(100)
-                    .fetch()
+        val timeoutSeconds = call.request.queryParameters["timeout"]?.toLongOrNull() ?: 300L
 
-                val items = staleEntries.map { record ->
-                    val claimedAt = record.get("claimed_at", java.time.OffsetDateTime::class.java)
-                    StaleOutboxItem(
-                        id = record.get("id", UUID::class.java)?.toString() ?: "",
-                        aggregateType = record.get("aggregatetype", String::class.java) ?: "",
-                        aggregateId = record.get("aggregateid", String::class.java) ?: "",
-                        eventType = record.get("type", String::class.java) ?: "",
-                        claimedAt = claimedAt?.toInstant()?.toString(),
-                        claimedBy = record.get("claimed_by", String::class.java),
-                        ageSeconds = claimedAt?.let {
-                            java.time.Duration.between(it.toInstant(), java.time.Instant.now()).seconds
-                        } ?: 0L
-                    )
-                }
-
-                call.respond(
-                    HttpStatusCode.OK,
-                    StaleOutboxResponse(
-                        items = items,
-                        count = items.size,
-                        timeoutSeconds = timeoutSeconds
-                    )
-                )
-            } catch (e: Exception) {
-                call.application.log.error("Failed to get stale entries", e)
-                call.respond(
-                    HttpStatusCode.InternalServerError,
-                    ApiError(
-                        code = "STALE_ERROR",
-                        message = "Failed to get stale entries: ${e.message}"
-                    )
-                )
+        when (val result = dashboardService.getStaleEntries(timeoutSeconds)) {
+            is AdminDashboardService.Result.Ok -> {
+                call.respond(HttpStatusCode.OK, StaleOutboxResponse(
+                    items = result.value.map { it.toResponse() },
+                    count = result.value.size,
+                    timeoutSeconds = timeoutSeconds
+                ))
+            }
+            is AdminDashboardService.Result.Err -> {
+                throw result.error
             }
         }
-}
-
-// ==================== 데이터 조회 함수 ====================
-
-private fun getOutboxStats(dsl: DSLContext): OutboxStatsResponse {
-    val stats = dsl.select(
-        DSL.field("status"),
-        DSL.field("aggregatetype"),
-        DSL.count().`as`("count"),
-        DSL.min(DSL.field("created_at")).`as`("oldest"),
-        DSL.max(DSL.field("created_at")).`as`("newest"),
-        DSL.field("AVG(EXTRACT(EPOCH FROM (COALESCE(processed_at, NOW()) - created_at)))").`as`("avg_latency_sec")
-    )
-        .from(DSL.table("outbox_stats"))
-        .groupBy(DSL.field("status"), DSL.field("aggregatetype"))
-        .orderBy(DSL.field("status"), DSL.field("aggregatetype"))
-        .fetch()
-
-    val byStatus = mutableMapOf<String, Long>()
-    val byType = mutableMapOf<String, Long>()
-    val details = mutableListOf<OutboxStatDetail>()
-
-    stats.forEach { record ->
-        val status = record.get("status", String::class.java) ?: "UNKNOWN"
-        val type = record.get("aggregatetype", String::class.java) ?: "UNKNOWN"
-        val count = record.get("count", Long::class.java) ?: 0L
-        val oldest = record.get("oldest", java.time.OffsetDateTime::class.java)
-        val newest = record.get("newest", java.time.OffsetDateTime::class.java)
-        val avgLatency = record.get("avg_latency_sec", java.math.BigDecimal::class.java)?.toDouble()
-
-        byStatus[status] = (byStatus[status] ?: 0L) + count
-        byType[type] = (byType[type] ?: 0L) + count
-
-        details.add(
-            OutboxStatDetail(
-                status = status,
-                aggregateType = type,
-                count = count,
-                oldest = oldest?.toInstant()?.toString(),
-                newest = newest?.toInstant()?.toString(),
-                avgLatencySeconds = avgLatency
-            )
-        )
     }
-
-    // 전체 통계
-    val totalPending = dsl.selectCount()
-        .from(DSL.table("outbox"))
-        .where(DSL.field("status").eq("PENDING"))
-        .fetchOne(0, Int::class.java) ?: 0
-
-    val totalProcessing = dsl.selectCount()
-        .from(DSL.table("outbox"))
-        .where(DSL.field("status").eq("PROCESSING"))
-        .fetchOne(0, Int::class.java) ?: 0
-
-    val totalFailed = dsl.selectCount()
-        .from(DSL.table("outbox"))
-        .where(DSL.field("status").eq("FAILED"))
-        .fetchOne(0, Int::class.java) ?: 0
-
-    val totalProcessed = dsl.selectCount()
-        .from(DSL.table("outbox"))
-        .where(DSL.field("status").eq("PROCESSED"))
-        .fetchOne(0, Int::class.java) ?: 0
-
-    return OutboxStatsResponse(
-        total = OutboxTotalStats(
-            pending = totalPending.toLong(),
-            processing = totalProcessing.toLong(),
-            failed = totalFailed.toLong(),
-            processed = totalProcessed.toLong()
-        ),
-        byStatus = byStatus,
-        byType = byType,
-        details = details
-    )
-}
-
-private fun getWorkerStatus(worker: OutboxPollingWorker): WorkerStatusResponse {
-    val metrics = worker.getMetrics()
-    return WorkerStatusResponse(
-        running = worker.isRunning(),
-        processed = metrics.processed,
-        failed = metrics.failed,
-        polls = metrics.polls,
-        lastPollTime = null // TODO: Metrics에 lastPollTime 추가 필요
-    )
-}
-
-private fun getDatabaseStats(dsl: DSLContext): DatabaseStatsResponse {
-    val rawDataCount = dsl.selectCount()
-        .from(DSL.table("raw_data"))
-        .fetchOne(0, Int::class.java) ?: 0
-
-    // DynamoDB는 별도 조회 필요 (현재는 PostgreSQL만)
-    return DatabaseStatsResponse(
-        rawDataCount = rawDataCount.toLong(),
-        outboxCount = 0L, // 위에서 계산됨
-        note = "DynamoDB stats require separate query"
-    )
-}
-
-private fun getRecentOutboxEntries(dsl: DSLContext, limit: Int): RecentOutboxResponse {
-    val entries = dsl.select()
-        .from(DSL.table("outbox"))
-        .orderBy(DSL.field("created_at").desc())
-        .limit(limit)
-        .fetch()
-
-    val items = entries.map { record ->
-        RecentOutboxItem(
-            id = record.get("id", UUID::class.java)?.toString() ?: "",
-            aggregateType = record.get("aggregatetype", String::class.java) ?: "",
-            aggregateId = record.get("aggregateid", String::class.java) ?: "",
-            eventType = record.get("type", String::class.java) ?: "",
-            status = record.get("status", String::class.java) ?: "",
-            createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant()?.toString(),
-            processedAt = record.get("processed_at", java.time.OffsetDateTime::class.java)?.toInstant()?.toString(),
-            retryCount = record.get("retry_count", Int::class.java) ?: 0
-        )
-    }
-
-    return RecentOutboxResponse(items = items, count = items.size)
-}
-
-private fun getFailedOutboxEntries(dsl: DSLContext, limit: Int): FailedOutboxResponse {
-    val entries = dsl.select()
-        .from(DSL.table("outbox"))
-        .where(DSL.field("status").eq("FAILED"))
-        .orderBy(DSL.field("created_at").desc())
-        .limit(limit)
-        .fetch()
-
-    val items = entries.map { record ->
-        FailedOutboxItem(
-            id = record.get("id", UUID::class.java)?.toString() ?: "",
-            aggregateType = record.get("aggregatetype", String::class.java) ?: "",
-            aggregateId = record.get("aggregateid", String::class.java) ?: "",
-            eventType = record.get("type", String::class.java) ?: "",
-            createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant()?.toString(),
-            retryCount = record.get("retry_count", Int::class.java) ?: 0,
-            failureReason = record.get("failure_reason", String::class.java)
-        )
-    }
-
-    return FailedOutboxResponse(items = items, count = items.size)
 }
 
 // ==================== Response DTOs ====================
@@ -718,19 +318,19 @@ data class DashboardResponse(
     val outbox: OutboxStatsResponse,
     val worker: WorkerStatusResponse,
     val database: DatabaseStatsResponse,
-    val timestamp: String  // Instant를 String으로 변환
+    val timestamp: String
 )
 
 @Serializable
 data class OutboxStatsResponse(
-    val total: OutboxTotalStats,
+    val total: OutboxTotalStatsResponse,
     val byStatus: Map<String, Long>,
     val byType: Map<String, Long>,
-    val details: List<OutboxStatDetail>
+    val details: List<OutboxStatDetailResponse>
 )
 
 @Serializable
-data class OutboxTotalStats(
+data class OutboxTotalStatsResponse(
     val pending: Long,
     val processing: Long,
     val failed: Long,
@@ -738,7 +338,7 @@ data class OutboxTotalStats(
 )
 
 @Serializable
-data class OutboxStatDetail(
+data class OutboxStatDetailResponse(
     val status: String,
     val aggregateType: String,
     val count: Long,
@@ -765,12 +365,12 @@ data class DatabaseStatsResponse(
 
 @Serializable
 data class RecentOutboxResponse(
-    val items: List<RecentOutboxItem>,
+    val items: List<RecentOutboxItemResponse>,
     val count: Int
 )
 
 @Serializable
-data class RecentOutboxItem(
+data class RecentOutboxItemResponse(
     val id: String,
     val aggregateType: String,
     val aggregateId: String,
@@ -783,12 +383,12 @@ data class RecentOutboxItem(
 
 @Serializable
 data class FailedOutboxResponse(
-    val items: List<FailedOutboxItem>,
+    val items: List<FailedOutboxItemResponse>,
     val count: Int
 )
 
 @Serializable
-data class FailedOutboxItem(
+data class FailedOutboxItemResponse(
     val id: String,
     val aggregateType: String,
     val aggregateId: String,
@@ -800,60 +400,12 @@ data class FailedOutboxItem(
 
 @Serializable
 data class DlqResponse(
-    val items: List<OutboxEntryDto>,
+    val items: List<OutboxEntryResponse>,
     val count: Int
 )
 
 @Serializable
-data class RetryResponse(
-    val success: Boolean,
-    val message: String,
-    val entry: OutboxEntryDto?
-)
-
-@Serializable
-data class BatchRetryResponse(
-    val success: Boolean,
-    val retriedCount: Int,
-    val message: String
-)
-
-@Serializable
-data class StaleOutboxResponse(
-    val items: List<StaleOutboxItem>,
-    val count: Int,
-    val timeoutSeconds: Long
-)
-
-@Serializable
-data class StaleOutboxItem(
-    val id: String,
-    val aggregateType: String,
-    val aggregateId: String,
-    val eventType: String,
-    val claimedAt: String?,
-    val claimedBy: String?,
-    val ageSeconds: Long
-)
-
-@Serializable
-data class HourlyStatsResponse(
-    val items: List<HourlyStatItem>,
-    val hours: Int
-)
-
-@Serializable
-data class HourlyStatItem(
-    val hour: String,
-    val pending: Long,
-    val processing: Long,
-    val processed: Long,
-    val failed: Long,
-    val total: Long
-)
-
-@Serializable
-data class OutboxEntryDto(
+data class OutboxEntryResponse(
     val id: String,
     val idempotencyKey: String,
     val aggregateType: String,
@@ -871,24 +423,152 @@ data class OutboxEntryDto(
     val entityVersion: Long? = null
 )
 
-// ==================== DTO 변환 함수 ====================
+@Serializable
+data class RetryResponse(
+    val success: Boolean,
+    val message: String,
+    val entry: OutboxEntryResponse?
+)
 
-private fun com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry.toDto(): OutboxEntryDto {
-    return OutboxEntryDto(
-        id = id.toString(),
-        idempotencyKey = idempotencyKey,
-        aggregateType = aggregateType.name,
-        aggregateId = aggregateId,
-        eventType = eventType,
-        payload = payload,
-        status = status.name,
-        createdAt = createdAt.toString(),
-        processedAt = processedAt?.toString(),
-        claimedAt = claimedAt?.toString(),
-        claimedBy = claimedBy,
-        retryCount = retryCount,
-        failureReason = failureReason,
-        priority = priority.takeIf { it != com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry.DEFAULT_PRIORITY },
-        entityVersion = entityVersion
-    )
-}
+@Serializable
+data class BatchRetryResponse(
+    val success: Boolean,
+    val retriedCount: Int,
+    val message: String
+)
+
+@Serializable
+data class HourlyStatsResponse(
+    val items: List<HourlyStatItemResponse>,
+    val hours: Int
+)
+
+@Serializable
+data class HourlyStatItemResponse(
+    val hour: String,
+    val pending: Long,
+    val processing: Long,
+    val processed: Long,
+    val failed: Long,
+    val total: Long
+)
+
+@Serializable
+data class StaleOutboxResponse(
+    val items: List<StaleOutboxItemResponse>,
+    val count: Int,
+    val timeoutSeconds: Long
+)
+
+@Serializable
+data class StaleOutboxItemResponse(
+    val id: String,
+    val aggregateType: String,
+    val aggregateId: String,
+    val eventType: String,
+    val claimedAt: String?,
+    val claimedBy: String?,
+    val ageSeconds: Long
+)
+
+// ==================== Domain → DTO 변환 ====================
+
+private fun DashboardData.toResponse() = DashboardResponse(
+    outbox = outbox.toResponse(),
+    worker = worker.toResponse(),
+    database = database.toResponse(),
+    timestamp = timestamp.toString()
+)
+
+private fun OutboxStats.toResponse() = OutboxStatsResponse(
+    total = OutboxTotalStatsResponse(total.pending, total.processing, total.failed, total.processed),
+    byStatus = byStatus,
+    byType = byType,
+    details = details.map { it.toResponse() }
+)
+
+private fun OutboxStatDetail.toResponse() = OutboxStatDetailResponse(
+    status = status,
+    aggregateType = aggregateType,
+    count = count,
+    oldest = oldest?.toString(),
+    newest = newest?.toString(),
+    avgLatencySeconds = avgLatencySeconds
+)
+
+private fun WorkerStatus.toResponse() = WorkerStatusResponse(
+    running = running,
+    processed = processed,
+    failed = failed,
+    polls = polls,
+    lastPollTime = lastPollTime
+)
+
+private fun DatabaseStats.toResponse() = DatabaseStatsResponse(
+    rawDataCount = rawDataCount,
+    outboxCount = outboxCount,
+    note = note
+)
+
+private fun RecentOutboxItem.toResponse() = RecentOutboxItemResponse(
+    id = id,
+    aggregateType = aggregateType,
+    aggregateId = aggregateId,
+    eventType = eventType,
+    status = status,
+    createdAt = createdAt?.toString(),
+    processedAt = processedAt?.toString(),
+    retryCount = retryCount
+)
+
+private fun FailedOutboxItem.toResponse() = FailedOutboxItemResponse(
+    id = id,
+    aggregateType = aggregateType,
+    aggregateId = aggregateId,
+    eventType = eventType,
+    createdAt = createdAt?.toString(),
+    retryCount = retryCount,
+    failureReason = failureReason
+)
+
+private fun OutboxEntryDetail.toResponse() = OutboxEntryResponse(
+    id = id,
+    idempotencyKey = idempotencyKey,
+    aggregateType = aggregateType,
+    aggregateId = aggregateId,
+    eventType = eventType,
+    payload = payload,
+    status = status,
+    createdAt = createdAt.toString(),
+    processedAt = processedAt?.toString(),
+    claimedAt = claimedAt?.toString(),
+    claimedBy = claimedBy,
+    retryCount = retryCount,
+    failureReason = failureReason,
+    priority = priority,
+    entityVersion = entityVersion
+)
+
+private fun HourlyStatsData.toResponse() = HourlyStatsResponse(
+    items = items.map { it.toResponse() },
+    hours = hours
+)
+
+private fun HourlyStatItem.toResponse() = HourlyStatItemResponse(
+    hour = hour.toString(),
+    pending = pending,
+    processing = processing,
+    processed = processed,
+    failed = failed,
+    total = total
+)
+
+private fun StaleOutboxItem.toResponse() = StaleOutboxItemResponse(
+    id = id,
+    aggregateType = aggregateType,
+    aggregateId = aggregateId,
+    eventType = eventType,
+    claimedAt = claimedAt?.toString(),
+    claimedBy = claimedBy,
+    ageSeconds = ageSeconds
+)

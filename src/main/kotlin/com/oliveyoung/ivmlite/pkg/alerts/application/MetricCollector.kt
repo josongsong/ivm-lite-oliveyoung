@@ -152,17 +152,21 @@ class MetricCollector(
     
     private fun collectPipelineMetrics(values: MutableMap<String, Any>) {
         try {
-            // 평균 처리 시간 (최근 100건)
-            val avgLatency = dsl.select(
-                DSL.field("AVG(EXTRACT(EPOCH FROM (processed_at - created_at)))")
+            // 평균 처리 시간 (최근 100건) - 서브쿼리 사용
+            val subquery = dsl.select(
+                DSL.field("EXTRACT(EPOCH FROM (processed_at - created_at))", Double::class.java).`as`("latency")
             )
                 .from(DSL.table("outbox"))
                 .where(DSL.field("status").eq("PROCESSED"))
                 .and(DSL.field("processed_at").isNotNull)
                 .orderBy(DSL.field("processed_at").desc())
                 .limit(100)
+                .asTable("recent")
+
+            val avgLatency = dsl.select(DSL.avg(DSL.field("latency", Double::class.java)))
+                .from(subquery)
                 .fetchOne(0, Double::class.java) ?: 0.0
-            
+
             values["pipeline.e2e.latency_seconds"] = avgLatency
             
             // Raw Data 카운트

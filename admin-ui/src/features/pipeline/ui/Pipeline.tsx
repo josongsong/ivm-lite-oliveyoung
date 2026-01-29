@@ -13,7 +13,12 @@ import {
   Send
 } from 'lucide-react'
 import { fetchApi } from '@/shared/api'
-import type { PipelineOverviewResponse } from '@/shared/types'
+import type {
+  EntityFlowResponse,
+  PipelineOverviewResponse,
+  RawDataDetailResponse,
+  SliceDetailResponse,
+} from '@/shared/types'
 import { Loading, PageHeader } from '@/shared/ui'
 import './Pipeline.css'
 
@@ -23,41 +28,6 @@ const stageIcons: Record<string, React.ReactNode> = {
   'Slicing': <Scissors size={20} />,
   'View': <Eye size={20} />,
   'Sink': <Rocket size={20} />,
-}
-
-interface RawDataItem {
-  tenantId: string
-  entityKey: string
-  version: number
-  schemaId: string
-  createdAt: string | null
-}
-
-interface SliceItem {
-  tenantId: string
-  entityKey: string
-  version: number
-  sliceType: string
-  hash: string
-  createdAt: string | null
-}
-
-interface SliceDetailResponse {
-  stats: { total: number; byType: Record<string, number> }
-  byType: { type: string; count: number; lastCreated: string | null }[]
-  recent: SliceItem[]
-}
-
-interface RawDataDetailResponse {
-  stats: { total: number; byTenant: Record<string, number>; bySchema: Record<string, number> }
-  recent: RawDataItem[]
-}
-
-interface EntityFlowResponse {
-  entityKey: string
-  rawData: RawDataItem[]
-  slices: SliceItem[]
-  outbox: { id: string; aggregateType: string; eventType: string; status: string; createdAt: string | null; processedAt: string | null }[]
 }
 
 export function Pipeline() {

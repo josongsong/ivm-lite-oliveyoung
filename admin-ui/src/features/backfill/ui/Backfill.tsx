@@ -14,6 +14,7 @@ import {
   Zap
 } from 'lucide-react'
 import { fetchApi, postApi } from '@/shared/api'
+import { QUERY_CONFIG } from '@/shared/config'
 import type { BackfillJob, BackfillResponse, BackfillStatus } from '@/shared/types'
 import { fadeInUp, formatDuration, formatTimeSince, Loading, PageHeader, staggerContainer } from '@/shared/ui'
 import './Backfill.css'
@@ -256,7 +257,7 @@ export function Backfill() {
   const { data, isLoading } = useQuery({
     queryKey: ['backfill'],
     queryFn: () => fetchApi<BackfillResponse>('/backfill'),
-    refetchInterval: 5000, // 5초마다 갱신
+    refetchInterval: QUERY_CONFIG.REALTIME_INTERVAL,
   })
 
   const pauseMutation = useMutation({

@@ -36,12 +36,12 @@ export const BaseNode = memo(function BaseNode({
       className={`workflow-node ${nodeType} ${selected ? 'selected' : ''} status-${data.status}`}
       style={{
         width: dimensions.width,
-        height: dimensions.height,
+        minHeight: dimensions.height,
         background: colors.bg,
         borderColor: selected ? statusColor : colors.border,
         boxShadow: selected
-          ? `0 0 20px ${colors.glow}, 0 0 40px ${colors.glow}`
-          : `0 0 10px ${colors.glow}`
+          ? `0 0 15px ${colors.glow}`
+          : `0 0 8px ${colors.glow}`
       }}
     >
       <div

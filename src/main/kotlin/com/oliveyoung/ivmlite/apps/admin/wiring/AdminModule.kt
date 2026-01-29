@@ -50,6 +50,12 @@ import com.oliveyoung.ivmlite.pkg.workflow.canvas.adapters.WorkflowGraphBuilder
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.ports.WorkflowGraphBuilderPort
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.application.WorkflowCanvasService
 
+// Admin Services (SOTA Refactoring)
+import com.oliveyoung.ivmlite.apps.admin.application.AdminDashboardService
+import com.oliveyoung.ivmlite.apps.admin.application.AdminPipelineService
+import com.oliveyoung.ivmlite.apps.admin.application.AdminContractService
+import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+
 import org.jooq.DSLContext
 import org.koin.dsl.module
 
@@ -65,6 +71,26 @@ import org.koin.dsl.module
 val adminAppModule = module {
     // Config (Hoplite)
     single<AppConfig> { ConfigLoader.load() }
+
+    // Admin Services (SOTA Refactoring)
+    single {
+        AdminDashboardService(
+            outboxRepo = get(),
+            worker = get(),
+            dsl = get()
+        )
+    }
+
+    single {
+        AdminPipelineService(
+            dsl = get(),
+            contractRegistry = getOrNull<ContractRegistryPort>()
+        )
+    }
+
+    single {
+        AdminContractService()
+    }
 }
 
 /**

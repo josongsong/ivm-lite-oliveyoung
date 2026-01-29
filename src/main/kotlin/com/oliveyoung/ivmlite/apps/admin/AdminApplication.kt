@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.apps.admin
 
+import com.oliveyoung.ivmlite.apps.admin.dto.ApiError
+import com.oliveyoung.ivmlite.apps.admin.dto.toKtorStatus
 import com.oliveyoung.ivmlite.apps.admin.routes.adminRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.alertRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.backfillRoutes
@@ -8,9 +10,11 @@ import com.oliveyoung.ivmlite.apps.admin.routes.healthRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.observabilityRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.pipelineRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.workflowCanvasRoutes
-import com.oliveyoung.ivmlite.pkg.alerts.application.AlertEngine
 import com.oliveyoung.ivmlite.apps.admin.wiring.adminAllModules
+import com.oliveyoung.ivmlite.pkg.alerts.application.AlertEngine
 import com.oliveyoung.ivmlite.shared.config.AppConfig
+import com.oliveyoung.ivmlite.shared.config.DotenvLoader
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import io.ktor.http.*
 import io.ktor.serialization.kotlinx.json.*
 import io.ktor.server.application.*
@@ -18,14 +22,15 @@ import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.statuspages.*
+import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import io.ktor.server.http.content.*
+import kotlinx.serialization.SerializationException
 import kotlinx.serialization.json.Json
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
 import org.koin.logger.slf4jLogger
-import com.oliveyoung.ivmlite.shared.config.DotenvLoader
 
 /**
  * IVM Lite Admin Application
@@ -68,13 +73,65 @@ fun Application.module() {
         })
     }
     
-    // Status Pages (Error handling)
+    // Status Pages (전역 에러 핸들링 - SOTA 트레이싱)
+    // DEV_MODE=true 시 스택트레이스 포함
+    val devMode = System.getenv("DEV_MODE")?.toBoolean() ?: false
+
     install(StatusPages) {
+        // DomainError: 비즈니스 에러 (400, 404, 500 등)
+        exception<DomainError> { call, cause ->
+            val requestId = ApiError.generateRequestId()
+            val path = call.request.path()
+            call.application.log.warn("[{}] [DomainError] {} {} - {}: {}",
+                requestId, call.request.httpMethod.value, path, cause::class.simpleName, cause.message)
+            call.respond(cause.toKtorStatus(), ApiError.from(cause, requestId, path, devMode))
+        }
+
+        // SerializationException: JSON 파싱 에러 (400)
+        exception<SerializationException> { call, cause ->
+            val requestId = ApiError.generateRequestId()
+            val path = call.request.path()
+            call.application.log.warn("[{}] [SerializationError] {} {} - {}",
+                requestId, call.request.httpMethod.value, path, cause.message)
+            call.respond(
+                HttpStatusCode.BadRequest,
+                ApiError.fromException("INVALID_JSON", "Invalid JSON: ${cause.message}", requestId, path, cause, devMode)
+            )
+        }
+
+        // IllegalArgumentException: 입력 검증 에러 (400)
+        exception<IllegalArgumentException> { call, cause ->
+            val requestId = ApiError.generateRequestId()
+            val path = call.request.path()
+            call.application.log.warn("[{}] [ValidationError] {} {} - {}",
+                requestId, call.request.httpMethod.value, path, cause.message)
+            call.respond(
+                HttpStatusCode.BadRequest,
+                ApiError.fromException("VALIDATION_ERROR", cause.message ?: "Invalid request", requestId, path, cause, devMode)
+            )
+        }
+
+        // BadRequestException: Ktor 요청 에러 (400)
+        exception<io.ktor.server.plugins.BadRequestException> { call, cause ->
+            val requestId = ApiError.generateRequestId()
+            val path = call.request.path()
+            call.application.log.warn("[{}] [BadRequest] {} {} - {}",
+                requestId, call.request.httpMethod.value, path, cause.message)
+            call.respond(
+                HttpStatusCode.BadRequest,
+                ApiError.fromException("BAD_REQUEST", cause.message ?: "Bad request", requestId, path, cause, devMode)
+            )
+        }
+
+        // Throwable: 기타 모든 에러 (500)
         exception<Throwable> { call, cause ->
-            call.application.log.error("Unhandled exception", cause)
+            val requestId = ApiError.generateRequestId()
+            val path = call.request.path()
+            call.application.log.error("[{}] [InternalError] {} {} - {}: {}",
+                requestId, call.request.httpMethod.value, path, cause::class.simpleName, cause.message, cause)
             call.respond(
                 HttpStatusCode.InternalServerError,
-                mapOf("error" to (cause.message ?: "Internal server error"))
+                ApiError.fromException("INTERNAL_ERROR", "${cause::class.simpleName}: ${cause.message}", requestId, path, cause, devMode)
             )
         }
     }

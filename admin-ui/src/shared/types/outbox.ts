@@ -50,3 +50,34 @@ export interface BatchRetryResponse {
   retriedCount: number
   message: string
 }
+
+export interface StaleOutboxItem {
+  id: string
+  aggregateType: string
+  aggregateId: string
+  eventType: string
+  claimedAt: string | null
+  claimedBy: string | null
+  ageSeconds: number
+}
+
+export interface StaleResponse {
+  items: StaleOutboxItem[]
+  count: number
+  timeoutSeconds: number
+}
+
+export interface FailedOutboxItem {
+  id: string
+  aggregateType: string
+  aggregateId: string
+  eventType: string
+  createdAt: string | null
+  retryCount: number
+  failureReason: string | null
+}
+
+export interface FailedResponse {
+  items: FailedOutboxItem[]
+  count: number
+}
