@@ -16,11 +16,15 @@ import java.util.UUID
  * @property aggregateId 집계 ID (형식: "tenantId:entityKey")
  * @property eventType 이벤트 타입 (예: "RawDataIngested", "SliceCreated")
  * @property payload 이벤트 페이로드 (JSON 문자열)
- * @property status 처리 상태 (PENDING, PROCESSED, FAILED)
+ * @property status 처리 상태 (PENDING, PROCESSING, PROCESSED, FAILED)
  * @property createdAt 생성 시각
+ * @property claimedAt claim 시각 (PROCESSING 상태 전환 시각)
+ * @property claimedBy claim한 worker ID (디버깅용)
  * @property processedAt 처리 완료 시각 (null이면 미처리)
  * @property retryCount 재시도 횟수
  * @property failureReason 실패 사유 (FAILED 상태일 때)
+ * @property priority 처리 우선순위 (낮을수록 높은 우선순위, 기본 100)
+ * @property entityVersion 엔티티 버전 (순서 보장용)
  */
 data class OutboxEntry(
     val id: UUID,
@@ -31,9 +35,13 @@ data class OutboxEntry(
     val payload: String,
     val status: OutboxStatus,
     val createdAt: Instant,
+    val claimedAt: Instant? = null,
+    val claimedBy: String? = null,
     val processedAt: Instant? = null,
     val retryCount: Int = 0,
     val failureReason: String? = null,
+    val priority: Int = DEFAULT_PRIORITY,  // Tier 1: Priority Queue
+    val entityVersion: Long? = null,       // Tier 1: Entity-Level Ordering
 ) {
     init {
         require(idempotencyKey.isNotBlank()) { "idempotencyKey must not be blank" }
@@ -46,6 +54,7 @@ data class OutboxEntry(
 
     companion object {
         const val MAX_RETRY_COUNT = 5
+        const val DEFAULT_PRIORITY = 100  // 기본 우선순위 (낮음)
 
         /**
          * 새 OutboxEntry 생성 (PENDING 상태)
@@ -94,6 +103,15 @@ data class OutboxEntry(
     }
 
     /**
+     * PROCESSING으로 마킹 (worker가 claim)
+     */
+    fun markClaimed(workerId: String? = null, at: Instant = Instant.now()): OutboxEntry = copy(
+        status = OutboxStatus.PROCESSING,
+        claimedAt = at,
+        claimedBy = workerId,
+    )
+
+    /**
      * 처리 완료로 마킹
      */
     fun markProcessed(at: Instant = Instant.now()): OutboxEntry = copy(
@@ -118,11 +136,15 @@ data class OutboxEntry(
     fun canRetry(): Boolean = retryCount < MAX_RETRY_COUNT
 
     /**
-     * PENDING으로 리셋 (재시도용)
+     * PENDING으로 리셋 (재시도용 또는 stale 복구)
      */
     fun resetToPending(): OutboxEntry {
         check(canRetry()) { "Max retry count ($MAX_RETRY_COUNT) exceeded" }
-        return copy(status = OutboxStatus.PENDING)
+        return copy(
+            status = OutboxStatus.PENDING,
+            claimedAt = null,
+            claimedBy = null,
+        )
     }
 
     /**

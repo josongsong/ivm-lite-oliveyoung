@@ -52,8 +52,7 @@ DynamoDB E2E 테스트 및 운영 환경에서 필요한 모든 계약(Contract)
 ## DynamoDB 테이블 구조
 
 ### 테이블명
-- **로컬**: `ivm-lite-schema-registry-local` (또는 설정에 따라)
-- **운영**: `ivm-lite-schema-registry-{env}` (예: `-dev`, `-prod`)
+- **Remote-only**: `${DYNAMODB_TABLE}` (예: `ivm-lite-schema-registry-dev`, `ivm-lite-schema-registry-prod`)
 
 ### 키 스키마
 - **PK**: `{kind}#{id}` (예: `RULESET#ruleset.core.v1`)
@@ -72,8 +71,8 @@ DynamoDB E2E 테스트 및 운영 환경에서 필요한 모든 계약(Contract)
 ### 방법 1: Seed 스크립트 사용 (권장)
 
 ```bash
-# Seed 스크립트 실행 (구현 필요)
-./gradlew run --args="seed-contracts-to-dynamodb --table ivm-lite-schema-registry-local --dir src/main/resources/contracts/v1"
+# Remote-only: DYNAMODB_TABLE 환경 변수를 설정한 뒤 실행
+./scripts/seed-contracts.sh
 ```
 
 ### 방법 2: 수동 업로드 (AWS CLI)
@@ -81,7 +80,7 @@ DynamoDB E2E 테스트 및 운영 환경에서 필요한 모든 계약(Contract)
 ```bash
 # 예시: ruleset.core.v1 업로드
 aws dynamodb put-item \
-  --table-name ivm-lite-schema-registry-local \
+  --table-name "$DYNAMODB_TABLE" \
   --item '{
     "PK": {"S": "RULESET#ruleset.core.v1"},
     "SK": {"S": "1.0.0"},
@@ -106,7 +105,7 @@ adapter.putContract(contract)
 
 ## 최소 필수 계약 세트 (E2E 테스트용)
 
-DynamoDbE2ETest를 실행하기 위해 최소한 다음 3개 계약이 필요합니다:
+DynamoDbE2ETest(IntegrationTag)를 실행하기 위해 최소한 다음 3개 계약이 필요합니다:
 
 1. ✅ **RULESET#ruleset.core.v1** (version: 1.0.0)
 2. ✅ **CHANGESET#changeset.v1** (version: 1.0.0)
@@ -121,7 +120,7 @@ DynamoDbE2ETest를 실행하기 위해 최소한 다음 3개 계약이 필요합
 ./gradlew test --tests "com.oliveyoung.ivmlite.pkg.contracts.DynamoDBContractRegistryAdapterTest"
 
 # E2E 테스트 실행
-./gradlew test --tests "com.oliveyoung.ivmlite.integration.DynamoDbE2ETest"
+E2E_RUN=true DYNAMODB_ENDPOINT=... ./gradlew integrationTest --tests "com.oliveyoung.ivmlite.integration.DynamoDbE2ETest"
 ```
 
 ## 참고

@@ -1,7 +1,9 @@
 package com.oliveyoung.ivmlite.apps.runtimeapi
 
+import com.oliveyoung.ivmlite.shared.config.DotenvLoader
 import com.oliveyoung.ivmlite.apps.runtimeapi.routes.healthRoutes
 import com.oliveyoung.ivmlite.apps.runtimeapi.routes.ingestRoutes
+import com.oliveyoung.ivmlite.apps.runtimeapi.routes.outboxRoutes
 import com.oliveyoung.ivmlite.apps.runtimeapi.routes.queryRoutes
 import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.allModules
 import com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
@@ -16,12 +18,14 @@ import io.ktor.server.plugins.callid.*
 import io.ktor.server.plugins.contentnegotiation.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.response.*
+import io.ktor.server.http.content.*
 import io.ktor.server.routing.*
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.context.Scope
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
+import io.micrometer.core.instrument.MeterRegistry
 import org.koin.ktor.ext.getKoin
 import org.koin.ktor.ext.inject
 import org.koin.ktor.plugin.Koin
@@ -37,6 +41,9 @@ import java.util.*
  * Config: Hoplite
  */
 fun main() {
+    // .env 파일 로드 (환경변수 미설정 시 fallback)
+    DotenvLoader.load()
+
     embeddedServer(Netty, port = 8080, host = "0.0.0.0") {
         module()
     }.start(wait = true)
@@ -193,11 +200,13 @@ fun Application.module() {
 
     // Routes
     val healthCheckAdapters = getKoin().getAll<HealthCheckable>()
+    val meterRegistry = getKoin().getOrNull<MeterRegistry>()
 
     routing {
-        healthRoutes(healthCheckAdapters)
+        healthRoutes(healthCheckAdapters, meterRegistry = meterRegistry)
         ingestRoutes()
         queryRoutes()
+        outboxRoutes()
     }
 
     log.info("ivm-lite Runtime API started on ${config.server.host}:${config.server.port}")

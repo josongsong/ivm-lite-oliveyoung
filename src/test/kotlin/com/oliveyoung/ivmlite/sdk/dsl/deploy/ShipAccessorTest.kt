@@ -10,22 +10,6 @@ import kotlin.test.assertTrue
 class ShipAccessorTest {
 
     @Test
-    fun `sync() 호출 시 ShipMode_Sync로 ShipSpec 생성`() {
-        var capturedSpec: ShipSpec? = null
-        val accessor = ShipAccessor { capturedSpec = it }
-
-        accessor.sync {
-            opensearch {
-                index("products")
-            }
-        }
-
-        assertEquals(ShipMode.Sync, capturedSpec?.mode)
-        assertEquals(1, capturedSpec?.sinks?.size)
-        assertTrue(capturedSpec?.sinks?.get(0) is OpenSearchSinkSpec)
-    }
-
-    @Test
     fun `async() 호출 시 ShipMode_Async로 ShipSpec 생성`() {
         var capturedSpec: ShipSpec? = null
         val accessor = ShipAccessor { capturedSpec = it }
@@ -42,11 +26,11 @@ class ShipAccessorTest {
     }
 
     @Test
-    fun `sync() - 여러 sink 설정`() {
+    fun `async() - 여러 sink 설정`() {
         var capturedSpec: ShipSpec? = null
         val accessor = ShipAccessor { capturedSpec = it }
 
-        accessor.sync {
+        accessor.async {
             opensearch {
                 index("products")
             }
@@ -55,7 +39,7 @@ class ShipAccessorTest {
             }
         }
 
-        assertEquals(ShipMode.Sync, capturedSpec?.mode)
+        assertEquals(ShipMode.Async, capturedSpec?.mode)
         assertEquals(2, capturedSpec?.sinks?.size)
     }
 

@@ -128,10 +128,7 @@ object ConfigValidator {
             errors.add("database.password이 비어있습니다")
         }
         
-        // 개발 환경 경고 (기본 비밀번호 사용 시)
-        if (config.password == "ivm_local_dev") {
-            logger.warn("기본 데이터베이스 비밀번호를 사용하고 있습니다. 프로덕션 환경에서는 변경하세요.")
-        }
+        // Remote-only: 로컬 기본 비밀번호 검사는 제거 (기본값 자체가 없음)
     }
     
     private fun validateKafkaConfig(config: KafkaConfig, errors: MutableList<String>) {

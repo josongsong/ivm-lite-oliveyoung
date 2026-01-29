@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
 
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
@@ -21,6 +23,7 @@ import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.DeleteReason
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
 import com.oliveyoung.ivmlite.pkg.slices.domain.Tombstone
+import com.oliveyoung.ivmlite.pkg.slices.ports.SlicingEnginePort
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
@@ -35,7 +38,6 @@ import io.kotest.matchers.string.shouldContain as stringContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.mockk
 import io.mockk.coEvery
-import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
 
 /**
  * QueryViewWorkflow 단위 테스트 (RFC-IMPL-005)
@@ -47,7 +49,7 @@ class QueryViewWorkflowTest : StringSpec({
     val sliceRepo = InMemorySliceRepository()
     val invertedIndexRepo = InMemoryInvertedIndexRepository()
     val ingestWorkflow = IngestWorkflow(rawDataRepo, outboxRepo)
-    val slicingEngine = mockk<com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine>().also { engine ->
+    val slicingEngine = mockk<SlicingEnginePort>().also { engine ->
         coEvery { engine.slice(any(), any()) } answers {
             val rawData = firstArg<com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord>()
             val slices = listOf(
@@ -62,11 +64,11 @@ class QueryViewWorkflowTest : StringSpec({
                     ruleSetVersion = SemVer.parse("1.0.0"),
                 ),
             )
-            SlicingEngine.Result.Ok(SlicingEngine.SlicingResult(slices, emptyList()))
+            SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
         }
     }
-    val changeSetBuilder = ChangeSetBuilder()
-    val impactCalculator = ImpactCalculator()
+    val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
+    val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
     val contractRegistry = mockk<ContractRegistryPort>()
     val slicingWorkflow = SlicingWorkflow(
         rawDataRepo,

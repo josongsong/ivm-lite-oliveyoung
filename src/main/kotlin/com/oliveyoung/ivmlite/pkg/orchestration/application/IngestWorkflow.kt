@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.orchestration.application
 
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
+import com.oliveyoung.ivmlite.pkg.rawdata.ports.IngestUnitOfWorkPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
@@ -21,15 +22,39 @@ import io.opentelemetry.api.trace.Tracer
  *
  * RFC-V4-010: 외부 진입점은 *Workflow로 명명
  * RFC-IMPL-009: OpenTelemetry tracing 지원
- * 
+ *
+ * ## Transactional Outbox 패턴
+ * - IngestUnitOfWorkPort 사용 시: RawData + Outbox를 단일 트랜잭션으로 처리 (권장)
+ * - 개별 Port 사용 시: 순차 실행 (테스트/레거시 호환용)
+ *
  * NOTE: 현재는 rawdata 저장만 수행하지만, v1+에서는 ChangeSet/Slicing/Sink trigger 등을
  * 단계적으로 이어붙일 수 있는 "워크플로우"의 자리다.
  */
-class IngestWorkflow(
-    private val rawRepo: RawDataRepositoryPort,
-    private val outboxRepo: OutboxRepositoryPort,
-    private val tracer: Tracer = OpenTelemetry.noop().getTracer("ingest"),
+class IngestWorkflow private constructor(
+    private val unitOfWork: IngestUnitOfWorkPort?,
+    private val rawRepo: RawDataRepositoryPort?,
+    private val outboxRepo: OutboxRepositoryPort?,
+    private val tracer: Tracer,
 ) {
+    /**
+     * Primary constructor: UnitOfWork 사용 (트랜잭션 원자성 보장)
+     */
+    constructor(
+        unitOfWork: IngestUnitOfWorkPort,
+        tracer: Tracer = OpenTelemetry.noop().getTracer("ingest"),
+    ) : this(unitOfWork, null, null, tracer)
+
+    /**
+     * Legacy constructor: 개별 Port 사용 (하위 호환성)
+     *
+     * NOTE: 트랜잭션 원자성이 보장되지 않음. IngestUnitOfWorkPort 사용 권장.
+     */
+    constructor(
+        rawRepo: RawDataRepositoryPort,
+        outboxRepo: OutboxRepositoryPort,
+        tracer: Tracer = OpenTelemetry.noop().getTracer("ingest"),
+    ) : this(null, rawRepo, outboxRepo, tracer)
+
     suspend fun execute(
         tenantId: TenantId,
         entityKey: EntityKey,
@@ -46,6 +71,7 @@ class IngestWorkflow(
                 "version" to version.toString(),
                 "schema_id" to schemaId,
                 "schema_version" to schemaVersion.toString(),
+                "transactional" to (unitOfWork != null).toString(),
             ),
         ) {
             // v4: schema validation은 Port로 분리되어야 하나, 초기 스캐폴딩에서는 JSON 파싱 가능 여부만 체크.
@@ -66,14 +92,8 @@ class IngestWorkflow(
                 payload = canonical,
                 payloadHash = hash,
             )
-            // RawData 저장
-            when (val r = rawRepo.putIdempotent(record)) {
-                is RawDataRepositoryPort.Result.Ok -> { /* continue */ }
-                is RawDataRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
-            }
 
-            // Outbox에 이벤트 저장 (Transactional Outbox 패턴)
-            // JSON escape 적용하여 안전한 payload 생성
+            // Outbox 이벤트 생성
             val safePayload = buildOutboxPayload(tenantId.value, entityKey.value, version)
             val outboxEntry = OutboxEntry.create(
                 aggregateType = AggregateType.RAW_DATA,
@@ -81,16 +101,39 @@ class IngestWorkflow(
                 eventType = "RawDataIngested",
                 payload = safePayload,
             )
-            when (val r = outboxRepo.insert(outboxEntry)) {
-                is OutboxRepositoryPort.Result.Ok -> Result.Ok(Unit)
-                is OutboxRepositoryPort.Result.Err -> Result.Err(r.error)
+
+            // === 트랜잭션 실행 ===
+            if (unitOfWork != null) {
+                // UnitOfWork: 단일 트랜잭션으로 원자적 처리
+                when (val r = unitOfWork.executeIngest(record, outboxEntry)) {
+                    is IngestUnitOfWorkPort.Result.Ok -> Result.Ok(Unit)
+                    is IngestUnitOfWorkPort.Result.Err -> Result.Err(r.error)
+                }
+            } else {
+                // Legacy: 순차 실행 (하위 호환성)
+                val rawRepoNonNull = rawRepo ?: return@withSpanSuspend Result.Err(
+                    ContractError("Neither unitOfWork nor rawRepo is configured")
+                )
+                val outboxRepoNonNull = outboxRepo ?: return@withSpanSuspend Result.Err(
+                    ContractError("Neither unitOfWork nor outboxRepo is configured")
+                )
+
+                when (val r = rawRepoNonNull.putIdempotent(record)) {
+                    is RawDataRepositoryPort.Result.Ok -> { /* continue */ }
+                    is RawDataRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                }
+
+                when (val r = outboxRepoNonNull.insert(outboxEntry)) {
+                    is OutboxRepositoryPort.Result.Ok -> Result.Ok(Unit)
+                    is OutboxRepositoryPort.Result.Err -> Result.Err(r.error)
+                }
             }
         }
     }
 
     /**
      * Outbox payload를 안전하게 생성 (JSON escape 적용)
-     * 
+     *
      * NOTE: XSS/Injection 방지를 위해 특수문자 escape
      * NOTE: payloadVersion 필드로 스키마 버전 관리 (확장성 보장)
      */
@@ -99,7 +142,7 @@ class IngestWorkflow(
         val safeEntityKey = escapeJsonString(entityKey)
         return """{"payloadVersion":"1.0","tenantId":"$safeTenantId","entityKey":"$safeEntityKey","version":$version}"""
     }
-    
+
     /**
      * JSON 문자열 escape (RFC 8259 준수)
      */

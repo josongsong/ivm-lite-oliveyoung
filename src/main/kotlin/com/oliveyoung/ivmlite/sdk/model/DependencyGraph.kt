@@ -1,18 +1,9 @@
+@file:Suppress("unused")
 package com.oliveyoung.ivmlite.sdk.model
 
 /**
- * 의존성 그래프
- * RFC-IMPL-011 Wave 1-B
+ * Re-export from shared for backward compatibility
+ * 실제 정의는 shared.domain.deploy 패키지에 있음
  */
-data class DependencyGraph(
-    val nodes: Map<String, GraphNode>
-)
-
-/**
- * 그래프 노드
- */
-data class GraphNode(
-    val id: String,
-    val dependencies: List<String>,
-    val provides: List<String>
-)
+typealias DependencyGraph = com.oliveyoung.ivmlite.shared.domain.deploy.DependencyGraph
+typealias GraphNode = com.oliveyoung.ivmlite.shared.domain.deploy.GraphNode

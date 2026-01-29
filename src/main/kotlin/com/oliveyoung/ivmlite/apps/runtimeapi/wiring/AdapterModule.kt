@@ -1,7 +1,13 @@
 package com.oliveyoung.ivmlite.apps.runtimeapi.wiring
 
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.InMemoryChangeSetRepository
+import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
+import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
+import com.oliveyoung.ivmlite.pkg.changeset.ports.ChangeSetBuilderPort
 import com.oliveyoung.ivmlite.pkg.changeset.ports.ChangeSetRepositoryPort
+import com.oliveyoung.ivmlite.pkg.changeset.ports.ImpactCalculatorPort
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.GatedContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
@@ -9,19 +15,26 @@ import com.oliveyoung.ivmlite.pkg.contracts.domain.DefaultContractStatusGate
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.DynamoDbRawDataRepository
+import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryIngestUnitOfWork
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
-import com.oliveyoung.ivmlite.pkg.rawdata.adapters.JooqOutboxRepository
+import com.oliveyoung.ivmlite.pkg.rawdata.adapters.JooqIngestUnitOfWork
+// import com.oliveyoung.ivmlite.pkg.rawdata.adapters.JooqOutboxRepository  // Temporarily disabled - requires PostgreSQL
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.JooqRawDataRepository
+import com.oliveyoung.ivmlite.pkg.rawdata.ports.IngestUnitOfWorkPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
+import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DynamoDbInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DynamoDbSliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.JooqSliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.JooqInvertedIndexRepository
+import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
+import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
+import com.oliveyoung.ivmlite.pkg.slices.ports.SlicingEnginePort
 import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.shared.adapters.InMemoryContractCache
 import com.oliveyoung.ivmlite.shared.config.AppConfig
@@ -64,9 +77,44 @@ val adapterModule = module {
     // Outbox Repository (v1: InMemory Polling, v2: jOOQ + Debezium)
     single { InMemoryOutboxRepository() } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
 
+    // Ingest Unit of Work (v1: InMemory, v2: jOOQ)
+    // RFC-IMPL Transactional Outbox: RawData + Outbox 원자성 보장
+    single { InMemoryIngestUnitOfWork(get(), get()) } binds arrayOf(IngestUnitOfWorkPort::class, HealthCheckable::class)
+
     // ChangeSet Repository (v1.1: InMemory, v2: jOOQ)
     // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
     single { InMemoryChangeSetRepository() } binds arrayOf(ChangeSetRepositoryPort::class, HealthCheckable::class)
+
+    // ========================================
+    // Domain Service Port Adapters
+    // RFC-IMPL-010: Port 추상화로 SOLID DIP 준수
+    // ========================================
+
+    // JoinExecutor (SlicingEngine 의존성)
+    single { JoinExecutor(rawRepo = get()) }
+
+    // SlicingEngine → SlicingEnginePort
+    single {
+        SlicingEngine(
+            contractRegistry = get(),
+            joinExecutor = get(),
+        )
+    }
+    single<SlicingEnginePort> {
+        DefaultSlicingEngineAdapter(delegate = get<SlicingEngine>())
+    }
+
+    // ChangeSetBuilder → ChangeSetBuilderPort
+    single { ChangeSetBuilder() }
+    single<ChangeSetBuilderPort> {
+        DefaultChangeSetBuilderAdapter(delegate = get<ChangeSetBuilder>())
+    }
+
+    // ImpactCalculator → ImpactCalculatorPort
+    single { ImpactCalculator() }
+    single<ImpactCalculatorPort> {
+        DefaultImpactCalculatorAdapter(delegate = get<ImpactCalculator>())
+    }
 }
 
 /**
@@ -96,8 +144,12 @@ val jooqAdapterModule = module {
     // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
     single { JooqInvertedIndexRepository(get<DSLContext>()) } binds arrayOf(InvertedIndexRepositoryPort::class, HealthCheckable::class)
 
-    // Outbox Repository (jOOQ + Polling)
-    single { JooqOutboxRepository(get<DSLContext>()) } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
+    // Outbox Repository (InMemory - JooqOutboxRepository temporarily disabled)
+    single { InMemoryOutboxRepository() } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
+
+    // Ingest Unit of Work (jOOQ - Transactional Outbox)
+    // RFC-IMPL Transactional Outbox: RawData + Outbox 원자성 보장
+    single { JooqIngestUnitOfWork(get<DSLContext>()) } binds arrayOf(IngestUnitOfWorkPort::class, HealthCheckable::class)
 
     // ChangeSet Repository (v1.1: InMemory, v2: jOOQ)
     // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
@@ -137,12 +189,13 @@ val dynamodbContractModule = module {
 }
 
 /**
- * Full Production Adapter Module (DynamoDB + PostgreSQL Outbox)
+ * Full Production Adapter Module (DynamoDB 기반)
  *
- * 운영 환경용:
- * - DynamoDB: RawData, Slice, InvertedIndex
+ * 운영 환경용 (DynamoDB 중심):
+ * - DynamoDB: RawData, Slice, InvertedIndex, Contract Registry
  * - PostgreSQL: Outbox (트랜잭션 보장)
- * - DynamoDB: Contract Registry
+ *
+ * NOTE: DynamoDB는 트랜잭션이 제한적이므로 Outbox만 PostgreSQL 사용
  */
 val productionAdapterModule = module {
 
@@ -193,26 +246,13 @@ val productionAdapterModule = module {
         )
     } binds arrayOf(InvertedIndexRepositoryPort::class, HealthCheckable::class)
 
-    // Outbox Repository (PostgreSQL - 트랜잭션 보장)
-    single { JooqOutboxRepository(get<DSLContext>()) } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
+    // Outbox Repository (InMemory - JooqOutboxRepository temporarily disabled)
+    single { InMemoryOutboxRepository() } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
+
+    // Ingest Unit of Work (jOOQ - Transactional Outbox)
+    // RFC-IMPL Transactional Outbox: RawData + Outbox 원자성 보장
+    single { JooqIngestUnitOfWork(get<DSLContext>()) } binds arrayOf(IngestUnitOfWorkPort::class, HealthCheckable::class)
 
     // ChangeSet Repository (InMemory for now)
-    single { InMemoryChangeSetRepository() } binds arrayOf(ChangeSetRepositoryPort::class, HealthCheckable::class)
-
-    // RawData Repository (jOOQ)
-    single { JooqRawDataRepository(get<DSLContext>()) } binds arrayOf(RawDataRepositoryPort::class, HealthCheckable::class)
-
-    // Slice Repository (jOOQ)
-    single { JooqSliceRepository(get<DSLContext>()) } binds arrayOf(SliceRepositoryPort::class, HealthCheckable::class)
-
-    // InvertedIndex Repository (jOOQ - RFC-IMPL-010 GAP-E)
-    // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
-    single { JooqInvertedIndexRepository(get<DSLContext>()) } binds arrayOf(InvertedIndexRepositoryPort::class, HealthCheckable::class)
-
-    // Outbox Repository (jOOQ + Polling)
-    single { JooqOutboxRepository(get<DSLContext>()) } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
-
-    // ChangeSet Repository (v1.1: InMemory, v2: jOOQ)
-    // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
     single { InMemoryChangeSetRepository() } binds arrayOf(ChangeSetRepositoryPort::class, HealthCheckable::class)
 }

@@ -1,5 +1,6 @@
 # Detekt configuration for ivm-lite
-# RFC-IMPL-001: 기본 코드 품질 규칙
+# RFC-IMPL-001: Kotlin 코드 품질 규칙 (SOTA급)
+# 헥사고날 아키텍처 + 도메인 슬라이싱 최적화
 
 build:
   maxIssues: 50  # 점진적으로 줄여나가기
@@ -7,29 +8,726 @@ build:
     complexity: 2
     style: 1
     comments: 1
+    coroutines: 2
+    exceptions: 2
 
+# ============================================
+# 복잡도 규칙
+# ============================================
 complexity:
+  active: true
+  
   LongParameterList:
+    active: true
     functionThreshold: 8
-    constructorThreshold: 10
+    constructorThreshold: 12  # data class는 파라미터 많음
+    ignoreDefaultParameters: true
+    ignoreDataClasses: true
+    ignoreAnnotatedParameter: ['Inject', 'Autowired']
+  
   LongMethod:
+    active: true
     threshold: 80
+    ignoreAnnotated: ['Composable']
+  
   TooManyFunctions:
+    active: true
     thresholdInFiles: 30
     thresholdInClasses: 30
     thresholdInInterfaces: 30
     thresholdInObjects: 30
     thresholdInEnums: 30
+    ignoreDeprecated: true
+    ignorePrivate: true
+    ignoreOverridden: true
+  
+  CyclomaticComplexMethod:
+    active: true
+    threshold: 15
+    ignoreSingleWhenExpression: true
+    ignoreSimpleWhenEntries: true
+    ignoreNestingFunctions: false
+    nestingFunctions:
+      - 'run'
+      - 'let'
+      - 'apply'
+      - 'with'
+      - 'also'
+      - 'sequence'
+      - 'forEach'
+      - 'map'
+      - 'filter'
+      - 'flatMap'
+  
+  NestedBlockDepth:
+    active: true
+    threshold: 5
+  
+  LabeledExpression:
+    active: false  # 가끔 필요
+  
+  ReplaceSafeCallChainWithRun:
+    active: true
+  
+  StringLiteralDuplication:
+    active: false  # 문자열 상수는 종종 반복됨
 
+# ============================================
+# Coroutines 규칙 (Kotlin 특화)
+# ============================================
+coroutines:
+  active: true
+  
+  GlobalCoroutineUsage:
+    active: true  # GlobalScope 사용 경고
+  
+  InjectDispatcher:
+    active: true  # Dispatcher 주입 권장
+    dispatcherNames:
+      - 'IO'
+      - 'Default'
+      - 'Main'
+      - 'Unconfined'
+  
+  RedundantSuspendModifier:
+    active: true  # 불필요한 suspend 경고
+  
+  SleepInsteadOfDelay:
+    active: true  # Thread.sleep() 대신 delay() 사용
+  
+  SuspendFunWithFlowReturnType:
+    active: true  # Flow 반환 시 suspend 불필요
+  
+  SuspendFunWithCoroutineScopeReceiver:
+    active: false  # 때때로 필요
+
+# ============================================
+# 예외 처리 규칙
+# ============================================
+exceptions:
+  active: true
+  
+  TooGenericExceptionCaught:
+    active: true
+    exceptionNames:
+      - 'Exception'
+      - 'Error'
+      - 'Throwable'
+    allowedExceptionNameRegex: '_|(ignore|expected).*'
+  
+  TooGenericExceptionThrown:
+    active: true
+    exceptionNames:
+      - 'Exception'
+      - 'RuntimeException'
+      - 'Throwable'
+  
+  SwallowedException:
+    active: true
+    ignoredExceptionTypes:
+      - 'InterruptedException'
+      - 'NumberFormatException'
+      - 'ParseException'
+    allowedExceptionNameRegex: '_|(ignore|expected).*'
+  
+  ThrowingExceptionsWithoutMessageOrCause:
+    active: true
+    exceptions:
+      - 'IllegalArgumentException'
+      - 'IllegalStateException'
+      - 'IOException'
+  
+  PrintStackTrace:
+    active: true  # 프로덕션에서 금지
+  
+  RethrowCaughtException:
+    active: true
+  
+  ReturnFromFinally:
+    active: true
+  
+  ThrowingExceptionFromFinally:
+    active: true
+  
+  ThrowingExceptionInMain:
+    active: false  # CLI 앱에서는 필요
+  
+  ThrowingNewInstanceOfSameException:
+    active: true
+
+# ============================================
+# 명명 규칙
+# ============================================
+naming:
+  active: true
+  
+  ClassNaming:
+    active: true
+    classPattern: '[A-Z][a-zA-Z0-9]*'
+  
+  ConstructorParameterNaming:
+    active: true
+    parameterPattern: '[a-z][a-zA-Z0-9]*'
+    privateParameterPattern: '[a-z][a-zA-Z0-9]*'
+    excludeClassPattern: '$^'  # 없음
+  
+  EnumNaming:
+    active: true
+    enumEntryPattern: '[A-Z][_a-zA-Z0-9]*'
+  
+  FunctionNaming:
+    active: true
+    functionPattern: '[a-z][a-zA-Z0-9]*'
+    excludeClassPattern: '$^'
+    ignoreAnnotated: ['Composable']
+  
+  FunctionParameterNaming:
+    active: true
+    parameterPattern: '[a-z][a-zA-Z0-9]*'
+    excludeClassPattern: '$^'
+  
+  InvalidPackageDeclaration:
+    active: true
+    rootPackage: 'com.oliveyoung.ivmlite'
+    requireRootInDeclaration: false
+  
+  MatchingDeclarationName:
+    active: true
+    mustBeFirst: true
+  
+  MemberNameEqualsClassName:
+    active: true
+    ignoreOverridden: true
+  
+  ObjectPropertyNaming:
+    active: true
+    constantPattern: '[A-Za-z][_A-Za-z0-9]*'
+    propertyPattern: '[A-Za-z][_A-Za-z0-9]*'
+    privatePropertyPattern: '_?[A-Za-z][_A-Za-z0-9]*'
+  
+  PackageNaming:
+    active: true
+    packagePattern: '[a-z]+(\.[a-z][a-z0-9]*)*'
+  
+  TopLevelPropertyNaming:
+    active: true
+    constantPattern: '[A-Z][_A-Z0-9]*'
+    propertyPattern: '[A-Za-z][_A-Za-z0-9]*'
+    privatePropertyPattern: '_?[A-Za-z][_A-Za-z0-9]*'
+  
+  VariableNaming:
+    active: true
+    variablePattern: '[a-z][a-zA-Z0-9]*'
+    privateVariablePattern: '_?[a-z][a-zA-Z0-9]*'
+    excludeClassPattern: '$^'
+
+# ============================================
+# 성능 규칙
+# ============================================
+performance:
+  active: true
+  
+  ArrayPrimitive:
+    active: true  # Array<Int> 대신 IntArray 사용
+  
+  CouldBeSequence:
+    active: true
+    threshold: 3  # 3개 이상 체이닝 시 Sequence 권장
+  
+  ForEachOnRange:
+    active: true  # (1..10).forEach 대신 for (i in 1..10)
+  
+  SpreadOperator:
+    active: true  # * 연산자 경고 (성능 이슈)
+  
+  UnnecessaryPartOfBinaryExpression:
+    active: true
+  
+  UnnecessaryTemporaryInstantiation:
+    active: true
+
+# ============================================
+# 잠재적 버그 규칙
+# ============================================
+potential-bugs:
+  active: true
+  
+  CastToNullableType:
+    active: true  # as? 대신 as 사용 경고
+  
+  Deprecation:
+    active: true  # deprecated 사용 경고
+  
+  DontDowncastCollectionTypes:
+    active: true
+  
+  DoubleMutabilityForCollection:
+    active: true  # var + MutableList 사용 금지
+  
+  EqualsAlwaysReturnsTrueOrFalse:
+    active: true
+  
+  EqualsWithHashCodeExist:
+    active: true
+  
+  ExitOutsideMain:
+    active: true  # System.exit() 경고
+  
+  ExplicitGarbageCollectionCall:
+    active: true  # System.gc() 금지
+  
+  HasPlatformType:
+    active: true  # Java 플랫폼 타입 경고
+  
+  IgnoredReturnValue:
+    active: true
+    restrictToConfig: true
+    returnValueAnnotations:
+      - 'CheckReturnValue'
+      - 'CheckResult'
+  
+  ImplicitDefaultLocale:
+    active: true  # Locale 명시 필요
+  
+  ImplicitUnitReturnType:
+    active: false  # 때때로 괜찮음
+  
+  InvalidRange:
+    active: true  # 1..0 같은 무효 범위
+  
+  IteratorHasNextCallsNextMethod:
+    active: true
+  
+  IteratorNotThrowingNoSuchElementException:
+    active: true
+  
+  LateinitUsage:
+    active: false  # DI에서 필요
+  
+  MapGetWithNotNullAssertionOperator:
+    active: true  # map[key]!! 경고
+  
+  MissingPackageDeclaration:
+    active: true
+  
+  NullableToStringCall:
+    active: true  # null?.toString() 경고
+  
+  NullCheckOnMutableProperty:
+    active: true
+  
+  UnconditionalJumpStatementInLoop:
+    active: true  # while(true) { break } 패턴
+  
+  UnnecessaryNotNullCheck:
+    active: true
+  
+  UnnecessaryNotNullOperator:
+    active: true  # !!는 최소화
+  
+  UnnecessarySafeCall:
+    active: true
+  
+  UnreachableCatchBlock:
+    active: true
+  
+  UnreachableCode:
+    active: true
+  
+  UnsafeCallOnNullableType:
+    active: true  # 널러블에 !! 사용 경고
+  
+  UnsafeCast:
+    active: true  # as 대신 as? 권장
+  
+  UnusedUnaryOperator:
+    active: true
+  
+  UselessPostfixExpression:
+    active: true
+
+# ============================================
+# 스타일 규칙
+# ============================================
 style:
-  MaxLineLength:
-    maxLineLength: 140
-    excludeCommentStatements: true
-  MagicNumber:
-    active: false
-  WildcardImport:
-    active: false
+  active: true
+  
+  AlsoCouldBeApply:
+    active: true
+  
+  CanBeNonNullable:
+    active: true  # 널러블 불필요 시 경고
+  
+  CascadingCallWrapping:
+    active: true
+    includeElvis: true
+  
+  ClassOrdering:
+    active: true  # companion object 순서 등
+  
+  CollapsibleIfStatements:
+    active: true  # if 중첩 최소화
+  
+  DataClassContainsFunctions:
+    active: false  # data class에 함수 허용
+  
+  DataClassShouldBeImmutable:
+    active: true  # data class는 불변
+  
+  DestructuringDeclarationWithTooManyEntries:
+    active: true
+    maxDestructuringEntries: 5
+  
+  EqualsNullCall:
+    active: true  # == null 대신 ?.let 사용
+  
+  EqualsOnSignatureLine:
+    active: true  # = 는 시그니처 라인에
+  
+  ExplicitCollectionElementAccessMethod:
+    active: true  # get() 대신 []
+  
+  ExplicitItLambdaParameter:
+    active: true  # { it -> } 불필요
+  
+  ExpressionBodySyntax:
+    active: true
+    includeLineWrapping: true
+  
   ForbiddenComment:
     active: false  # TODO 허용 (개발 중)
+  
+  ForbiddenImport:
+    active: true
+    imports:
+      - 'java.util.stream.*'  # Kotlin Sequence 사용
+    forbiddenPatterns: ''
+  
+  # ============================================
+  # 아키텍처 제약 규칙 (RFC-V4-010 + SOLID)
+  # ============================================
+  # NOTE: Detekt의 ForbiddenImport는 파일 위치 기반 조건을 지원하지 않음
+  # 아키텍처 제약은 ArchUnit 테스트에서 강제
+  # 여기서는 전역적으로 금지해야 하는 패턴만 정의
+  
+  ForbiddenMethodCall:
+    active: true
+    methods:
+      - reason: 'use logger instead'
+        value: 'kotlin.io.println'
+      - reason: 'use logger instead'
+        value: 'kotlin.io.print'
+  
+  ForbiddenSuppress:
+    active: false
+  
+  ForbiddenVoid:
+    active: true  # Unit 사용
+    ignoreOverridden: true
+    ignoreUsageInGenerics: true
+  
+  FunctionOnlyReturningConstant:
+    active: true
+    ignoreOverridableFunction: true
+    ignoreActualFunction: true
+    excludedFunctions: []
+  
+  LoopWithTooManyJumpStatements:
+    active: true
+    maxJumpCount: 2
+  
+  MagicNumber:
+    active: false  # 상수는 괜찮음
+  
+  MandatoryBracesLoops:
+    active: true  # 루프에 중괄호 필수
+  
+  MaxChainedCallsOnSameLine:
+    active: true
+    maxChainedCalls: 5
+  
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+    excludePackageStatements: true
+    excludeImportStatements: true
+    excludeCommentStatements: true
+    excludeRawStrings: true
+  
+  MayBeConst:
+    active: true  # val → const val
+  
+  ModifierOrder:
+    active: true  # 수정자 순서
+  
+  MultilineLambdaItParameter:
+    active: true  # 멀티라인 람다에서 it 명시
+  
+  MultilineRawStringIndentation:
+    active: true
+    indentSize: 4
+    trimmingMethods:
+      - 'trimIndent'
+      - 'trimMargin'
+  
+  NestedClassesVisibility:
+    active: true  # 중첩 클래스 가시성 최소화
+  
+  NewLineAtEndOfFile:
+    active: true
+  
+  NoTabs:
+    active: true
+  
+  NullableBooleanCheck:
+    active: true
+  
+  ObjectLiteralToLambda:
+    active: true  # 람다로 변환 가능 시
+  
+  OptionalAbstractKeyword:
+    active: true  # abstract 불필요 시 제거
+  
+  OptionalUnit:
+    active: true  # : Unit 불필요
+  
+  PreferToOverPairSyntax:
+    active: true  # Pair(a, b) → a to b
+  
+  ProtectedMemberInFinalClass:
+    active: true  # final class에서 protected 불필요
+  
+  RedundantExplicitType:
+    active: true  # 타입 추론 가능 시
+  
+  RedundantHigherOrderMapUsage:
+    active: true  # map { it } 불필요
+  
+  RedundantVisibilityModifierRule:
+    active: true  # public 명시 불필요
+  
   ReturnCount:
+    active: true
     max: 5
+    excludedFunctions: []
+    excludeLabeled: true
+    excludeReturnFromLambda: true
+    excludeGuardClauses: true
+  
+  SafeCast:
+    active: true  # as → as?
+  
+  SerialVersionUIDInSerializableClass:
+    active: false  # kotlinx.serialization 사용
+  
+  SpacingBetweenPackageAndImports:
+    active: true
+  
+  ThrowsCount:
+    active: true
+    max: 3
+    excludeGuardClauses: true
+  
+  TrailingWhitespace:
+    active: true
+  
+  TrimMultilineRawString:
+    active: true
+  
+  UnderscoresInNumericLiterals:
+    active: true  # 1_000_000 형식 권장
+    acceptableLength: 5
+    allowNonStandardGrouping: false
+  
+  UnnecessaryAbstractClass:
+    active: true
+  
+  UnnecessaryAnnotationUseSiteTarget:
+    active: true
+  
+  UnnecessaryApply:
+    active: true
+  
+  UnnecessaryBackticks:
+    active: true
+  
+  UnnecessaryFilter:
+    active: true  # filter { }.first → firstOrNull { }
+  
+  UnnecessaryInheritance:
+    active: true  # : Any 불필요
+  
+  UnnecessaryInnerClass:
+    active: true  # inner 불필요 시
+  
+  UnnecessaryLet:
+    active: true  # ?.let { it } 불필요
+  
+  UnnecessaryParentheses:
+    active: true
+  
+  UntilInsteadOfRangeTo:
+    active: true  # 0..n-1 → 0 until n
+  
+  UnusedImports:
+    active: true
+  
+  UnusedParameter:
+    active: true
+    allowedNames: '_.*'  # _ 접두사 허용
+  
+  UnusedPrivateClass:
+    active: true
+  
+  UnusedPrivateMember:
+    active: true
+    allowedNames: '_.*|serialVersionUID'
+  
+  UnusedPrivateProperty:
+    active: true
+    allowedNames: '_.*'
+  
+  UseAnyOrNoneInsteadOfFind:
+    active: true  # find { } != null → any { }
+  
+  UseArrayLiteralsInAnnotations:
+    active: true  # arrayOf() → []
+  
+  UseCheckNotNull:
+    active: true  # check(x != null) → checkNotNull(x)
+  
+  UseCheckOrError:
+    active: true  # if (!condition) throw IllegalStateException() → check()
+  
+  UseDataClass:
+    active: true  # equals/hashCode 있으면 data class 권장
+    allowVars: false
+  
+  UseEmptyCounterpart:
+    active: true  # emptyList() 대신 listOf()
+  
+  UseIfEmptyOrIfBlank:
+    active: true  # .isEmpty() → .ifEmpty { }
+  
+  UseIfInsteadOfWhen:
+    active: true  # when에 2개 브랜치만 있으면 if 권장
+    ignoreWhenContainingVariableDeclaration: true
+  
+  UseIsNullOrEmpty:
+    active: true  # == null || .isEmpty() → .isNullOrEmpty()
+  
+  UseOrEmpty:
+    active: true  # ?: emptyList() → .orEmpty()
+  
+  UseRequire:
+    active: true  # if (!condition) throw IllegalArgumentException() → require()
+  
+  UseRequireNotNull:
+    active: true  # require(x != null) → requireNotNull(x)
+  
+  UseSumOfInsteadOfFlatMapSize:
+    active: true
+  
+  UselessCallOnNotNull:
+    active: true  # 널이 아닌데 ?. 사용
+  
+  UtilityClassWithPublicConstructor:
+    active: true  # object 사용 권장
+  
+  VarCouldBeVal:
+    active: true  # var → val
+  
+  WildcardImport:
+    active: false  # 와일드카드 import 허용
+
+# ============================================
+# 빈 블록 규칙
+# ============================================
+empty-blocks:
+  active: true
+  
+  EmptyCatchBlock:
+    active: true
+    allowedExceptionNameRegex: '_|(ignore|expected).*'
+  
+  EmptyClassBlock:
+    active: true
+  
+  EmptyDefaultConstructor:
+    active: true
+  
+  EmptyDoWhileBlock:
+    active: true
+  
+  EmptyElseBlock:
+    active: true
+  
+  EmptyFinallyBlock:
+    active: true
+  
+  EmptyForBlock:
+    active: true
+  
+  EmptyFunctionBlock:
+    active: true
+    ignoreOverridden: true
+  
+  EmptyIfBlock:
+    active: true
+  
+  EmptyInitBlock:
+    active: true
+  
+  EmptyKtFile:
+    active: true
+  
+  EmptySecondaryConstructor:
+    active: true
+  
+  EmptyTryBlock:
+    active: true
+  
+  EmptyWhenBlock:
+    active: true
+  
+  EmptyWhileBlock:
+    active: true
+
+# ============================================
+# 주석 규칙
+# ============================================
+comments:
+  active: true
+  
+  AbsentOrWrongFileLicense:
+    active: false  # 라이선스 헤더 필요 없음
+  
+  CommentOverPrivateFunction:
+    active: false  # private 함수에도 주석 허용
+  
+  CommentOverPrivateProperty:
+    active: false
+  
+  DeprecatedBlockTag:
+    active: true  # @deprecated 대신 @Deprecated 어노테이션
+  
+  EndOfSentenceFormat:
+    active: false  # 문장 끝 형식 강제하지 않음
+  
+  KDocReferencesNonPublicProperty:
+    active: true
+  
+  OutdatedDocumentation:
+    active: true
+    matchTypeParameters: true
+    matchDeclarationsOrder: true
+    allowParamOnConstructorProperties: false
+  
+  UndocumentedPublicClass:
+    active: false  # 점진적으로 추가
+  
+  UndocumentedPublicFunction:
+    active: false  # 점진적으로 추가
+  
+  UndocumentedPublicProperty:
+    active: false  # 점진적으로 추가

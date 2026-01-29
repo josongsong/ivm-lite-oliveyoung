@@ -1,0 +1,65 @@
+# RFC-IMPL-016: Brand RuleSet - RefIndexSlice 패턴 적용
+#
+# Brand 데이터 슬라이싱 규칙 정의:
+# - CORE: 전체 Brand 데이터 (상세 페이지용)
+# - SUMMARY: 경량 참조용 (REF_INDEX) - Product ENRICHED에서 LOOKUP
+#
+# 설계 원칙 (RFC-006):
+# - SUMMARY는 최소 필드만 포함 (id, name, logoUrl)
+# - Brand 변경 시 SUMMARY 재빌드 → Product ENRICHED만 Fanout
+# - Product CORE는 영향 없음 (효율성)
+
+kind: RULESET
+id: ruleset.brand.v1
+version: 1.0.0
+status: ACTIVE
+
+entityType: BRAND
+
+# 변경 경로 → 영향 슬라이스 (SSOT)
+# JSON Pointer 기반 변경 감지
+impactMap:
+  CORE:
+    - "/brandId"
+    - "/name"
+    - "/logoUrl"
+    - "/description"
+    - "/country"
+    - "/website"
+  # SUMMARY: name, logoUrl 변경 시만 영향
+  # brandId는 PK이므로 변경 불가 가정
+  SUMMARY:
+    - "/name"
+    - "/logoUrl"
+
+# 루트 레벨 joins 없음 (슬라이스별 joins 사용)
+joins: []
+
+slices:
+  # 1. CORE 슬라이스: 전체 Brand 데이터
+  #    - Brand 상세 페이지, 관리 화면에서 사용
+  #    - 모든 필드 포함 (PassThrough *)
+  - type: CORE
+    sliceKind: STANDARD
+    buildRules:
+      type: PassThrough
+      fields:
+        - "*"
+    joins: []
+
+  # 2. SUMMARY 슬라이스: 경량 참조용 (RFC-006 RefIndexSlice)
+  #    - Product ENRICHED에서 LOOKUP 대상
+  #    - 최소 필드만: id, name, logoUrl
+  #    - 변경 시 Product ENRICHED만 Fanout (효율성)
+  - type: SUMMARY
+    sliceKind: REF_INDEX
+    buildRules:
+      type: MapFields
+      mappings:
+        brandId: id
+        name: name
+        logoUrl: logoUrl
+    joins: []
+
+# Brand는 다른 엔티티를 참조하지 않음 (leaf entity)
+indexes: []

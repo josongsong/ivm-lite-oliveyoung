@@ -2,6 +2,8 @@ package com.oliveyoung.ivmlite.integration
 
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
@@ -10,6 +12,7 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
+import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
@@ -36,9 +39,9 @@ class E2EEvidenceTest : StringSpec({
     val invertedIndexRepo = InMemoryInvertedIndexRepository()
     val contractRegistry = LocalYamlContractRegistryAdapter()
     val joinExecutor = JoinExecutor(rawDataRepo)
-    val slicingEngine = SlicingEngine(contractRegistry, joinExecutor)
-    val changeSetBuilder = ChangeSetBuilder()
-    val impactCalculator = ImpactCalculator()
+    val slicingEngine = DefaultSlicingEngineAdapter(SlicingEngine(contractRegistry, joinExecutor))
+    val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
+    val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
 
     val ingestWorkflow = IngestWorkflow(rawDataRepo, outboxRepo)
     val slicingWorkflow = SlicingWorkflow(

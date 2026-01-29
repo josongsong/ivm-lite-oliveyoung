@@ -1,0 +1,15 @@
+<?xml version="1.0" ?>
+<!--
+  Detekt Baseline
+  
+  기존 이슈를 무시하고 새로운 이슈만 검출하려면:
+  1. ./gradlew detektBaseline 실행
+  2. 이 파일에 기존 이슈들이 기록됨
+  3. 이후 ./gradlew detekt 실행 시 새 이슈만 검출
+  
+  베이스라인 리셋: 이 파일을 빈 상태로 되돌리기
+-->
+<SmellBaseline>
+  <ManuallySuppressedIssues></ManuallySuppressedIssues>
+  <CurrentIssues></CurrentIssues>
+</SmellBaseline>

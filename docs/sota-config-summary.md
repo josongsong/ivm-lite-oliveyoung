@@ -109,8 +109,8 @@ ivm-lite-oliveyoung-full/
 # ℹ .env 파일 로드 중: ...
 # ✓ 환경 변수 검증 완료
 # ℹ 환경 변수 설정 확인:
-#   AWS_ACCESS_KEY_ID: AKIAQ3EG****
-#   AWS_SECRET_ACCESS_KEY: 45r2****eVcc
+#   AWS_ACCESS_KEY_ID: YOUR****
+#   AWS_SECRET_ACCESS_KEY: YOUR****KEY
 #   AWS_REGION: ap-northeast-2
 # ✓ 환경 변수 로드 완료
 

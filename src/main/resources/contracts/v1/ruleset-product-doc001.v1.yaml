@@ -1,0 +1,161 @@
+# RFC-IMPL-016: RefIndexSlice 패턴 적용
+# ENRICHED 슬라이스 추가로 Brand 정보 JOIN 지원
+
+kind: RULESET
+id: ruleset.product.doc001.v1
+version: 1.1.0
+status: ACTIVE
+
+entityType: PRODUCT
+
+# 변경 경로 → 영향 슬라이스(SSOT)
+impactMap:
+  CORE:
+    - "/_meta/schemaVersion"
+    - "/_meta/savedAt"
+    - "/_audit/*"
+    - "/masterInfo/gtin"
+    - "/masterInfo/gdsCd"
+    - "/masterInfo/gdsNm"
+    - "/masterInfo/gdsEngNm"
+    - "/masterInfo/brand/*"
+    - "/masterInfo/flags/*"
+    - "/masterInfo/gdsStatNm"
+    - "/masterInfo/buyTypNm"
+    - "/masterInfo/gdsRegYmd"
+    - "/masterInfo/md/*"
+    - "/masterInfo/scm/*"
+    - "/onlineInfo/prdtNo"
+    - "/onlineInfo/prdtName"
+    - "/onlineInfo/onlinePrdtName"
+    - "/onlineInfo/prdtStatCode"
+    - "/onlineInfo/sellStatCode"
+    - "/onlineInfo/displayYn"
+    - "/onlineInfo/prdtGbnCode"
+    - "/onlineInfo/onlineMd/*"
+    - "/onlineInfo/onlineBrand/*"
+    - "/onlineInfo/appExcluPrdtYn"
+    - "/emblemInfo/*"
+  PRICE:
+    - "/options"
+    - "/masterInfo/packaging/*"
+  INVENTORY:
+    - "/onlineInfo/orderQuantity/*"
+    - "/onlineInfo/orderLimits/*"
+    - "/onlineInfo/sellStatCode"
+    - "/reservationSale/*"
+    - "/masterInfo/shelfLifeManageYn"
+    - "/masterInfo/shelfLifeAvailableDays"
+    - "/masterInfo/clearanceYn"
+    - "/masterInfo/disposalAllowed"
+    - "/masterInfo/returnAllowed"
+  MEDIA:
+    - "/thumbnailImages"
+    - "/videoInfo/*"
+  CATEGORY:
+    - "/displayCategories"
+    - "/masterInfo/standardCategory/*"
+  INDEX:
+    - "/masterInfo/flags/*"
+    - "/options"
+    - "/displayCategories"
+    - "/onlineInfo/*"
+    - "/languageDisplayList"
+    - "/emblemInfo/*"
+    - "/additionalInfo/srchKeyWordText"
+  # RFC-IMPL-016: ENRICHED 슬라이스 영향 경로
+  # Brand 코드 변경 시 ENRICHED 재빌드 (Brand Fanout은 별도 트리거)
+  ENRICHED:
+    - "/masterInfo/brand/code"
+
+joins: []
+
+slices:
+  - type: CORE
+    buildRules:
+      type: PassThrough
+      fields:
+        - "*"
+    joins: []
+
+  - type: PRICE
+    buildRules:
+      type: PassThrough
+      fields:
+        - "options"
+        - "masterInfo.packaging"
+
+  - type: INVENTORY
+    buildRules:
+      type: PassThrough
+      fields:
+        - "onlineInfo.orderQuantity"
+        - "onlineInfo.orderLimits"
+        - "onlineInfo.sellStatCode"
+        - "reservationSale"
+        - "masterInfo.shelfLifeManageYn"
+        - "masterInfo.shelfLifeAvailableDays"
+        - "masterInfo.clearanceYn"
+        - "masterInfo.disposalAllowed"
+        - "masterInfo.returnAllowed"
+
+  - type: MEDIA
+    buildRules:
+      type: PassThrough
+      fields:
+        - "thumbnailImages"
+        - "videoInfo"
+
+  - type: CATEGORY
+    buildRules:
+      type: PassThrough
+      fields:
+        - "displayCategories"
+        - "masterInfo.standardCategory"
+    joins: []
+
+  - type: INDEX
+    buildRules:
+      type: PassThrough
+      fields:
+        - "*"
+
+  # RFC-IMPL-016: ENRICHED 슬라이스 (Brand 정보 JOIN)
+  # - Brand SUMMARY를 LOOKUP하여 brandName, brandLogoUrl 추가
+  # - Brand 변경 시 Fanout으로 이 슬라이스만 재빌드 (CORE 유지)
+  - type: ENRICHED
+    sliceKind: ENRICHMENT
+    buildRules:
+      type: PassThrough
+      fields: []  # 자체 필드 없음, JOIN 결과만 포함
+    joins:
+      - name: brand
+        type: LOOKUP
+        sourceFieldPath: masterInfo.brand.code
+        targetEntityType: BRAND
+        targetSliceType: SUMMARY
+        targetKeyPattern: "BRAND#{tenantId}#{value}"
+        required: false
+        missingPolicy: PARTIAL_ALLOWED
+        projection:
+          mode: COPY_FIELDS
+          fields:
+            - from: name
+              to: brandName
+            - from: logoUrl
+              to: brandLogoUrl
+
+# Join fanout/Impact 계산을 위한 inverted index(SSOT)
+indexes:
+  - type: brand
+    selector: $.masterInfo.brand.code
+    references: BRAND
+    maxFanout: 10000
+  - type: category
+    selector: $.displayCategories[*].sclsCtgrNo
+    references: CATEGORY
+    maxFanout: 50000
+  - type: keyword
+    selector: $.additionalInfo.srchKeyWordText
+  - type: gtin
+    selector: $.masterInfo.gtin

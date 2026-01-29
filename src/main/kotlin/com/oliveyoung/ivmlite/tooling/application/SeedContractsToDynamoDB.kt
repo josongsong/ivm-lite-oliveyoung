@@ -17,7 +17,8 @@ import java.io.File
  * 
  * 사용법:
  * ```bash
- * ./gradlew run --args="seed-contracts-to-dynamo --table ivm-lite-schema-registry-local --dir src/main/resources/contracts/v1"
+ * # Remote-only: DYNAMODB_TABLE 환경 변수를 설정한 뒤 실행
+ * ./scripts/seed-contracts.sh
  * ```
  */
 object SeedContractsToDynamoDB {

@@ -6,23 +6,27 @@ server:
   port: 8080
 
 database:
-  url: ${DB_URL:-jdbc:postgresql://localhost:5432/ivmlite}
-  user: ${DB_USER:-ivm}
-  password: ${DB_PASSWORD:-ivm_local_dev}
+  # Remote-only: .env 또는 환경 변수에서 로드
+  url: jdbc:postgresql://ivm-lite.crcikgmci55c.ap-northeast-2.rds.amazonaws.com:5432/ivmlite?sslmode=require
+  user: postgres
+  password: "Dhfflqmdud9("
   maxPoolSize: 10
   minIdle: 2
 
 dynamodb:
-  endpoint: ${DYNAMODB_ENDPOINT:-http://localhost:8000}
+  # Remote-only: 기본값은 AWS 엔드포인트 사용 (override는 opt-in)
+  endpoint: ${DYNAMODB_ENDPOINT:-}
   region: ${AWS_REGION:-ap-northeast-2}
-  tableName: ${DYNAMODB_TABLE:-ivm-lite-schema-registry-local}
+  # Remote-only: 환경 변수 우선, 없으면 .env 기본값 사용
+  tableName: ${DYNAMODB_TABLE:-ivm-lite-schema-registry}
   # AWS 자격 증명 (환경 변수 우선, 없으면 여기서 사용)
-  accessKeyId: ${AWS_ACCESS_KEY_ID:-}
-  secretAccessKey: ${AWS_SECRET_ACCESS_KEY:-}
+  accessKeyId: ${AWS_ACCESS_KEY_ID:-AKIAQ3EGTFD6OOJMNI6W}
+  secretAccessKey: ${AWS_SECRET_ACCESS_KEY:-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}
 
 kafka:
   bootstrapServers: ${KAFKA_BOOTSTRAP_SERVERS:-localhost:9094}
   consumerGroup: ivm-lite
+  topicPrefix: ${KAFKA_TOPIC_PREFIX:-ivm}  # 토픽명: {topicPrefix}.events.{aggregatetype}
 
 contracts:
   resourcePath: /contracts/v1
@@ -41,3 +45,6 @@ worker:
   backoffMultiplier: ${WORKER_BACKOFF_MULTIPLIER:-2.0}
   jitterFactor: ${WORKER_JITTER_FACTOR:-0.1}
   shutdownTimeoutMs: ${WORKER_SHUTDOWN_TIMEOUT_MS:-10000}
+  # 처리할 토픽 (null이면 모든 토픽)
+  # 예: topics: ["ivm.events.raw_data", "ivm.events.slice"]
+  # topics: ${WORKER_TOPICS:-}

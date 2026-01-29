@@ -36,24 +36,25 @@ if [[ ! -f "$ENV_FILE" ]]; then
     log_warn ".env 파일이 없습니다. 생성합니다..."
     cat > "$ENV_FILE" << 'EOF'
 # ============================================
-# IVM Lite AWS DynamoDB 자격 증명
+# IVM Lite Remote-only 환경 변수
 # ============================================
 # 이 파일은 .gitignore에 포함되어 Git에 커밋되지 않습니다.
-# 프로덕션 환경에서는 환경 변수나 IAM 역할을 사용하세요.
+# 프로덕션 환경에서는 환경 변수나 IAM 역할/SSO를 사용하세요.
 
-# AWS 자격 증명 (필수)
+# AWS (필요 시: 로컬에서 직접 AWS 호출할 때)
 export AWS_ACCESS_KEY_ID=YOUR_AWS_ACCESS_KEY_ID
 export AWS_SECRET_ACCESS_KEY=YOUR_AWS_SECRET_ACCESS_KEY
 export AWS_REGION=ap-northeast-2
 
-# DynamoDB 설정 (선택사항)
-# export DYNAMODB_ENDPOINT=http://localhost:8000  # 로컬 DynamoDB 사용 시
-# export DYNAMODB_TABLE=ivm-lite-schema-registry-local
+# DynamoDB (remote-only)
+# endpoint override는 기본 비움 (=AWS 기본 엔드포인트)
+export DYNAMODB_TABLE=YOUR_DYNAMODB_TABLE_NAME
+# export DYNAMODB_ENDPOINT=  # (optional) override endpoint
 
-# 데이터베이스 설정 (선택사항)
-# export DB_URL=jdbc:postgresql://localhost:5432/ivmlite
-# export DB_USER=ivm
-# export DB_PASSWORD=ivm_local_dev
+# PostgreSQL (remote-only)
+export DB_URL=jdbc:postgresql://YOUR_RDS_HOST:5432/YOUR_DB?sslmode=require
+export DB_USER=YOUR_DB_USER
+export DB_PASSWORD=YOUR_DB_PASSWORD
 
 # Kafka 설정 (선택사항)
 # export KAFKA_BOOTSTRAP_SERVERS=localhost:9094
@@ -81,6 +82,20 @@ validate_env() {
     
     if [[ -z "${AWS_REGION:-}" ]]; then
         missing_vars+=("AWS_REGION")
+    fi
+
+    if [[ -z "${DYNAMODB_TABLE:-}" ]]; then
+        missing_vars+=("DYNAMODB_TABLE")
+    fi
+
+    if [[ -z "${DB_URL:-}" ]]; then
+        missing_vars+=("DB_URL")
+    fi
+    if [[ -z "${DB_USER:-}" ]]; then
+        missing_vars+=("DB_USER")
+    fi
+    if [[ -z "${DB_PASSWORD:-}" ]]; then
+        missing_vars+=("DB_PASSWORD")
     fi
     
     if [[ ${#missing_vars[@]} -gt 0 ]]; then
@@ -125,7 +140,10 @@ log_info "환경 변수 설정 확인:"
 echo "  AWS_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID:0:8}****"
 echo "  AWS_SECRET_ACCESS_KEY: $(mask_secret "$AWS_SECRET_ACCESS_KEY")"
 echo "  AWS_REGION: ${AWS_REGION:-not set}"
-echo "  DYNAMODB_ENDPOINT: ${DYNAMODB_ENDPOINT:-not set (AWS 사용)}"
-echo "  DYNAMODB_TABLE: ${DYNAMODB_TABLE:-not set (기본값 사용)}"
+echo "  DYNAMODB_ENDPOINT: ${DYNAMODB_ENDPOINT:-not set (AWS default)}"
+echo "  DYNAMODB_TABLE: ${DYNAMODB_TABLE:-not set}"
+echo "  DB_URL: ${DB_URL:-not set}"
+echo "  DB_USER: ${DB_USER:-not set}"
+echo "  DB_PASSWORD: $(mask_secret "${DB_PASSWORD:-}")"
 
 log_success "환경 변수 로드 완료"

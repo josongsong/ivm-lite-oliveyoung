@@ -21,6 +21,7 @@ val appModule = module {
 val allModules = listOf(
     appModule,
     tracingModule,
+    metricsModule,
     adapterModule,
     workflowModule,
     workerModule,
@@ -36,6 +37,7 @@ val allModules = listOf(
 val productionModules = listOf(
     appModule,
     tracingModule,
+    metricsModule,
     infraModule,
     jooqAdapterModule,
     workflowModule,

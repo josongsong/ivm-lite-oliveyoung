@@ -183,6 +183,7 @@ class DomainErrorTest {
                 is DomainError.JoinError -> "JOIN"
                 is DomainError.MissingSliceError -> "MISSING_SLICE"
                 is DomainError.NotSupportedError -> "NOT_SUPPORTED"
+                is DomainError.InternalError -> "INTERNAL"
             }
             assertTrue(code.isNotBlank())
         }

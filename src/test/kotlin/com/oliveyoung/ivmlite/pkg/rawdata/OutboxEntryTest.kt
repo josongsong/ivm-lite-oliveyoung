@@ -158,6 +158,42 @@ class OutboxEntryTest {
     // ==================== 상태 전이 테스트 ====================
 
     @Test
+    fun `markClaimed - PENDING에서 PROCESSING으로 전이`() {
+        val entry = OutboxEntry.create(
+            aggregateType = AggregateType.RAW_DATA,
+            aggregateId = "t:e",
+            eventType = "Test",
+            payload = "{}",
+        )
+        val claimedAt = Instant.now()
+        val workerId = "worker-1234"
+
+        val claimed = entry.markClaimed(workerId, claimedAt)
+
+        assertEquals(OutboxStatus.PROCESSING, claimed.status)
+        assertEquals(claimedAt, claimed.claimedAt)
+        assertEquals(workerId, claimed.claimedBy)
+        assertEquals(0, claimed.retryCount) // 변경 없음
+        assertNull(claimed.processedAt)
+    }
+
+    @Test
+    fun `markClaimed - workerId 없이 호출 가능`() {
+        val entry = OutboxEntry.create(
+            aggregateType = AggregateType.RAW_DATA,
+            aggregateId = "t:e",
+            eventType = "Test",
+            payload = "{}",
+        )
+
+        val claimed = entry.markClaimed()
+
+        assertEquals(OutboxStatus.PROCESSING, claimed.status)
+        assertNotNull(claimed.claimedAt)
+        assertNull(claimed.claimedBy)
+    }
+
+    @Test
     fun `markProcessed - PENDING에서 PROCESSED로 전이`() {
         val entry = OutboxEntry.create(
             aggregateType = AggregateType.RAW_DATA,
@@ -274,6 +310,29 @@ class OutboxEntryTest {
 
         assertEquals(OutboxStatus.PENDING, reset.status)
         assertEquals(2, reset.retryCount) // 변경 없음
+    }
+
+    @Test
+    fun `resetToPending - PROCESSING에서 복구시 claimedAt, claimedBy 초기화`() {
+        val entry = OutboxEntry(
+            id = UUID.randomUUID(),
+            idempotencyKey = "idem_test",
+            aggregateType = AggregateType.RAW_DATA,
+            aggregateId = "t:e",
+            eventType = "Test",
+            payload = "{}",
+            status = OutboxStatus.PROCESSING,
+            createdAt = Instant.now(),
+            claimedAt = Instant.now(),
+            claimedBy = "worker-1234",
+            retryCount = 1,
+        )
+
+        val reset = entry.resetToPending()
+
+        assertEquals(OutboxStatus.PENDING, reset.status)
+        assertNull(reset.claimedAt)
+        assertNull(reset.claimedBy)
     }
 
     @Test

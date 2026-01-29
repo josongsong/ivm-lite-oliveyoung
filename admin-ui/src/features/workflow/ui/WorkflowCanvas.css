@@ -1,0 +1,149 @@
+.workflow-canvas {
+  width: 100%;
+  height: 100%;
+  min-height: 100%;
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: var(--bg-primary, #0a0a0f);
+}
+
+.workflow-canvas .react-flow__edge-path {
+  stroke-width: 2;
+}
+
+.workflow-canvas .react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 5;
+  animation: flow 0.5s linear infinite;
+}
+
+@keyframes flow {
+  from { stroke-dashoffset: 10; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* 컨트롤 스타일링 */
+.workflow-controls {
+  background: var(--bg-secondary, #12121a);
+  border: 1px solid var(--border-color, #2a2a3a);
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.workflow-controls button {
+  background: var(--bg-primary, #0a0a0f);
+  border: none;
+  border-bottom: 1px solid var(--border-color, #2a2a3a);
+  color: var(--text-primary, #f0f0f0);
+  width: 28px;
+  height: 28px;
+}
+
+.workflow-controls button:last-child {
+  border-bottom: none;
+}
+
+.workflow-controls button:hover {
+  background: var(--bg-tertiary, #1a1a2a);
+}
+
+.workflow-controls button svg {
+  fill: var(--text-primary, #f0f0f0);
+}
+
+/* 미니맵 스타일링 */
+.workflow-minimap {
+  background: var(--bg-secondary, #12121a);
+  border: 1px solid var(--border-color, #2a2a3a);
+  border-radius: 8px;
+}
+
+.workflow-minimap .react-flow__minimap-mask {
+  fill: rgba(0, 0, 0, 0.8);
+}
+
+/* 범례 */
+.workflow-legend {
+  background: rgba(10, 10, 15, 0.95);
+  border: 1px solid var(--border-color, #2a2a3a);
+  border-radius: 8px;
+  padding: 12px 16px;
+  backdrop-filter: blur(8px);
+}
+
+.legend-section {
+  margin-bottom: 10px;
+}
+
+.legend-section:last-child {
+  margin-bottom: 0;
+}
+
+.legend-title {
+  font-size: 0.6rem;
+  text-transform: uppercase;
+  color: var(--text-muted, #666);
+  margin-bottom: 6px;
+  letter-spacing: 0.1em;
+  font-weight: 700;
+}
+
+.legend-items {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.legend-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* NODE TYPES - 채워진 원 */
+.legend-dot {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+}
+
+/* STATUS - 테두리만 있는 링 */
+.legend-ring {
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: transparent;
+  border: 2px solid;
+  box-sizing: border-box;
+}
+
+.legend-label {
+  font-size: 0.7rem;
+  color: var(--text-secondary, #a0a0a0);
+  text-transform: capitalize;
+}
+
+/* React Flow 기본 스타일 오버라이드 */
+.workflow-canvas .react-flow__attribution {
+  display: none;
+}
+
+.workflow-canvas .react-flow__pane {
+  cursor: grab;
+}
+
+.workflow-canvas .react-flow__pane:active {
+  cursor: grabbing;
+}
+
+/* 엣지 스타일 */
+.workflow-canvas .react-flow__edge {
+  pointer-events: all;
+}
+
+.workflow-canvas .react-flow__edge:hover .react-flow__edge-path {
+  stroke: #00d4ff;
+  stroke-width: 3;
+}

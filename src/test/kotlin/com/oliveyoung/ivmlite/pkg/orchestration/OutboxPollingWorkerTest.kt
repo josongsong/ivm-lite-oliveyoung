@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
 
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
+import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
@@ -12,6 +14,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxEventTypes
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
+import com.oliveyoung.ivmlite.pkg.slices.ports.SlicingEnginePort
 import com.oliveyoung.ivmlite.shared.config.WorkerConfig
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
@@ -25,7 +28,6 @@ import kotlinx.serialization.encodeToString
 import kotlinx.serialization.json.Json
 import io.mockk.mockk
 import io.mockk.coEvery
-import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
 import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
@@ -47,11 +49,11 @@ class OutboxPollingWorkerTest : StringSpec({
     val sliceRepo = InMemorySliceRepository()
     val outboxRepo = InMemoryOutboxRepository()
     val invertedIndexRepo = InMemoryInvertedIndexRepository()
-    val slicingEngine = mockk<com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine>().also { engine ->
+    val slicingEngine = mockk<SlicingEnginePort>().also { engine ->
         coEvery { engine.slice(any(), any()) } answers {
             val rawData = firstArg<com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord>()
             val slices = listOf(
-                com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord(
+                SliceRecord(
                     tenantId = rawData.tenantId,
                     entityKey = rawData.entityKey,
                     version = rawData.version,
@@ -62,11 +64,11 @@ class OutboxPollingWorkerTest : StringSpec({
                     ruleSetVersion = SemVer.parse("1.0.0"),
                 ),
             )
-            SlicingEngine.Result.Ok(SlicingEngine.SlicingResult(slices, emptyList()))
+            SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
         }
     }
-    val changeSetBuilder = ChangeSetBuilder()
-    val impactCalculator = ImpactCalculator()
+    val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
+    val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
     val contractRegistry = mockk<ContractRegistryPort>()
     val slicingWorkflow = SlicingWorkflow(
         rawDataRepo,
@@ -327,5 +329,131 @@ class OutboxPollingWorkerTest : StringSpec({
             val metrics = worker.getMetrics()
             metrics.processed shouldBe 1
         }
+    }
+
+    // ==================== Claim 기반 동작 테스트 ====================
+
+    "claim 기반 처리 - PROCESSING 상태로 전환 후 처리" {
+        val tenantId = TenantId("tenant-claim-test")
+        val entityKey = EntityKey("PRODUCT#tenant-claim-test#item-1")
+
+        ingestWorkflow.execute(
+            tenantId = tenantId,
+            entityKey = entityKey,
+            version = 1L,
+            schemaId = "product.v1",
+            schemaVersion = SemVer.parse("1.0.0"),
+            payloadJson = """{"name": "Claim Test"}""",
+        )
+
+        // 처리 전 상태 확인
+        val beforePending = outboxRepo.findPending(10)
+        (beforePending as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value.size shouldBe 1
+
+        val worker = OutboxPollingWorker(
+            outboxRepo = outboxRepo,
+            slicingWorkflow = slicingWorkflow,
+            config = testConfig,
+        )
+
+        worker.start()
+        delay(300)
+        worker.stop()
+
+        // 처리 후: PENDING 없음, PROCESSED 1개
+        val afterPending = outboxRepo.findPending(10)
+        (afterPending as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value.size shouldBe 0
+
+        val metrics = worker.getMetrics()
+        metrics.processed shouldBe 1
+    }
+
+    "stale PROCESSING 엔트리 자동 복구" {
+        // 오래된 PROCESSING 상태의 엔트리 직접 생성
+        val staleEntry = OutboxEntry(
+            id = java.util.UUID.randomUUID(),
+            idempotencyKey = "idem_stale_test",
+            aggregateType = AggregateType.RAW_DATA,
+            aggregateId = "tenant-stale:entity-stale",
+            eventType = OutboxEventTypes.RAW_DATA_INGESTED,
+            payload = Json.encodeToString(
+                OutboxPollingWorker.RawDataIngestedPayload(
+                    tenantId = "tenant-stale",
+                    entityKey = "PRODUCT#tenant-stale#stale-item",
+                    version = 1L,
+                )
+            ),
+            status = com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus.PROCESSING,
+            createdAt = java.time.Instant.now().minusSeconds(1000),
+            claimedAt = java.time.Instant.now().minusSeconds(600), // 10분 전 claim
+            claimedBy = "dead-worker",
+        )
+        outboxRepo.insert(staleEntry)
+
+        // RawData도 저장 (Slicing을 위해)
+        val stalePayload = """{"name": "Stale Test"}"""
+        rawDataRepo.putIdempotent(
+            com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord(
+                tenantId = TenantId("tenant-stale"),
+                entityKey = EntityKey("PRODUCT#tenant-stale#stale-item"),
+                version = 1L,
+                schemaId = "product.v1",
+                schemaVersion = SemVer.parse("1.0.0"),
+                payload = stalePayload,
+                payloadHash = "sha256:stale-test-hash",
+            )
+        )
+
+        val worker = OutboxPollingWorker(
+            outboxRepo = outboxRepo,
+            slicingWorkflow = slicingWorkflow,
+            config = testConfig,
+        )
+
+        worker.start()
+        delay(500) // recovery + 처리 시간
+        worker.stop()
+
+        // stale 엔트리가 복구되어 처리됨
+        val metrics = worker.getMetrics()
+        metrics.processed shouldBeGreaterThan 0
+    }
+
+    "여러 worker 시뮬레이션 - 중복 처리 없음" {
+        val tenantId = TenantId("tenant-multi-worker")
+
+        // 20개 엔트리 생성
+        repeat(20) { i ->
+            val entityKey = EntityKey("PRODUCT#tenant-multi-worker#item-$i")
+            ingestWorkflow.execute(
+                tenantId = tenantId,
+                entityKey = entityKey,
+                version = (i + 1).toLong(),
+                schemaId = "product.v1",
+                schemaVersion = SemVer.parse("1.0.0"),
+                payloadJson = """{"index": $i}""",
+            )
+        }
+
+        // 3개 worker 동시 실행
+        val workers = (1..3).map {
+            OutboxPollingWorker(
+                outboxRepo = outboxRepo,
+                slicingWorkflow = slicingWorkflow,
+                config = testConfig.copy(batchSize = 5),
+            )
+        }
+
+        workers.forEach { it.start() }
+        delay(1000) // 처리 시간
+        workers.forEach { it.stop() }
+
+        // 총 처리 수는 정확히 20개
+        val totalProcessed = workers.sumOf { it.getMetrics().processed }
+        totalProcessed shouldBe 20
+
+        // PENDING 없음
+        val pending = outboxRepo.findPending(100)
+        (pending as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value.size shouldBe 0
     }
 })

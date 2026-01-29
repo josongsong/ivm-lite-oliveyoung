@@ -1,0 +1,28 @@
+kind: VIEW_DEFINITION
+id: view.product.core.v1
+version: 1.0.0
+status: ACTIVE
+
+viewName: PRODUCT_CORE
+entityType: PRODUCT
+description: "상품 기본 정보 (식별/상태/브랜드)"
+
+requiredSlices:
+  - CORE
+
+optionalSlices: []
+
+missingPolicy: FAIL_CLOSED
+
+partialPolicy:
+  allowed: false
+  optionalOnly: true
+  responseMeta:
+    includeMissingSlices: false
+    includeUsedContracts: true
+
+fallbackPolicy: NONE
+
+ruleSetRef:
+  id: ruleset.product.doc001.v1
+  version: 1.0.0

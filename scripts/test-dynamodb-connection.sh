@@ -77,8 +77,12 @@ else
     exit $EXIT_CODE
 fi
 
-# 4. 특정 테이블 존재 확인 (선택사항)
-TABLE_NAME="${DYNAMODB_TABLE:-ivm-lite-schema-registry-local}"
+# 4. 특정 테이블 존재 확인
+TABLE_NAME="${DYNAMODB_TABLE:-}"
+if [[ -z "$TABLE_NAME" ]]; then
+    log_error "DYNAMODB_TABLE이 설정되지 않았습니다 (remote-only)."
+    exit 1
+fi
 log_info "4. 테이블 존재 확인: $TABLE_NAME"
 echo ""
 
@@ -93,9 +97,7 @@ else
     echo ""
     log_warn "테이블 '$TABLE_NAME'을 찾을 수 없습니다 (exit code: $EXIT_CODE)"
     echo ""
-    log_info "테이블이 없으면 생성하세요:"
-    echo "  ./infra/dynamodb/create-tables.sh"
-    echo ""
+    log_info "테이블 생성은 IaC/운영 절차로 진행하세요 (remote-only)."
     log_info "또는 다른 테이블 이름을 사용하려면:"
     echo "  export DYNAMODB_TABLE=your-table-name"
 fi

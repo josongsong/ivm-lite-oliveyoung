@@ -1,5 +1,8 @@
 package com.oliveyoung.ivmlite.sdk
 
+import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
+import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
+import com.oliveyoung.ivmlite.sdk.client.ConsumeApi
 import com.oliveyoung.ivmlite.sdk.client.DeployStatusApi
 import com.oliveyoung.ivmlite.sdk.client.IvmClient
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
@@ -13,6 +16,10 @@ import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductBuilder
 import com.oliveyoung.ivmlite.sdk.execution.DeployExecutor
 import com.oliveyoung.ivmlite.sdk.schema.TypedQueryBuilder
 import com.oliveyoung.ivmlite.sdk.schema.ViewRef
+import com.oliveyoung.ivmlite.shared.config.KafkaConfig
+import com.oliveyoung.ivmlite.shared.config.WorkerConfig
+import com.oliveyoung.ivmlite.shared.domain.types.Topic
+import kotlinx.coroutines.flow.Flow
 
 /**
  * IVM SDK Entry Point - DX 끝판왕
@@ -97,6 +104,18 @@ object Ivm {
     @Volatile
     private var queryWorkflow: com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow? = null
     
+    @Volatile
+    private var outboxPollingWorker: com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker? = null
+
+    @Volatile
+    private var outboxRepository: OutboxRepositoryPort? = null
+    
+    @Volatile
+    private var kafkaConfig: KafkaConfig = KafkaConfig()
+    
+    @Volatile
+    private var workerConfig: WorkerConfig = WorkerConfig()
+    
     /**
      * QueryViewWorkflow 주입 (DI 컨테이너용)
      * 
@@ -111,9 +130,63 @@ object Ivm {
         }
     }
 
+    /**
+     * OutboxPollingWorker 주입 (DI 컨테이너용)
+     * 
+     * SDK에서 Worker를 시작/중지할 수 있도록 합니다.
+     * 
+     * @example
+     * ```kotlin
+     * // DI 컨테이너에서 주입
+     * Ivm.setWorker(worker)
+     * 
+     * // Worker 시작
+     * Ivm.worker.start()
+     * 
+     * // Worker 중지
+     * Ivm.worker.stop()
+     * ```
+     */
+    fun setWorker(worker: com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker) {
+        synchronized(lock) {
+            this.outboxPollingWorker = worker
+        }
+    }
+
+    /**
+     * OutboxRepository 주입 (DI 컨테이너용)
+     * 
+     * SDK에서 Outbox 이벤트를 consume할 수 있도록 합니다.
+     * 
+     * @example
+     * ```kotlin
+     * Ivm.setOutboxRepository(outboxRepo)
+     * 
+     * // 특정 토픽만 consume
+     * val entries = Ivm.consume(Topic.RAW_DATA).poll()
+     * ```
+     */
+    fun setOutboxRepository(repo: OutboxRepositoryPort) {
+        synchronized(lock) {
+            this.outboxRepository = repo
+        }
+    }
+
+    /**
+     * Kafka/Worker 설정 주입 (DI 컨테이너용)
+     */
+    fun setConfigs(kafka: KafkaConfig, worker: WorkerConfig) {
+        synchronized(lock) {
+            this.kafkaConfig = kafka
+            this.workerConfig = worker
+        }
+    }
+
     internal fun getConfig() = config
     internal fun getExecutor() = executor
     internal fun getQueryWorkflow() = queryWorkflow
+    internal fun getWorker() = outboxPollingWorker
+    internal fun getOutboxRepository() = outboxRepository
 
     // ===== Client API (캐싱 적용) =====
 
@@ -351,4 +424,222 @@ object Ivm {
      */
     val queries: QueryApi
         get() = QueryApi(config)
+
+    /**
+     * Worker API (OutboxPollingWorker 제어)
+     * 
+     * OutboxPollingWorker를 시작/중지할 수 있습니다.
+     * 
+     * @example
+     * ```kotlin
+     * // Worker 시작
+     * Ivm.worker.start()
+     * 
+     * // Worker 중지 (Graceful shutdown)
+     * runBlocking {
+     *     Ivm.worker.stop()
+     * }
+     * 
+     * // Worker 상태 확인
+     * if (Ivm.worker.isRunning()) {
+     *     println("Worker is running")
+     * }
+     * ```
+     * 
+     * @throws IllegalStateException Worker가 주입되지 않은 경우
+     */
+    val worker: WorkerApi
+        get() {
+            val worker = outboxPollingWorker
+                ?: throw IllegalStateException("OutboxPollingWorker is not set. Call Ivm.setWorker() first.")
+            return WorkerApi(worker)
+        }
+
+    // ===== Consume API (토픽 기반 이벤트 소비) =====
+
+    /**
+     * Consume API - 토픽 기반 이벤트 소비
+     * 
+     * Kafka와 PostgreSQL Polling 모두에서 동일한 API로 사용.
+     * 
+     * @example
+     * ```kotlin
+     * // 특정 토픽만 구독
+     * val entries = Ivm.consume(Topic.RAW_DATA).poll()
+     * 
+     * // 여러 토픽 구독
+     * val entries = Ivm.consume(Topic.RAW_DATA, Topic.SLICE).poll()
+     * 
+     * // Flow로 연속 소비
+     * Ivm.consume(Topic.RAW_DATA).flow().collect { entry ->
+     *     println("Received: ${entry.eventType}")
+     * }
+     * 
+     * // 토픽명으로 구독
+     * val entries = Ivm.consumeByTopicName("ivm.events.raw_data").poll()
+     * ```
+     * 
+     * @param topics 구독할 토픽 목록
+     * @return ConsumeBuilder for fluent chaining
+     * @throws IllegalStateException OutboxRepository가 주입되지 않은 경우
+     */
+    fun consume(vararg topics: Topic): ConsumeBuilder {
+        val repo = outboxRepository
+            ?: throw IllegalStateException("OutboxRepository is not set. Call Ivm.setOutboxRepository() first.")
+        return ConsumeBuilder(repo, kafkaConfig.topicPrefix, workerConfig, topics.toList())
+    }
+
+    /**
+     * 토픽명으로 Consume
+     * 
+     * @param topicNames 토픽명 목록 (예: "ivm.events.raw_data")
+     * @return ConsumeBuilder
+     */
+    fun consumeByTopicName(vararg topicNames: String): ConsumeBuilder {
+        val repo = outboxRepository
+            ?: throw IllegalStateException("OutboxRepository is not set. Call Ivm.setOutboxRepository() first.")
+        val topics = topicNames.mapNotNull { Topic.fromTopicName(it) }
+        return ConsumeBuilder(repo, kafkaConfig.topicPrefix, workerConfig, topics)
+    }
+
+    /**
+     * 모든 토픽 Consume
+     * 
+     * @return ConsumeBuilder
+     */
+    fun consumeAll(): ConsumeBuilder {
+        val repo = outboxRepository
+            ?: throw IllegalStateException("OutboxRepository is not set. Call Ivm.setOutboxRepository() first.")
+        return ConsumeBuilder(repo, kafkaConfig.topicPrefix, workerConfig, Topic.entries.toList())
+    }
+
+    /**
+     * 사용 가능한 토픽명 목록 조회
+     */
+    fun availableTopics(): List<String> = Topic.allTopicNames(kafkaConfig.topicPrefix)
+}
+
+/**
+ * Consume Builder - Fluent API
+ * 
+ * @example
+ * ```kotlin
+ * Ivm.consume(Topic.RAW_DATA)
+ *     .batchSize(50)
+ *     .pollInterval(200)
+ *     .poll()
+ * ```
+ */
+class ConsumeBuilder(
+    private val outboxRepo: OutboxRepositoryPort,
+    private val topicPrefix: String,
+    private val workerConfig: WorkerConfig,
+    private val topics: List<Topic>,
+) {
+    private var batchSize: Int = workerConfig.batchSize
+    private var pollIntervalMs: Long = workerConfig.pollIntervalMs
+    
+    fun batchSize(size: Int): ConsumeBuilder {
+        this.batchSize = size
+        return this
+    }
+    
+    fun pollInterval(ms: Long): ConsumeBuilder {
+        this.pollIntervalMs = ms
+        return this
+    }
+
+    /**
+     * 이벤트 조회 (한 번)
+     */
+    suspend fun poll(limit: Int = batchSize): List<OutboxEntry> {
+        val aggregateType = topics.firstOrNull()?.aggregateType
+        
+        val result = if (aggregateType != null) {
+            outboxRepo.findPendingByType(aggregateType, limit)
+        } else {
+            outboxRepo.findPending(limit)
+        }
+        
+        return when (result) {
+            is OutboxRepositoryPort.Result.Ok -> result.value
+            is OutboxRepositoryPort.Result.Err -> emptyList()
+        }
+    }
+
+    /**
+     * Flow로 연속 소비
+     */
+    fun flow(): Flow<OutboxEntry> = kotlinx.coroutines.flow.flow {
+        while (true) {
+            val entries = poll()
+            
+            for (entry in entries) {
+                emit(entry)
+            }
+            
+            val delayMs = if (entries.isEmpty()) {
+                workerConfig.idlePollIntervalMs
+            } else {
+                pollIntervalMs
+            }
+            kotlinx.coroutines.delay(delayMs)
+        }
+    }
+
+    /**
+     * 콜백으로 처리
+     */
+    suspend fun forEach(handler: suspend (OutboxEntry) -> Unit) {
+        flow().collect { entry ->
+            handler(entry)
+        }
+    }
+
+    /**
+     * 이벤트 처리 완료 표시
+     */
+    suspend fun ack(entries: List<OutboxEntry>) {
+        val ids = entries.map { it.id }
+        outboxRepo.markProcessed(ids)
+    }
+
+    /**
+     * 이벤트 처리 실패 표시
+     */
+    suspend fun nack(entry: OutboxEntry, reason: String) {
+        outboxRepo.markFailed(entry.id, reason)
+    }
+}
+
+/**
+ * Worker API - OutboxPollingWorker 제어
+ * 
+ * @example
+ * ```kotlin
+ * Ivm.worker.start()  // Worker 시작
+ * runBlocking { Ivm.worker.stop() }  // Worker 중지
+ * ```
+ */
+class WorkerApi(
+    private val worker: com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
+) {
+    /**
+     * Worker 시작
+     * 
+     * @return true if started, false if already running or disabled
+     */
+    fun start(): Boolean = worker.start()
+
+    /**
+     * Worker 중지 (Graceful shutdown)
+     * 
+     * @return true if stopped, false if not running
+     */
+    suspend fun stop(): Boolean = worker.stop()
+
+    /**
+     * Worker 실행 중 여부 확인
+     */
+    fun isRunning(): Boolean = worker.isRunning()
 }

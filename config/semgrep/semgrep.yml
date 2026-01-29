@@ -8,6 +8,7 @@ rules:
     severity: WARNING
     languages: [kotlin, java]
     pattern: $X.printStackTrace(...)
+
   - id: no-runtime-exec
     message: Avoid Runtime.exec/ProcessBuilder for shell commands; use validated APIs to prevent command injection.
     severity: WARNING
@@ -15,3 +16,61 @@ rules:
     pattern-either:
       - pattern: Runtime.getRuntime().exec(...)
       - pattern: ProcessBuilder(...)
+
+  # ============================================
+  # 아키텍처 제약 규칙 (레이어 의존성 방향)
+  # ============================================
+  # pkg (core) → sdk 역참조 금지
+  - id: pkg-must-not-import-sdk
+    message: |
+      🚫 아키텍처 위반: pkg(코어)는 sdk를 참조할 수 없습니다.
+      의존성 방향: sdk → pkg → shared (단방향)
+      
+      해결 방법:
+      - 공통 모델은 shared.domain으로 이동
+      - sdk.model.X → shared.domain.X
+    severity: ERROR
+    languages: [kotlin]
+    pattern: import com.oliveyoung.ivmlite.sdk.$...
+    paths:
+      include:
+        - "**/pkg/**/*.kt"
+
+  # pkg (core) → apps 역참조 금지
+  - id: pkg-must-not-import-apps
+    message: |
+      🚫 아키텍처 위반: pkg(코어)는 apps를 참조할 수 없습니다.
+      의존성 방향: apps → pkg → shared (단방향)
+    severity: ERROR
+    languages: [kotlin]
+    pattern: import com.oliveyoung.ivmlite.apps.$...
+    paths:
+      include:
+        - "**/pkg/**/*.kt"
+
+  # sdk → apps 역참조 금지
+  - id: sdk-must-not-import-apps
+    message: |
+      🚫 아키텍처 위반: sdk는 apps를 참조할 수 없습니다.
+      의존성 방향: apps → sdk → pkg → shared (단방향)
+    severity: ERROR
+    languages: [kotlin]
+    pattern: import com.oliveyoung.ivmlite.apps.$...
+    paths:
+      include:
+        - "**/sdk/**/*.kt"
+
+  # shared는 pkg, sdk, apps 모두 참조 금지 (최하위 레이어)
+  - id: shared-must-be-independent
+    message: |
+      🚫 아키텍처 위반: shared는 다른 레이어를 참조할 수 없습니다.
+      shared는 최하위 레이어로 독립적이어야 합니다.
+    severity: ERROR
+    languages: [kotlin]
+    pattern-either:
+      - pattern: import com.oliveyoung.ivmlite.pkg.$...
+      - pattern: import com.oliveyoung.ivmlite.sdk.$...
+      - pattern: import com.oliveyoung.ivmlite.apps.$...
+    paths:
+      include:
+        - "**/shared/**/*.kt"

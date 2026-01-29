@@ -4,9 +4,15 @@
 
 set -e
 
-DYNAMODB_ENDPOINT=${DYNAMODB_ENDPOINT:-http://localhost:8000}
+if [[ -z "${DYNAMODB_ENDPOINT:-}" ]]; then
+  echo "ERROR: Remote-only 정책으로 로컬 DynamoDB는 사용하지 않습니다." >&2
+  echo "이 스크립트는 endpoint override(DYNAMODB_ENDPOINT)가 명시된 경우에만 실행됩니다." >&2
+  exit 1
+fi
+
+DYNAMODB_ENDPOINT=${DYNAMODB_ENDPOINT}
 AWS_REGION=${AWS_REGION:-ap-northeast-2}
-TABLE_NAME="ivm-lite-schema-registry-local"
+TABLE_NAME="${DYNAMODB_TABLE:?DYNAMODB_TABLE is required (remote-only)}"
 
 echo "⏳ Waiting for DynamoDB Local to be ready..."
 until aws dynamodb list-tables --endpoint-url "$DYNAMODB_ENDPOINT" --region "$AWS_REGION" > /dev/null 2>&1; do

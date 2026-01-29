@@ -62,7 +62,7 @@ class DeployJobStatusTest : StringSpec({
         val ready = DeployJobStatus("3", DeployState.READY, now, now)
         val sinking = DeployJobStatus("4", DeployState.SINKING, now, now)
         val done = DeployJobStatus("5", DeployState.DONE, now, now)
-        val failed = DeployJobStatus("6", DeployState.FAILED, now, now, "Error")
+        val failed = DeployJobStatus("6", DeployState.FAILED, now, now, error = "Error")
 
         queued.state shouldBe DeployState.QUEUED
         running.state shouldBe DeployState.RUNNING

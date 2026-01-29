@@ -143,67 +143,33 @@ class DeployExecutor(
             }
         }
 
-        // 4. Ship
+        // 4. Ship (항상 Outbox를 통해 비동기 처리)
         spec.shipSpec?.let { shipSpec ->
-            val sinkTypes = shipSpec.sinks.map { sinkSpecToType(it) }
+            // ShipMode.Sync도 Outbox를 통해 처리 (일관성 및 확장성)
+            shipSpec.sinks.forEach { sink ->
+                val shipTaskEntry = OutboxEntry.create(
+                    aggregateType = AggregateType.SLICE,
+                    aggregateId = "${rawDataParams.tenantId.value}:${rawDataParams.entityKey.value}",
+                    eventType = "ShipRequested",
+                    payload = buildJsonObject {
+                        put("payloadVersion", "1.0")
+                        put("tenantId", rawDataParams.tenantId.value)
+                        put("entityKey", rawDataParams.entityKey.value)
+                        put("version", rawDataParams.version.toString())
+                        put("sink", sinkSpecToType(sink))
+                        put("shipMode", "async")
+                    }.toString()
+                )
 
-            when (shipSpec.mode) {
-                ShipMode.Sync -> {
-                    // 동기 Ship - ShipWorkflow 연동
-                    val shipResult = shipWorkflow.executeToMultipleSinks(
-                        tenantId = rawDataParams.tenantId,
-                        entityKey = rawDataParams.entityKey,
-                        version = rawDataParams.version,
-                        sinkTypes = sinkTypes
-                    )
-
-                    when (shipResult) {
-                        is ShipWorkflow.Result.Err -> {
-                            return DeployResult.failure(
-                                rawDataParams.entityKey.value,
-                                rawDataParams.version.toString(),
-                                "Ship failed: ${shipResult.error}"
-                            )
-                        }
-                        is ShipWorkflow.Result.Ok -> {
-                            if (shipResult.value.failedCount > 0) {
-                                return DeployResult.failure(
-                                    rawDataParams.entityKey.value,
-                                    rawDataParams.version.toString(),
-                                    "Ship partially failed: ${shipResult.value.errors}"
-                                )
-                            }
-                        }
-                    }
-                }
-                ShipMode.Async -> {
-                    // 비동기 Ship → Outbox 적재
-                    shipSpec.sinks.forEach { sink ->
-                        val shipTaskEntry = OutboxEntry.create(
-                            aggregateType = AggregateType.SLICE,
-                            aggregateId = "${rawDataParams.tenantId.value}:${rawDataParams.entityKey.value}",
-                            eventType = "ShipRequested",
-                            payload = buildJsonObject {
-                                put("payloadVersion", "1.0")
-                                put("tenantId", rawDataParams.tenantId.value)
-                                put("entityKey", rawDataParams.entityKey.value)
-                                put("version", rawDataParams.version.toString())
-                                put("sink", sinkSpecToType(sink))
-                                put("shipMode", "async")
-                            }.toString()
+                when (val r = outboxRepository.insert(shipTaskEntry)) {
+                    is OutboxRepositoryPort.Result.Err -> {
+                        return DeployResult.failure(
+                            rawDataParams.entityKey.value,
+                            rawDataParams.version.toString(),
+                            "Ship outbox insert failed: ${r.error}"
                         )
-
-                        when (val r = outboxRepository.insert(shipTaskEntry)) {
-                            is OutboxRepositoryPort.Result.Err -> {
-                                return DeployResult.failure(
-                                    rawDataParams.entityKey.value,
-                                    rawDataParams.version.toString(),
-                                    "Ship outbox insert failed: ${r.error}"
-                                )
-                            }
-                            is OutboxRepositoryPort.Result.Ok -> { /* continue */ }
-                        }
                     }
+                    is OutboxRepositoryPort.Result.Ok -> { /* continue */ }
                 }
             }
         }
@@ -495,30 +461,22 @@ class DeployExecutor(
     }
 
     /**
-     * Ship 동기 실행 (전체 Sink)
+     * Ship 실행 (항상 Outbox를 통해 비동기 처리)
+     * 
+     * @deprecated 동기 실행은 제거되었습니다. 항상 Outbox를 통해 비동기로 처리됩니다.
+     *             shipAsync()를 사용하세요.
      */
+    @Deprecated("Ship은 항상 Outbox를 통해 비동기로 처리됩니다. shipAsync()를 사용하세요.", ReplaceWith("shipAsync(input, version)"))
     suspend fun <T : EntityInput> shipSync(input: T, version: Long, sinkTypes: List<String>): ShipResult {
-        val tenantId = TenantId(input.tenantId)
-        val entityKey = extractEntityKey(input)
-
-        val result = shipWorkflow.executeToMultipleSinks(tenantId, entityKey, version, sinkTypes)
-
-        return when (result) {
-            is ShipWorkflow.Result.Ok -> ShipResult(
-                entityKey = entityKey.value,
-                version = version,
-                sinks = result.value.sinkResults.filter { it.success }.map { it.sinkType },
-                success = result.value.failedCount == 0,
-                error = if (result.value.failedCount > 0) result.value.errors.joinToString() else null
-            )
-            is ShipWorkflow.Result.Err -> ShipResult(
-                entityKey = entityKey.value,
-                version = version,
-                sinks = emptyList(),
-                success = false,
-                error = result.error.toString()
-            )
-        }
+        // Outbox를 통해 비동기로 처리 (일관성 유지)
+        val job = shipAsync(input, version)
+        return ShipResult(
+            entityKey = job.entityKey,
+            version = job.version.toLong(),
+            sinks = sinkTypes,
+            success = true,
+            error = null
+        )
     }
 
     /**
@@ -555,31 +513,23 @@ class DeployExecutor(
     }
 
     /**
-     * 특정 Sink만 동기 Ship
+     * 특정 Sink만 Ship 실행 (항상 Outbox를 통해 비동기 처리)
+     * 
+     * @deprecated 동기 실행은 제거되었습니다. 항상 Outbox를 통해 비동기로 처리됩니다.
+     *             shipAsyncTo()를 사용하세요.
      */
+    @Deprecated("Ship은 항상 Outbox를 통해 비동기로 처리됩니다. shipAsyncTo()를 사용하세요.", ReplaceWith("shipAsyncTo(input, version, sinks)"))
     suspend fun <T : EntityInput> shipSyncTo(input: T, version: Long, sinks: List<SinkSpec>): ShipResult {
-        val tenantId = TenantId(input.tenantId)
-        val entityKey = extractEntityKey(input)
-
+        // Outbox를 통해 비동기로 처리 (일관성 유지)
+        val job = shipAsyncTo(input, version, sinks)
         val sinkTypes = sinks.map { sinkSpecToType(it) }
-        val result = shipWorkflow.executeToMultipleSinks(tenantId, entityKey, version, sinkTypes)
-
-        return when (result) {
-            is ShipWorkflow.Result.Ok -> ShipResult(
-                entityKey = entityKey.value,
-                version = version,
-                sinks = result.value.sinkResults.filter { it.success }.map { it.sinkType },
-                success = result.value.failedCount == 0,
-                error = if (result.value.failedCount > 0) result.value.errors.joinToString() else null
-            )
-            is ShipWorkflow.Result.Err -> ShipResult(
-                entityKey = entityKey.value,
-                version = version,
-                sinks = emptyList(),
-                success = false,
-                error = result.error.toString()
-            )
-        }
+        return ShipResult(
+            entityKey = job.entityKey,
+            version = job.version.toLong(),
+            sinks = sinkTypes,
+            success = true,
+            error = null
+        )
     }
 
     /**

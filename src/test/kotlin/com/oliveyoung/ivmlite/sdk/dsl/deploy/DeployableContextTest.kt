@@ -66,25 +66,6 @@ class DeployableContextTest {
     }
 
     @Test
-    fun `deploy - Full DSL with sync compile and sync ship`() {
-        val context = DeployableContext(testInput, testConfig)
-
-        val result = context.deploy {
-            compile.sync()
-            ship.sync {
-                opensearch {
-                    index("products")
-                }
-            }
-            cutover.ready()
-        }
-
-        assertTrue(result.success)
-        assertEquals("product:TEST-001", result.entityKey)
-        assertNotNull(result.version)
-    }
-
-    @Test
     fun `deployAsync - Type-safe async DSL`() {
         val context = DeployableContext(testInput, testConfig)
 

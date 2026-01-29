@@ -1,0 +1,193 @@
+# IVM-Lite Project Rules for Cursor AI
+
+## 프로젝트 개요
+IVM-Lite는 Kotlin + Ktor 기반의 데이터 파이프라인 시스템입니다.
+RawData → Slice → View → Sink 흐름을 처리합니다.
+
+## 언어 설정
+- 응답은 항상 한국어로 합니다.
+- 코드 주석도 한국어로 작성합니다.
+
+---
+
+## 빌드 & 실행 명령어
+
+### 빠른 빌드 (테스트 스킵)
+```bash
+./gradlew fastBuild
+```
+
+### Admin 앱 실행 (포트 8081)
+```bash
+./gradlew fastAdmin    # 빠른 빌드 후 실행
+./gradlew runAdmin     # 일반 실행
+```
+
+### Runtime API 실행 (포트 8080)
+```bash
+./gradlew run
+```
+
+### 전체 빌드
+```bash
+./gradlew build
+```
+
+### 클린 빌드 (캐시 정리)
+```bash
+./gradlew clean build --no-build-cache
+```
+
+---
+
+## 테스트 명령어
+
+### 기본 단위 테스트
+```bash
+./gradlew test
+```
+
+### 빠른 단위 테스트 (병렬 실행)
+```bash
+./gradlew unitTest
+```
+
+### 통합 테스트 (Docker 필요)
+```bash
+./gradlew integrationTest
+```
+
+### 특정 패키지 테스트
+```bash
+./gradlew testPackage -Dpkg=slices
+./gradlew testPackage -Dpkg=contracts
+./gradlew testPackage -Dpkg=orchestration
+```
+
+### 전체 검사 (테스트 + 린트)
+```bash
+./gradlew checkAll
+```
+
+### 린트만 실행
+```bash
+./gradlew lint
+./gradlew detekt
+```
+
+---
+
+## Frontend (Admin UI)
+
+### 개발 서버 실행 (포트 3000)
+```bash
+cd admin-ui && npm run dev
+```
+
+### 빌드
+```bash
+cd admin-ui && npm run build
+```
+
+### 린트
+```bash
+cd admin-ui && npm run lint
+```
+
+### 타입 체크
+```bash
+cd admin-ui && npm run typecheck
+```
+
+---
+
+## 프로젝트 구조
+
+```
+src/main/kotlin/com/oliveyoung/ivmlite/
+├── apps/
+│   ├── admin/          # Admin API (포트 8081)
+│   ├── runtimeapi/     # Runtime API (포트 8080)
+│   └── opscli/         # CLI 도구
+├── pkg/
+│   ├── contracts/      # Contract 도메인
+│   ├── rawdata/        # RawData 도메인
+│   ├── slices/         # Slice 도메인
+│   ├── views/          # View 도메인
+│   ├── sinks/          # Sink 도메인
+│   ├── orchestration/  # Outbox & Worker
+│   └── ...
+└── shared/             # 공통 유틸리티
+
+admin-ui/src/
+├── app/                # 앱 설정, 라우팅
+├── features/           # 기능별 모듈
+├── shared/             # 공통 컴포넌트
+└── widgets/            # 레이아웃 위젯
+```
+
+---
+
+## 아키텍처 원칙
+
+1. Hexagonal Architecture: Port/Adapter 패턴
+2. Contract is Law: YAML 계약이 SSOT
+3. Domain-Sliced Design: 도메인별 모듈 분리
+4. FSD (Feature-Sliced Design): 프론트엔드 구조
+
+---
+
+## 환경변수 설정 (중요!)
+
+**.env 파일에 DB 접속 정보가 있습니다. jOOQ 코드 생성, 테스트 실행 시 반드시 로드하세요.**
+
+```bash
+# .env 로드 후 Gradle 실행
+source .env && ./gradlew jooqCodegen
+source .env && ./gradlew test
+
+# 또는 export로 직접 설정
+export DB_URL="jdbc:postgresql://..."
+export DB_USER="postgres"
+export DB_PASSWORD="..."
+```
+
+.env 파일 주요 변수:
+- `DB_URL`: PostgreSQL JDBC URL
+- `DB_USER`: DB 사용자
+- `DB_PASSWORD`: DB 비밀번호
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: DynamoDB 접근용
+
+---
+
+## 주의사항
+
+1. **환경변수**: .env 파일에서 로드 (source .env)
+2. Configuration Cache: 활성화되어 있음. 환경변수는 System.getenv() 대신 providers.environmentVariable() 사용 권장
+3. 통합 테스트: Docker가 필요함 (integrationTest 태스크)
+4. jOOQ 코드: ./gradlew jooqCodegen으로 DB에서 생성 (DB 연결 필요, .env 로드 필수)
+5. 계약 파일: src/main/resources/contracts/v1/ 에 YAML로 정의
+
+---
+
+## 자주 사용하는 워크플로우
+
+### 개발 시작
+```bash
+# 터미널 1: Backend
+./gradlew fastAdmin
+
+# 터미널 2: Frontend
+cd admin-ui && npm run dev
+```
+
+### 코드 수정 후 확인
+```bash
+./gradlew unitTest testPackage -Dpkg=수정한패키지명
+```
+
+### PR 전 체크
+```bash
+./gradlew checkAll
+cd admin-ui && npm run lint && npm run typecheck
+```

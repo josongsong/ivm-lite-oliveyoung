@@ -13,19 +13,23 @@ import software.amazon.awssdk.services.dynamodb.model.*
 import java.net.URI
 
 /**
- * DynamoDB Local 간단한 연결 테스트
+ * DynamoDB endpoint override 간단한 연결 테스트
  * 
  * - DynamoDB 연결 확인
  * - 테이블 생성
  * - 데이터 쓰기/읽기
  * 
- * 실행 전: docker-compose up -d dynamodb
+ * Remote-only 정책: 기본 테스트에서는 실행되지 않도록 IntegrationTag + endpoint opt-in.
  */
-class DynamoDbSimpleTest : StringSpec({
+class DynamoDbSimpleTest : StringSpec(init@{
+    tags(IntegrationTag)
+
+    val endpoint = System.getenv("DYNAMODB_ENDPOINT") ?: ""
+    if (endpoint.isBlank()) return@init
 
     val client = DynamoDbAsyncClient.builder()
-        .endpointOverride(URI.create("http://localhost:8000"))
-        .region(Region.AP_NORTHEAST_2)
+        .endpointOverride(URI.create(endpoint))
+        .region(Region.of(System.getenv("AWS_REGION") ?: "ap-northeast-2"))
         .credentialsProvider(
             StaticCredentialsProvider.create(
                 AwsBasicCredentials.create("dummy", "dummy")

@@ -7,7 +7,7 @@
     "database.hostname": "postgres",
     "database.port": "5432",
     "database.user": "ivm",
-    "database.password": "ivm_local_dev",
+    "database.password": "${DB_PASSWORD}",
     "database.dbname": "ivmlite",
     "database.server.name": "ivm",
     

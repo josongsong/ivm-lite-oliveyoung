@@ -16,9 +16,10 @@ import javax.sql.DataSource
 object DatabaseConfig {
 
     data class DbProperties(
-        val url: String = System.getenv("DB_URL") ?: "jdbc:postgresql://localhost:5432/ivmlite",
-        val user: String = System.getenv("DB_USER") ?: "ivm",
-        val password: String = System.getenv("DB_PASSWORD") ?: "ivm_local_dev",
+        // Remote-only: 로컬 기본값 제거 (환경 변수로만 주입)
+        val url: String = System.getenv("DB_URL") ?: error("DB_URL is required"),
+        val user: String = System.getenv("DB_USER") ?: error("DB_USER is required"),
+        val password: String = System.getenv("DB_PASSWORD") ?: error("DB_PASSWORD is required"),
         val maxPoolSize: Int = System.getenv("DB_MAX_POOL_SIZE")?.toIntOrNull() ?: 10,
         val minIdle: Int = System.getenv("DB_MIN_IDLE")?.toIntOrNull() ?: 2,
     )

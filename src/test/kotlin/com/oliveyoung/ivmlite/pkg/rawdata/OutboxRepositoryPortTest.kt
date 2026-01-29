@@ -260,6 +260,187 @@ class OutboxRepositoryPortTest {
         assertIs<DomainError.NotFoundError>(result.error)
     }
 
+    // ==================== claim 테스트 ====================
+
+    @Test
+    fun `claim - PENDING 엔트리를 PROCESSING으로 전환하고 반환`() = runBlocking {
+        val entries = (1..5).map { createEntry() }
+        repo.insertAll(entries)
+
+        val result = repo.claim(limit = 3, type = null, workerId = "test-worker")
+
+        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertEquals(3, result.value.size)
+        assertTrue(result.value.all { it.status == OutboxStatus.PROCESSING })
+        assertTrue(result.value.all { it.claimedBy == "test-worker" })
+        assertTrue(result.value.all { it.claimedAt != null })
+
+        // PENDING 상태는 2개만 남음
+        val pending = repo.findPending(limit = 10)
+        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(pending)
+        assertEquals(2, pending.value.size)
+    }
+
+    @Test
+    fun `claim - createdAt 오름차순으로 claim (FIFO)`() = runBlocking {
+        val now = Instant.now()
+        val old = createEntry(createdAt = now.minusSeconds(100))
+        val mid = createEntry(createdAt = now.minusSeconds(50))
+        val recent = createEntry(createdAt = now)
+
+        // 순서 섞어서 저장
+        repo.insertAll(listOf(recent, old, mid))
+
+        val result = repo.claim(limit = 2, type = null, workerId = null)
+
+        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertEquals(old.id, result.value[0].id)
+        assertEquals(mid.id, result.value[1].id)
+    }
+
+    @Test
+    fun `claim - type 필터 적용`() = runBlocking {
+        val rawData1 = createEntry(aggregateType = AggregateType.RAW_DATA)
+        val rawData2 = createEntry(aggregateType = AggregateType.RAW_DATA)
+        val slice = createEntry(aggregateType = AggregateType.SLICE)
+
+        repo.insertAll(listOf(rawData1, rawData2, slice))
+
+        val result = repo.claim(limit = 10, type = AggregateType.SLICE, workerId = null)
+
+        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertEquals(1, result.value.size)
+        assertEquals(slice.id, result.value[0].id)
+    }
+
+    @Test
+    fun `claim - PENDING이 없으면 빈 리스트`() = runBlocking {
+        // PROCESSED만 저장
+        val processed = createEntry(status = OutboxStatus.PROCESSED)
+        repo.insert(processed)
+
+        val result = repo.claim(limit = 10, type = null, workerId = null)
+
+        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertTrue(result.value.isEmpty())
+    }
+
+    @Test
+    fun `claim - PROCESSING 상태는 다시 claim되지 않음`() = runBlocking {
+        val entry = createEntry()
+        repo.insert(entry)
+
+        // 첫 번째 claim
+        val first = repo.claim(limit = 10, type = null, workerId = "worker-1")
+        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(first)
+        assertEquals(1, first.value.size)
+
+        // 두 번째 claim - 이미 PROCESSING이므로 빈 결과
+        val second = repo.claim(limit = 10, type = null, workerId = "worker-2")
+        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(second)
+        assertTrue(second.value.isEmpty())
+    }
+
+    // ==================== claimOne 테스트 ====================
+
+    @Test
+    fun `claimOne - 단일 엔트리 claim`() = runBlocking {
+        val entries = (1..5).map { createEntry() }
+        repo.insertAll(entries)
+
+        val result = repo.claimOne(type = null, workerId = "single-worker")
+
+        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry?>>(result)
+        val claimed = result.value
+        assertNotNull(claimed)
+        assertEquals(OutboxStatus.PROCESSING, claimed.status)
+        assertEquals("single-worker", claimed.claimedBy)
+    }
+
+    @Test
+    fun `claimOne - PENDING 없으면 null 반환`() = runBlocking {
+        val result = repo.claimOne(type = null, workerId = null)
+
+        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry?>>(result)
+        assertEquals(null, result.value)
+    }
+
+    // ==================== recoverStaleProcessing 테스트 ====================
+
+    @Test
+    fun `recoverStaleProcessing - 오래된 PROCESSING을 PENDING으로 복구`() = runBlocking {
+        val now = Instant.now()
+        
+        // 10분 전에 claim된 엔트리 (stale)
+        val stale = createEntry(
+            status = OutboxStatus.PROCESSING,
+            claimedAt = now.minusSeconds(600),
+            claimedBy = "dead-worker",
+        )
+        // 1분 전에 claim된 엔트리 (not stale)
+        val recent = createEntry(
+            status = OutboxStatus.PROCESSING,
+            claimedAt = now.minusSeconds(60),
+            claimedBy = "active-worker",
+        )
+        repo.insertAll(listOf(stale, recent))
+
+        // 5분(300초) 기준으로 stale 복구
+        val result = repo.recoverStaleProcessing(olderThanSeconds = 300)
+
+        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertEquals(1, result.value)
+
+        // stale은 PENDING으로 복구, claimedAt/claimedBy 초기화
+        val staleAfter = repo.findById(stale.id)
+        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(staleAfter)
+        assertEquals(OutboxStatus.PENDING, staleAfter.value.status)
+        assertEquals(null, staleAfter.value.claimedAt)
+        assertEquals(null, staleAfter.value.claimedBy)
+        assertEquals(1, staleAfter.value.retryCount) // retryCount 증가
+
+        // recent는 그대로 PROCESSING
+        val recentAfter = repo.findById(recent.id)
+        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(recentAfter)
+        assertEquals(OutboxStatus.PROCESSING, recentAfter.value.status)
+    }
+
+    @Test
+    fun `recoverStaleProcessing - MAX_RETRY 초과시 복구 안함`() = runBlocking {
+        val now = Instant.now()
+        
+        // MAX_RETRY에 도달한 stale 엔트리
+        val maxRetried = createEntry(
+            status = OutboxStatus.PROCESSING,
+            claimedAt = now.minusSeconds(600),
+            claimedBy = "dead-worker",
+            retryCount = OutboxEntry.MAX_RETRY_COUNT,
+        )
+        repo.insert(maxRetried)
+
+        val result = repo.recoverStaleProcessing(olderThanSeconds = 300)
+
+        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertEquals(0, result.value) // 복구 안됨
+
+        // 여전히 PROCESSING
+        val after = repo.findById(maxRetried.id)
+        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(after)
+        assertEquals(OutboxStatus.PROCESSING, after.value.status)
+    }
+
+    @Test
+    fun `recoverStaleProcessing - PENDING이나 PROCESSED는 영향 없음`() = runBlocking {
+        val pending = createEntry(status = OutboxStatus.PENDING)
+        val processed = createEntry(status = OutboxStatus.PROCESSED)
+        repo.insertAll(listOf(pending, processed))
+
+        val result = repo.recoverStaleProcessing(olderThanSeconds = 0) // 즉시 타임아웃
+
+        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertEquals(0, result.value)
+    }
+
     // ==================== AggregateType 필터 테스트 ====================
 
     @Test
@@ -284,10 +465,12 @@ class OutboxRepositoryPortTest {
         retryCount: Int = 0,
         createdAt: Instant = Instant.now(),
         aggregateType: AggregateType = AggregateType.RAW_DATA,
+        claimedAt: Instant? = null,
+        claimedBy: String? = null,
     ): OutboxEntry {
         val aggregateId = "tenant-1:entity-${UUID.randomUUID().toString().take(8)}"
         val eventType = "TestEvent"
-        val payload = """{"test": true}"""
+        val payload = """{"test": true, "random": "${UUID.randomUUID()}"}"""
         return OutboxEntry(
             id = UUID.randomUUID(),
             idempotencyKey = OutboxEntry.generateIdempotencyKey(aggregateId, eventType, payload),
@@ -297,6 +480,8 @@ class OutboxRepositoryPortTest {
             payload = payload,
             status = status,
             createdAt = createdAt,
+            claimedAt = claimedAt,
+            claimedBy = claimedBy,
             processedAt = if (status == OutboxStatus.PROCESSED) Instant.now() else null,
             retryCount = retryCount,
         )

@@ -78,7 +78,7 @@ slices:
 # maxFanout: circuit breaker 임계값 (기본값: 10000)
 indexes:
   - type: brand
-    selector: $.brandId      # EntityKey 형식: "BRAND#tenant#entityId" 또는 entityId만
+    selector: $.brand        # EntityKey 형식: "BRAND#tenant#entityId" 또는 entityId만
     references: BRAND        # Brand 변경 시 → 연관 Product 자동 재슬라이싱
     maxFanout: 10000
   - type: category

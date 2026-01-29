@@ -276,11 +276,15 @@ class OutboxIdempotencyTest : StringSpec({
                 async { repo.insertAll(entries1) },
                 async { repo.insertAll(entries2) },
             ).awaitAll()
-            
+
             // 하나만 성공
-            val successes = results.count { it is OutboxRepositoryPort.Result.Ok }
-            val failures = results.count { it is OutboxRepositoryPort.Result.Err }
-            
+            val successes = results.count { result ->
+                result is OutboxRepositoryPort.Result.Ok<*>
+            }
+            val failures = results.count { result ->
+                result is OutboxRepositoryPort.Result.Err
+            }
+
             successes shouldBe 1
             failures shouldBe 1
         }

@@ -60,16 +60,38 @@ class ArchitectureConstraintsTest : StringSpec({
         }
     }
 
-    "RFC-V4-010: apps는 도메인 직접 호출 금지 (orchestration 통해서만)" {
+    "RFC-V4-010: apps는 도메인 서비스 직접 호출 금지 (orchestration 통해서만)" {
+        // RFC-IMPL-010: Port 추상화 완료 → 강제 적용
+        // playground는 개발/테스트용이므로 제외
+        // RFC 의도:
+        // - 도메인 **타입**(Record, VO, Entry 등)은 허용
+        // - Port 인터페이스를 통한 DI는 허용
+        // - 도메인 **서비스/로직** 직접 호출만 금지
+
+        val isDomainServiceClass = object : DescribedPredicate<JavaClass>("is domain service class") {
+            override fun test(input: JavaClass): Boolean {
+                val name = input.simpleName
+                val pkg = input.packageName
+
+                // domain 패키지 내 서비스 클래스 패턴
+                if (!pkg.contains(".domain")) return false
+
+                // 서비스 클래스 패턴 (금지 대상)
+                return name.endsWith("Engine") ||
+                    name.endsWith("Builder") ||
+                    name.endsWith("Calculator") ||
+                    name.endsWith("Service") ||
+                    name.endsWith("Executor") ||
+                    name.endsWith("Handler") ||
+                    name.endsWith("Processor")
+            }
+        }
+
         noClasses()
             .that().resideInAPackage("..apps..")
             .and().resideOutsideOfPackage("..wiring..")
-            .should().dependOnClassesThat()
-            .resideInAPackage("..pkg.rawdata.domain..")
-            .orShould().dependOnClassesThat()
-            .resideInAPackage("..pkg.changeset.domain..")
-            .orShould().dependOnClassesThat()
-            .resideInAPackage("..pkg.slices.domain..")
+            .and().resideOutsideOfPackage("..playground..")
+            .should().dependOnClassesThat(isDomainServiceClass)
             .check(classes)
     }
 
@@ -135,8 +157,105 @@ class ArchitectureConstraintsTest : StringSpec({
             .check(classes)
     }
 
-    // RFC-V4-010: orchestration은 ports를 통해서만 도메인 호출
-    // 단, 도메인 **타입**(데이터 클래스, VO)은 사용 허용
-    // 도메인 **서비스/로직** 직접 호출만 금지 (코드 리뷰로 검증)
-    // 현재 OutboxEntry, RawDataRecord, SliceRecord 등 도메인 타입은 orchestration에서 필수적으로 사용
+    // ============================================
+    // SOLID 원칙 강화 규칙
+    // ============================================
+    
+    "SOLID: Orchestration에서 Domain 서비스 클래스 직접 참조 금지" {
+        // RFC-IMPL-010: Port 추상화 완료 → 강제 적용
+        // Orchestration은 Port를 통해서만 도메인 로직에 접근해야 함
+        // 예외: Record, VO, Contract 등 데이터 타입은 허용
+        // 금지: *Engine, *Builder, *Calculator, *Service 등 서비스 클래스
+
+        val isDomainServiceClass = object : DescribedPredicate<JavaClass>("is domain service class") {
+            override fun test(input: JavaClass): Boolean {
+                val name = input.simpleName
+                val pkg = input.packageName
+
+                // domain 패키지 내 서비스 클래스 패턴
+                if (!pkg.contains(".domain")) return false
+
+                // 서비스 클래스 패턴 (금지 대상)
+                return name.endsWith("Engine") ||
+                    name.endsWith("Builder") ||
+                    name.endsWith("Calculator") ||
+                    name.endsWith("Service") ||
+                    name.endsWith("Executor") ||
+                    name.endsWith("Handler") ||
+                    name.endsWith("Processor")
+            }
+        }
+
+        noClasses()
+            .that().resideInAPackage("..orchestration.application..")
+            .should().dependOnClassesThat(isDomainServiceClass)
+            .check(classes)
+    }
+    
+    "SOLID: adapters는 다른 도메인의 adapters를 직접 참조 금지" {
+        // 각 도메인의 adapters는 독립적이어야 함
+        val businessDomains = listOf("rawdata", "changeset", "slices", "sinks")
+        
+        businessDomains.forEach { domainA ->
+            businessDomains.filter { it != domainA }.forEach { domainB ->
+                noClasses()
+                    .that().resideInAPackage("..pkg.$domainA.adapters..")
+                    .should().dependOnClassesThat()
+                    .resideInAPackage("..pkg.$domainB.adapters..")
+                    .check(classes)
+            }
+        }
+    }
+    
+    "SOLID: Port 인터페이스는 domain 패키지의 서비스 클래스를 참조하면 안 됨" {
+        // Port는 순수 인터페이스여야 함 (구현 의존 금지)
+        val isDomainServiceClass = object : DescribedPredicate<JavaClass>("is domain service class") {
+            override fun test(input: JavaClass): Boolean {
+                val name = input.simpleName
+                val pkg = input.packageName
+                
+                if (!pkg.contains(".domain")) return false
+                
+                // 서비스 클래스 패턴 (Port가 참조하면 안 됨)
+                return name.endsWith("Engine") ||
+                    name.endsWith("Builder") ||
+                    name.endsWith("Calculator") ||
+                    name.endsWith("Service") ||
+                    name.endsWith("Executor")
+            }
+        }
+        
+        noClasses()
+            .that().resideInAPackage("..ports..")
+            .and().haveSimpleNameEndingWith("Port")
+            .should().dependOnClassesThat(isDomainServiceClass)
+            .check(classes)
+    }
+    
+    "SOLID: Record/VO 클래스는 외부 인프라에 의존하면 안 됨" {
+        // RFC-IMPL-010: Port 추상화 완료 → 강제 적용
+        // 도메인 모델은 순수해야 함 (인프라 의존 금지)
+        val isRecord = object : DescribedPredicate<JavaClass>("is Record or VO") {
+            override fun test(input: JavaClass): Boolean {
+                val name = input.simpleName
+                return name.endsWith("Record") ||
+                    name.endsWith("Entry") ||
+                    name.endsWith("VO")
+            }
+        }
+
+        classes()
+            .that(isRecord)
+            .and().resideInAPackage("..domain..")
+            .should().onlyDependOnClassesThat()
+            .resideInAnyPackage(
+                "java..",
+                "kotlin..",
+                "kotlinx..",
+                "org.jetbrains..",  // Kotlin nullability annotations
+                "com.oliveyoung.ivmlite.shared..",
+                "com.oliveyoung.ivmlite.pkg..domain.."
+            )
+            .check(classes)
+    }
 })

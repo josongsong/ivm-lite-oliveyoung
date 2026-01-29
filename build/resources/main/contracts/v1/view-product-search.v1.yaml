@@ -1,26 +1,33 @@
-# ViewDefinition Contract - Product Search
 kind: VIEW_DEFINITION
 id: view.product.search.v1
 version: 1.0.0
 status: ACTIVE
 
+viewName: PRODUCT_SEARCH
+entityType: PRODUCT
+description: "검색 결과 - 검색/필터에 필요한 정보"
+
 requiredSlices:
   - CORE
-  - PRICING
+  - PRICE
+  - CATEGORY
+  - INDEX
 
-optionalSlices: []
+optionalSlices:
+  - MEDIA
+  - INVENTORY
 
-missingPolicy: FAIL_CLOSED
+missingPolicy: PARTIAL_ALLOWED
 
 partialPolicy:
-  allowed: false
-  optionalOnly: true
+  allowed: true
+  optionalOnly: false
   responseMeta:
     includeMissingSlices: true
-    includeUsedContracts: false
+    includeUsedContracts: true
 
 fallbackPolicy: NONE
 
 ruleSetRef:
-  id: ruleset.core.v1
+  id: ruleset.product.doc001.v1
   version: 1.0.0
