@@ -1,9 +1,11 @@
 package com.oliveyoung.ivmlite.sdk
 
+import arrow.core.getOrElse
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
 import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductInput
 import com.oliveyoung.ivmlite.sdk.dsl.deploy.DeployableContext
 import com.oliveyoung.ivmlite.sdk.model.*
+import io.kotest.assertions.fail
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -122,7 +124,7 @@ class RfcGoldenTest : StringSpec({
                     dataset("reco-feed")
                 }
             }
-        }
+        }.getOrElse { fail("deployAsync failed: ${it.message}") }
 
         // 비동기 Job 검증
         job.state shouldBe DeployState.QUEUED
@@ -200,7 +202,7 @@ class RfcGoldenTest : StringSpec({
             personalize {
                 dataset("reco-feed")
             }
-        }
+        }.getOrElse { fail("deployQueued failed: ${it.message}") }
 
         // 비동기 Job 검증
         job.state shouldBe DeployState.QUEUED
@@ -288,7 +290,7 @@ class RfcGoldenTest : StringSpec({
                     index("products")
                 }
             }
-        }
+        }.getOrElse { fail("deployAsync failed: ${it.message}") }
 
         job.state shouldBe DeployState.QUEUED
 
@@ -319,7 +321,7 @@ class RfcGoldenTest : StringSpec({
                     index("products")
                 }
             }
-        }
+        }.getOrElse { fail("deployAsync failed: ${it.message}") }
 
         job.state shouldBe DeployState.QUEUED
     }

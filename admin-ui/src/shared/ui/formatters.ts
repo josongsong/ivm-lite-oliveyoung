@@ -1,21 +1,4 @@
 /**
- * Format seconds into human-readable duration
- * @example formatDuration(3661) => "1h 1m 1s"
- */
-export function formatDuration(seconds: number): string {
-  if (seconds < 60) return `${seconds}s`
-  const mins = Math.floor(seconds / 60)
-  const secs = seconds % 60
-  if (mins < 60) return `${mins}m ${secs}s`
-  const hours = Math.floor(mins / 60)
-  const remainMins = mins % 60
-  if (hours < 24) return `${hours}h ${remainMins}m`
-  const days = Math.floor(hours / 24)
-  const remainHours = hours % 24
-  return `${days}d ${remainHours}h`
-}
-
-/**
  * Format seconds into Korean readable age
  * @example formatAge(3661) => "1시간"
  */
@@ -54,4 +37,33 @@ export function formatUptime(seconds: number): string {
   const hours = Math.floor((seconds % 86400) / 3600)
   const mins = Math.floor((seconds % 3600) / 60)
   return `${days}d ${hours}h ${mins}m`
+}
+
+/**
+ * Format duration in milliseconds to human-readable string
+ * @example formatDuration(1234) => "1.23s"
+ */
+export function formatDuration(ms: number): string {
+  if (ms < 1) return `${ms.toFixed(2)}ms`
+  if (ms < 1000) return `${ms.toFixed(0)}ms`
+  if (ms < 60000) return `${(ms / 1000).toFixed(2)}s`
+  const mins = Math.floor(ms / 60000)
+  const secs = ((ms % 60000) / 1000).toFixed(0)
+  return `${mins}m ${secs}s`
+}
+
+/**
+ * Format ISO8601 date string to local time string
+ * @example formatTime("2024-01-01T00:00:00Z") => "2024-01-01 09:00:00"
+ */
+export function formatTime(dateStr: string): string {
+  const date = new Date(dateStr)
+  return date.toLocaleString('ko-KR', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  })
 }

@@ -1,13 +1,16 @@
-import { motion } from 'framer-motion'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import {
   Activity,
   ArrowDownRight,
   ArrowUpRight,
+  ChevronDown,
   Cloud,
   Database,
   ExternalLink,
   GitBranch,
+  Hash,
   Layers,
   Monitor,
   X
@@ -51,16 +54,36 @@ const nodeIcons: Record<string, React.ReactNode> = {
 }
 
 export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: WorkflowDetailPanelProps) {
-  const statusColor = STATUS_COLORS[node.data.status]
-  const nodeColor = NODE_COLORS[node.type || 'rawdata']
+  const [isFieldsExpanded, setIsFieldsExpanded] = useState(true)
+  
+  // 안전한 데이터 접근
+  const nodeData = node?.data
+  const status = nodeData?.status || 'inactive'
+  const statusColor = STATUS_COLORS[status] || STATUS_COLORS.inactive
+  const nodeType = node?.type || 'rawdata'
+  const nodeColor = NODE_COLORS[nodeType] || NODE_COLORS.rawdata
+  
+  // 슬라이스 필드 정보 추출 (metadata에서) - 배열인지 확인
+  const rawSchemaFields = nodeData?.metadata?.schemaFields
+  const schemaFields = Array.isArray(rawSchemaFields) ? rawSchemaFields as string[] : []
+  
+  // node가 없으면 렌더링하지 않음
+  if (!node || !nodeData) {
+    return null
+  }
 
   return (
     <motion.div
       className="detail-panel"
-      initial={{ x: 400, opacity: 0 }}
+      initial={{ x: 320, opacity: 0 }}
       animate={{ x: 0, opacity: 1 }}
-      exit={{ x: 400, opacity: 0 }}
-      transition={{ type: 'spring', damping: 25 }}
+      exit={{ x: 320, opacity: 0 }}
+      transition={{ 
+        type: 'spring', 
+        stiffness: 400, 
+        damping: 35,
+        mass: 0.8
+      }}
     >
       {/* 헤더 */}
       <div className="panel-header" style={{ borderLeftColor: nodeColor?.border }}>
@@ -69,7 +92,7 @@ export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: Workfl
             {nodeIcons[node.type || 'rawdata']}
           </span>
           <div className="panel-title-info">
-            <h3 className="panel-title">{node.data.label}</h3>
+            <h3 className="panel-title">{nodeData.label}</h3>
             <span className="panel-type">{node.type}</span>
           </div>
           <div
@@ -88,29 +111,84 @@ export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: Workfl
         <section className="panel-section">
           <h4 className="section-title">기본 정보</h4>
           <div className="info-grid">
-            {node.data.entityType && (
+            {nodeData.entityType && (
               <div className="info-item">
                 <span className="info-label">Entity Type</span>
-                <span className="info-value">{node.data.entityType}</span>
+                <span className="info-value">{nodeData.entityType}</span>
               </div>
             )}
             <div className="info-item">
               <span className="info-label">상태</span>
               <span className="info-value status-value" style={{ color: statusColor }}>
-                {node.data.status.toUpperCase()}
+                {status.toUpperCase()}
               </span>
             </div>
-            {node.data.contractId && (
+            {nodeData.contractId && (
               <div className="info-item">
                 <span className="info-label">Contract ID</span>
-                <span className="info-value mono">{node.data.contractId}</span>
+                <span className="info-value mono">{nodeData.contractId}</span>
               </div>
             )}
           </div>
         </section>
 
+        {/* 스키마 필드 (슬라이스 노드용) */}
+        {nodeType === 'slice' && schemaFields.length > 0 && (
+          <section className="panel-section schema-fields-section">
+            <button 
+              className="section-title-toggle"
+              onClick={() => setIsFieldsExpanded(!isFieldsExpanded)}
+            >
+              <div className="section-title-left">
+                <Hash size={14} />
+                <span>스키마 필드</span>
+                <span className="field-count">{schemaFields.length}</span>
+              </div>
+              <ChevronDown 
+                size={14} 
+                className={`chevron ${isFieldsExpanded ? 'expanded' : ''}`}
+              />
+            </button>
+            <AnimatePresence initial={false}>
+              {isFieldsExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: 'easeInOut' }}
+                  className="fields-container"
+                >
+                  <div className="fields-grid">
+                    {schemaFields.map((field, index) => (
+                      <motion.div
+                        key={field}
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: index * 0.03 }}
+                        className={`field-tag ${field === '*' ? 'wildcard' : ''}`}
+                      >
+                        <span className="field-icon">
+                          {field === '*' ? '✦' : '•'}
+                        </span>
+                        <span className="field-name">
+                          {field === '*' ? 'All Fields' : field}
+                        </span>
+                      </motion.div>
+                    ))}
+                  </div>
+                  {schemaFields.includes('*') && (
+                    <div className="wildcard-hint">
+                      <span>✦</span> 모든 필드가 슬라이스에 포함됩니다
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </section>
+        )}
+
         {/* 통계 */}
-        {node.data.stats && (
+        {nodeData.stats && (
           <section className="panel-section">
             <h4 className="section-title">
               <Activity size={14} />
@@ -119,29 +197,31 @@ export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: Workfl
             <div className="stats-grid">
               <div className="stat-card">
                 <div className="stat-value">
-                  {formatNumber(node.data.stats.recordCount)}
+                  {formatNumber(nodeData.stats.recordCount ?? 0)}
                 </div>
                 <div className="stat-label">Total Records</div>
               </div>
               <div className="stat-card">
                 <div className="stat-value">
-                  {node.data.stats.throughput.toFixed(1)}
+                  {typeof nodeData.stats.throughput === 'number' 
+                    ? nodeData.stats.throughput.toFixed(1) 
+                    : '0.0'}
                   <span className="stat-unit">/min</span>
                 </div>
                 <div className="stat-label">Throughput</div>
               </div>
-              {node.data.stats.latencyP99Ms !== undefined && (
+              {typeof nodeData.stats.latencyP99Ms === 'number' && (
                 <div className="stat-card">
                   <div className="stat-value">
-                    {node.data.stats.latencyP99Ms}
+                    {nodeData.stats.latencyP99Ms}
                     <span className="stat-unit">ms</span>
                   </div>
                   <div className="stat-label">P99 Latency</div>
                 </div>
               )}
-              <div className={`stat-card ${node.data.stats.errorCount > 0 ? 'error' : ''}`}>
+              <div className={`stat-card ${(nodeData.stats.errorCount ?? 0) > 0 ? 'error' : ''}`}>
                 <div className="stat-value">
-                  {node.data.stats.errorCount}
+                  {nodeData.stats.errorCount ?? 0}
                 </div>
                 <div className="stat-label">Errors</div>
               </div>
@@ -153,31 +233,31 @@ export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: Workfl
         {detail && (
           <section className="panel-section">
             <h4 className="section-title">연결된 노드</h4>
-            {detail.upstreamNodes.length > 0 && (
+            {Array.isArray(detail.upstreamNodes) && detail.upstreamNodes.length > 0 && (
               <div className="connection-group">
                 <div className="connection-label">
                   <ArrowDownRight size={12} />
                   Upstream ({detail.upstreamNodes.length})
                 </div>
                 <div className="connection-nodes">
-                  {detail.upstreamNodes.map(nodeId => (
-                    <span key={nodeId} className="connection-tag">
-                      {nodeId}
+                  {detail.upstreamNodes.map((nodeId, idx) => (
+                    <span key={nodeId || `upstream-${idx}`} className="connection-tag">
+                      {nodeId || 'Unknown'}
                     </span>
                   ))}
                 </div>
               </div>
             )}
-            {detail.downstreamNodes.length > 0 && (
+            {Array.isArray(detail.downstreamNodes) && detail.downstreamNodes.length > 0 && (
               <div className="connection-group">
                 <div className="connection-label">
                   <ArrowUpRight size={12} />
                   Downstream ({detail.downstreamNodes.length})
                 </div>
                 <div className="connection-nodes">
-                  {detail.downstreamNodes.map(nodeId => (
-                    <span key={nodeId} className="connection-tag">
-                      {nodeId}
+                  {detail.downstreamNodes.map((nodeId, idx) => (
+                    <span key={nodeId || `downstream-${idx}`} className="connection-tag">
+                      {nodeId || 'Unknown'}
                     </span>
                   ))}
                 </div>
@@ -187,18 +267,18 @@ export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: Workfl
         )}
 
         {/* 관련 Contract */}
-        {detail?.relatedContracts && detail.relatedContracts.length > 0 && (
+        {Array.isArray(detail?.relatedContracts) && detail.relatedContracts.length > 0 && (
           <section className="panel-section">
             <h4 className="section-title">관련 Contract</h4>
             <div className="contract-list">
-              {detail.relatedContracts.map(contract => (
+              {detail.relatedContracts.map((contract, idx) => (
                 <Link
-                  key={contract.id}
-                  to={`/contracts/${contract.kind}/${encodeURIComponent(contract.id)}`}
+                  key={contract?.id || `contract-${idx}`}
+                  to={`/contracts/${contract?.kind || 'unknown'}/${encodeURIComponent(contract?.id || '')}`}
                   className="contract-link"
                 >
-                  <span className="contract-kind">{contract.kind}</span>
-                  <span className="contract-id">{contract.id}</span>
+                  <span className="contract-kind">{contract?.kind || 'Unknown'}</span>
+                  <span className="contract-id">{contract?.id || 'N/A'}</span>
                   <ExternalLink size={12} />
                 </Link>
               ))}
@@ -207,19 +287,22 @@ export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: Workfl
         )}
 
         {/* 최근 활동 */}
-        {detail?.recentActivity && detail.recentActivity.length > 0 && (
+        {Array.isArray(detail?.recentActivity) && detail.recentActivity.length > 0 && (
           <section className="panel-section">
             <h4 className="section-title">최근 활동</h4>
             <div className="activity-list">
-              {detail.recentActivity.slice(0, 5).map((activity, idx) => (
-                <div key={idx} className="activity-item">
-                  <span className="activity-time">
-                    {formatTime(activity.timestamp)}
-                  </span>
-                  <span className="activity-action">{activity.action}</span>
-                  <span className="activity-details">{activity.details}</span>
-                </div>
-              ))}
+              {detail.recentActivity.slice(0, 5).map((activity, idx) => {
+                if (!activity) return null
+                return (
+                  <div key={idx} className="activity-item">
+                    <span className="activity-time">
+                      {activity.timestamp ? formatTime(activity.timestamp) : 'N/A'}
+                    </span>
+                    <span className="activity-action">{activity.action || 'Unknown'}</span>
+                    <span className="activity-details">{activity.details || ''}</span>
+                  </div>
+                )
+              })}
             </div>
           </section>
         )}
@@ -234,7 +317,7 @@ export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: Workfl
 
       {/* 액션 버튼 */}
       <div className="panel-actions">
-        {node.data.contractId && (
+        {nodeData.contractId && (
           <Link
             to={`/contracts`}
             className="action-btn primary"
@@ -244,7 +327,7 @@ export function WorkflowDetailPanel({ node, detail, isLoading, onClose }: Workfl
           </Link>
         )}
         <Link
-          to={`/pipeline${node.data.entityType ? `?entity=${node.data.entityType}` : ''}`}
+          to={`/pipeline${nodeData.entityType ? `?entity=${nodeData.entityType}` : ''}`}
           className="action-btn secondary"
         >
           Pipeline 보기

@@ -1,9 +1,11 @@
 package com.oliveyoung.ivmlite.sdk.domain
 
+import arrow.core.Either
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
 import com.oliveyoung.ivmlite.sdk.dsl.entity.EntityInput
 import com.oliveyoung.ivmlite.sdk.execution.DeployExecutor
 import com.oliveyoung.ivmlite.sdk.model.*
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -23,7 +25,7 @@ abstract class EntityActions<T : EntityInput>(
         return executeSync(spec)
     }
 
-    fun deployAsync(): DeployJob {
+    fun deployAsync(): Either<DomainError, DeployJob> {
         val spec = DeploySpec(
             compileMode = CompileMode.Async,
             shipSpec = null,
@@ -65,10 +67,9 @@ abstract class EntityActions<T : EntityInput>(
         return runBlocking { executor.executeSync(input, spec) }
     }
 
-    private fun executeAsync(spec: DeploySpec): DeployJob {
-        val executor = this.executor ?: throw IllegalStateException(
-            "DeployExecutor is not configured. Cannot execute deployAsync() operation. " +
-            "Configure executor via Ivm.client().configure { executor = ... }"
+    private fun executeAsync(spec: DeploySpec): Either<DomainError, DeployJob> {
+        val executor = this.executor ?: return Either.Left(
+            DomainError.ConfigError("DeployExecutor is not configured. Configure executor via Ivm.client().configure { executor = ... }")
         )
         return runBlocking { executor.executeAsync(input, spec) }
     }

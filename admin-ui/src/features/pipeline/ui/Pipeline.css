@@ -188,6 +188,11 @@
   padding: 0;
   color: var(--text-primary);
   font-size: 0.8rem;
+  outline: none;
+}
+
+.search-input-wrapper input:focus {
+  outline: none;
 }
 
 /* Entity Flow Results */

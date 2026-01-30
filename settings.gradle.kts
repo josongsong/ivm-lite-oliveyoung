@@ -18,7 +18,10 @@ pluginManagement {
 // Dependency Resolution (중앙 집중)
 // ============================================
 dependencyResolutionManagement {
-    repositoriesMode.set(RepositoriesMode.PREFER_SETTINGS)
+    // FAIL_ON_PROJECT_REPOS: 프로젝트에서 repositories 선언 시 빌드 실패 (권장)
+    // PREFER_SETTINGS: settings의 repositories 우선, 프로젝트 repositories는 무시 (경고만)
+    // PREFER_PROJECT: 프로젝트 repositories 우선
+    repositoriesMode.set(RepositoriesMode.FAIL_ON_PROJECT_REPOS)
     repositories {
         mavenCentral()
         // 필요시 추가 레포지토리

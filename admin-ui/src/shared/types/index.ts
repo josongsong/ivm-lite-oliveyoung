@@ -82,3 +82,63 @@ export type {
   HourlyStatItem,
   HourlyStatsResponse,
 } from './stats'
+
+// Environment types
+export type {
+  EnvironmentType,
+  DatabaseInfo,
+  EnvironmentConfig,
+  GitInfo,
+  AppInstance,
+  AppInstanceType,
+  AppInstanceStatus,
+  EnvironmentResponse,
+} from './environment'
+
+// Trace types
+export type {
+  TraceListResult,
+  TraceSummary,
+  TraceDetail,
+  SpanDetail,
+  HttpInfo,
+  ServiceMapResult,
+  ServiceNode,
+  ServiceEdge,
+  EdgeStatistics,
+  TraceFilterOptions,
+} from './trace'
+
+// Explorer types
+export type {
+  ExplorerQueryParams,
+  SearchSuggestion,
+  AutocompleteResponse,
+  RawDataEntry,
+  RawDataListEntry,
+  RawDataResponse,
+  RawDataListResponse,
+  SliceEntry,
+  SliceListResponse,
+  ViewResult,
+  ViewResponse,
+  LineageNodeType,
+  LineageNode,
+  LineageEdge,
+  LineageResponse,
+  VersionDiff,
+  DiffResponse,
+  ExplorerTab,
+  SearchHistoryItem,
+  SchemaInfo,
+  SchemaField,
+  SchemaListResponse,
+  RawDataCreateRequest,
+  RawDataCreateResponse,
+  ViewDefinitionListResponse,
+  ViewDefinitionEntry,
+  SliceTypeInfo,
+  SliceTypesResponse,
+  SliceListItem,
+  SliceListByTypeResponse,
+} from './explorer'

@@ -18,28 +18,44 @@
 
 ## 필수 명령어
 
+> 💡 **Tip**: `just` 명령어 러너를 사용하면 더 간편합니다! (`brew install just` 또는 `cargo install just`)
+> 
+> ```bash
+> just admin-dev      # Admin Backend 개발 모드
+> just admin-ui-dev   # Admin Frontend 개발 모드
+> just dev            # 전체 개발 환경 실행 가이드
+> just --list         # 사용 가능한 모든 명령어 보기
+> ```
+
 ### Backend (Kotlin)
 
-| 목적 | 명령어 |
-|------|--------|
-| Admin 실행 | ./gradlew fastAdmin |
-| Runtime 실행 | ./gradlew run |
-| 빠른 빌드 | ./gradlew fastBuild |
-| 단위 테스트 | ./gradlew unitTest |
-| 통합 테스트 | ./gradlew integrationTest |
-| 패키지 테스트 | ./gradlew testPackage -Dpkg=slices |
-| 전체 검사 | ./gradlew checkAll |
-| 린트 | ./gradlew lint |
-| 클린 | ./gradlew clean |
+| 목적 | 명령어 (Gradle) | 명령어 (Just) |
+|------|----------------|--------------|
+| Admin 실행 | ./gradlew fastAdmin | `just admin-fast` |
+| Admin 개발 모드 | ./gradlew runAdminDev | `just admin` |
+| Admin Hot Reload | ./gradlew --no-configuration-cache --continuous runAdminDev | `just admin-dev` |
+| Runtime 실행 | ./gradlew run | `just runtime` |
+| Runtime 개발 모드 | ./gradlew runApiDev | `just runtime-dev` |
+| 빠른 빌드 | ./gradlew fastBuild | `just build` |
+| 단위 테스트 | ./gradlew unitTest | `just test` |
+| 통합 테스트 | ./gradlew integrationTest | `just test-integration` |
+| 패키지 테스트 | ./gradlew testPackage -Dpkg=slices | `just test-pkg slices` |
+| 전체 검사 | ./gradlew checkAll | `just check` |
+| 린트 | ./gradlew lint | `just lint` |
+| 클린 | ./gradlew clean | `just clean` |
 
 ### Frontend (React)
 
-| 목적 | 명령어 |
-|------|--------|
-| 개발 서버 | cd admin-ui && npm run dev |
-| 빌드 | cd admin-ui && npm run build |
-| 린트 | cd admin-ui && npm run lint |
-| 타입체크 | cd admin-ui && npm run typecheck |
+| 목적 | 명령어 (npm) | 명령어 (Just) |
+|------|-------------|--------------|
+| 개발 서버 (Hot Reload) | cd admin-ui && npm run dev | `just admin-ui-dev` |
+| 빌드 | cd admin-ui && npm run build | `just build-ui` |
+| 린트 | cd admin-ui && npm run lint | `just lint-ui` |
+| 타입체크 | cd admin-ui && npm run typecheck | `just typecheck-ui` |
+
+**접속 주소**:
+- 개발 서버: http://localhost:3000 (Vite HMR 자동 지원)
+- 프로덕션: http://localhost:8081/admin
 
 ---
 
@@ -197,6 +213,49 @@ source .env && ./gradlew run
 
 ---
 
+## 개발 모드 (Hot Reload)
+
+### Admin 앱 개발 모드 (Backend)
+```bash
+# Just 사용 (권장)
+just admin-dev
+
+# 또는 Gradle 직접 사용
+./gradlew --no-configuration-cache --continuous runAdminDev
+```
+
+**주의사항**:
+- Configuration Cache와 `--continuous` 모드 호환성 문제로 `--no-configuration-cache` 옵션 권장
+- 포트 충돌 시: `just kill-ports` 또는 `lsof -ti:8081 | xargs kill -9`
+- `DEV_MODE=true` 환경변수 자동 설정 (에러 상세 출력)
+
+### Admin UI 개발 모드 (Frontend)
+```bash
+# Just 사용 (권장)
+just admin-ui-dev
+
+# 또는 npm 직접 사용
+cd admin-ui && npm run dev
+```
+
+**접속 주소**:
+- 개발 서버: http://localhost:3000 (Vite HMR 자동 지원)
+- 프로덕션 빌드: http://localhost:8081/admin (Backend에 빌드된 정적 파일 서빙)
+
+### 전체 개발 환경 실행
+```bash
+# Just 사용 (권장)
+just dev  # 실행 가이드 표시
+
+# 터미널 1: Backend (Hot Reload)
+just admin-dev
+
+# 터미널 2: Frontend (Hot Reload)
+just admin-ui-dev
+```
+
+---
+
 ## AI 어시스턴트 팁
 
 1. 빌드 실패 시: ./gradlew clean fastBuild로 캐시 정리
@@ -204,3 +263,78 @@ source .env && ./gradlew run
 3. 새 기능 추가 시: 관련 RFC 문서 (docs/rfc/) 먼저 확인
 4. 계약 수정 시: contracts/v1/ 디렉토리의 YAML 파일 수정
 5. 프론트엔드 작업 시: admin-ui/src/features/ 구조 따르기
+6. 개발 중 Hot Reload: `--no-configuration-cache --continuous` 옵션 사용
+
+---
+
+## 코딩 컨벤션
+
+### Kotlin 에러 처리
+
+**⚠️ 중요: try-catch 대신 Arrow의 Result 타입 사용**
+
+이 프로젝트는 Arrow 라이브러리를 사용하여 함수형 에러 처리를 합니다. `try-catch` 블록 대신 Arrow의 `Either` 타입과 `either` 빌더를 사용하세요.
+
+**❌ 잘못된 예시 (try-catch 사용):**
+```kotlin
+fun getData(): Result<Data> {
+    return try {
+        val data = fetchData()
+        Result.Ok(data)
+    } catch (e: Exception) {
+        Result.Err(DomainError.StorageError(e.message))
+    }
+}
+```
+
+**✅ 올바른 예시 (Arrow Either 사용):**
+```kotlin
+import arrow.core.Either
+import arrow.core.raise.catch
+import arrow.core.raise.either
+
+fun getData(): Either<DomainError, Data> = either {
+    val data = catch({ e: Exception ->
+        raise(DomainError.StorageError("Failed to fetch data: ${e.message}"))
+    }) {
+        fetchData()
+    }
+    data
+}
+```
+
+**Arrow Either 사용 패턴:**
+
+1. **함수 반환 타입**: `Either<DomainError, T>` 사용
+2. **에러 처리**: `either { }` 빌더 내에서 `catch { }` 사용
+3. **에러 발생**: `raise(DomainError.xxx)` 사용
+4. **중첩 호출**: `.bind()` 사용하여 Either 언래핑
+
+**예시:**
+```kotlin
+fun getEnvironment(env: String): Either<DomainError, EnvironmentData> = either {
+    val databases = getDatabaseInfo().bind()  // Either 언래핑
+    val config = getEnvironmentConfig().bind()
+    
+    EnvironmentData(
+        environment = env,
+        databases = databases,
+        config = config
+    )
+}.catch { e: Exception ->
+    DomainError.StorageError("Failed to get environment: ${e.message}")
+}
+
+private fun getDatabaseInfo(): Either<DomainError, List<DatabaseInfo>> = either {
+    catch({ e: Exception ->
+        raise(DomainError.StorageError("Failed to get database info: ${e.message}"))
+    }) {
+        // 데이터베이스 정보 조회 로직
+        listOf(...)
+    }
+}
+```
+
+**참고:**
+- Arrow 라이브러리: `io.arrow-kt:arrow-core:1.2.1`
+- 문서: https://arrow-kt.io/docs/core/either/

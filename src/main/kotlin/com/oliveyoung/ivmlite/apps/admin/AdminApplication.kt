@@ -6,6 +6,7 @@ import com.oliveyoung.ivmlite.apps.admin.routes.adminRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.alertRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.backfillRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.contractRoutes
+import com.oliveyoung.ivmlite.apps.admin.routes.explorerRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.healthRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.observabilityRoutes
 import com.oliveyoung.ivmlite.apps.admin.routes.pipelineRoutes
@@ -170,6 +171,11 @@ fun Application.module() {
 
             // Workflow Canvas Routes (RFC-IMPL-015: 파이프라인 시각화)
             workflowCanvasRoutes()
+
+            // Data Explorer Routes (RawData, Slice, View 조회)
+            route("/query") {
+                explorerRoutes()
+            }
         }
         
         // Static Resources (React Admin UI)

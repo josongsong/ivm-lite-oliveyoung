@@ -16,7 +16,7 @@ import {
 } from 'lucide-react'
 import { fetchApi } from '@/shared/api'
 import type { ContractListResponse } from '@/shared/types'
-import { Loading, PageHeader } from '@/shared/ui'
+import { ApiError, Loading, PageHeader } from '@/shared/ui'
 import './Contracts.css'
 
 // Contract 종류별 정보 (한글 설명 포함)
@@ -76,20 +76,30 @@ export function Contracts() {
     }
   }, [searchParams])
 
-  const { data: contractsData, isLoading } = useQuery({
+  const { data: contractsData, isLoading, isError, refetch } = useQuery({
     queryKey: ['contracts'],
     queryFn: () => fetchApi<ContractListResponse>('/contracts'),
+    retry: 1,
   })
 
   const filteredContracts = contractsData?.contracts?.filter(contract => {
     const matchesKind = selectedKind === 'all' || contract.kind === selectedKind
-    const matchesSearch = !searchTerm || 
+    const matchesSearch = !searchTerm ||
       contract.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contract.kind.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesKind && matchesSearch
   }) ?? []
 
   if (isLoading) return <Loading />
+
+  if (isError) {
+    return (
+      <div className="page-container">
+        <PageHeader title="Contracts" subtitle="스키마, 룰셋, 뷰 정의 등 시스템 계약을 관리합니다" />
+        <ApiError onRetry={refetch} />
+      </div>
+    )
+  }
 
   // 실제 contract 목록에서 kind별 개수 계산 (동기화)
   const actualByKind: Record<string, number> = {}
@@ -198,17 +208,16 @@ export function Contracts() {
         transition={{ delay: 0.2 }}
       >
         <AnimatePresence mode="popLayout">
-          {filteredContracts.map((contract, index) => {
+          {filteredContracts.map((contract) => {
             const info = contractKindInfo[contract.kind] || { label: contract.kind, color: 'cyan', description: '' }
             
             return (
               <motion.div
-                key={`${contract.kind}-${contract.id}`}
+                key={`${contract.kind}-${contract.id}-${contract.version}`}
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}
                 exit={{ opacity: 0, scale: 0.9 }}
-                transition={{ delay: index * 0.03 }}
               >
                 <Link 
                   to={`/contracts/${contract.kind}/${encodeURIComponent(contract.id)}`}

@@ -19,7 +19,7 @@ import {
 import { fetchApi, postApi } from '@/shared/api'
 import { QUERY_CONFIG } from '@/shared/config'
 import type { Alert, AlertRule, AlertSeverity, AlertsResponse } from '@/shared/types'
-import { fadeInLeft, formatTimeSince, Loading, PageHeader, staggerContainer } from '@/shared/ui'
+import { ApiError, fadeInLeft, formatTimeSince, Loading, PageHeader, staggerContainer } from '@/shared/ui'
 import './Alerts.css'
 
 function getSeverityIcon(severity: AlertSeverity) {
@@ -166,10 +166,11 @@ export function Alerts() {
   const [showRules, setShowRules] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['alerts'],
     queryFn: () => fetchApi<AlertsResponse>('/alerts'),
     refetchInterval: QUERY_CONFIG.DASHBOARD_INTERVAL,
+    retry: 1,
   })
 
   const acknowledgeMutation = useMutation({
@@ -188,6 +189,15 @@ export function Alerts() {
   })
 
   if (isLoading) return <Loading />
+
+  if (isError) {
+    return (
+      <div className="page-container">
+        <PageHeader title="Alerts" subtitle="시스템 알림을 관리하고 대응합니다" />
+        <ApiError onRetry={() => refetch()} />
+      </div>
+    )
+  }
 
   const summary = data?.summary ?? { active: 0, acknowledged: 0, silenced: 0 }
   const allAlerts = data?.alerts ?? []

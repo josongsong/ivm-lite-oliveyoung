@@ -2,7 +2,11 @@ import org.jooq.meta.jaxb.Logging
 import java.time.Duration
 
 buildscript {
-    repositories { mavenCentral() }
+    // buildscript repositories는 settings.gradle.kts의 dependencyResolutionManagement와 별개
+    // Flyway, PostgreSQL JDBC 드라이버 다운로드용
+    repositories { 
+        mavenCentral()
+    }
     dependencies {
         classpath("org.flywaydb:flyway-database-postgresql:10.10.0")
         classpath("org.postgresql:postgresql:42.7.3")
@@ -19,7 +23,10 @@ plugins {
     `maven-publish`  // 내부 배포용
 }
 
-repositories { mavenCentral() }
+// repositories는 settings.gradle.kts의 dependencyResolutionManagement에서 중앙 관리
+// PREFER_SETTINGS 모드이므로 여기서 선언하면 settings의 repositories가 무시됨
+// 따라서 주석 처리 (settings.gradle.kts에서 mavenCentral() 이미 선언됨)
+// repositories { mavenCentral() }
 
 // ============================================
 // Version Catalog (RFC-IMPL-009 SSOT)
@@ -68,6 +75,7 @@ dependencies {
     implementation("io.ktor:ktor-server-status-pages:$ktorVersion")
     implementation("io.ktor:ktor-server-call-logging:$ktorVersion")
     implementation("io.ktor:ktor-server-call-id:$ktorVersion")
+    implementation("io.ktor:ktor-server-cors:$ktorVersion")
     implementation("io.ktor:ktor-serialization-kotlinx-json:$ktorVersion")
 
     // ============================================
@@ -97,6 +105,9 @@ dependencies {
     implementation("io.opentelemetry:opentelemetry-api:$otelVersion")
     implementation("io.opentelemetry:opentelemetry-sdk:$otelVersion")
     implementation("io.opentelemetry:opentelemetry-exporter-otlp:$otelVersion")
+    
+    // AWS X-Ray SDK (Trace 조회용 - TraceService에서 사용)
+    implementation("software.amazon.awssdk:xray:2.20.26")
 
     // Ktor OTel instrumentation (하이브리드용)
     implementation("io.opentelemetry.instrumentation:opentelemetry-ktor-2.0:2.23.0-alpha")
@@ -378,13 +389,16 @@ tasks.register("regenerateJooq") {
 }
 
 // compileKotlin: 생성 코드가 있으면 jooqCodegen 스킵
-// NOTE: Configuration cache 호환을 위해 doFirst 내에서 직접 경로 계산
+// NOTE: Configuration cache 호환을 위해 경로를 미리 계산
 tasks.named("compileKotlin") {
     // jooqCodegen 의존성 제거 - src에 생성 코드가 있으므로 불필요
     // 생성 코드가 없으면 컴파일 에러로 자연스럽게 알 수 있음
 
+    // Configuration cache 호환: 경로를 configuration phase에서 계산
+    val generatedDirPath = layout.projectDirectory.dir("src/main/kotlin/com/oliveyoung/ivmlite/generated/jooq")
+    
     doFirst {
-        val generatedDir = file("src/main/kotlin/com/oliveyoung/ivmlite/generated/jooq")
+        val generatedDir = generatedDirPath.asFile
         if (!generatedDir.exists() || generatedDir.listFiles()?.isEmpty() == true) {
             logger.warn("""
                 |
@@ -885,5 +899,44 @@ tasks.register<JavaExec>("runAdmin") {
         "-XX:TieredStopAtLevel=1",       // JIT 컴파일 최소화 (빠른 시작)
         "-XX:+UseParallelGC",            // 빠른 GC
         "-Xverify:none"                  // 바이트코드 검증 스킵 (개발용)
+    )
+}
+
+// Admin 개발 모드 (Hot Reload) - 파일 변경 시 자동 재시작
+tasks.register<JavaExec>("runAdminDev") {
+    group = "application"
+    description = "Run Admin Application in dev mode with hot reload (use: ./gradlew --continuous runAdminDev)"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.oliveyoung.ivmlite.apps.admin.AdminApplicationKt")
+
+    // 현재 쉘의 모든 환경 변수 상속
+    environment.putAll(System.getenv())
+    environment("ADMIN_PORT", System.getenv("ADMIN_PORT") ?: "8081")
+    environment("DEV_MODE", "true")
+
+    // JVM 최적화 (개발 모드)
+    jvmArgs(
+        "-XX:TieredStopAtLevel=1",       // JIT 컴파일 최소화 (빠른 시작)
+        "-XX:+UseParallelGC",            // 빠른 GC
+        "-Xverify:none"                  // 바이트코드 검증 스킵
+    )
+}
+
+// Runtime API 개발 모드 (Hot Reload)
+tasks.register<JavaExec>("runApiDev") {
+    group = "application"
+    description = "Run Runtime API in dev mode with hot reload (use: ./gradlew --continuous runApiDev)"
+    classpath = sourceSets["main"].runtimeClasspath
+    mainClass.set("com.oliveyoung.ivmlite.apps.runtimeapi.ApplicationKt")
+
+    // 현재 쉘의 모든 환경 변수 상속
+    environment.putAll(System.getenv())
+    environment("DEV_MODE", "true")
+
+    // JVM 최적화 (개발 모드)
+    jvmArgs(
+        "-XX:TieredStopAtLevel=1",
+        "-XX:+UseParallelGC",
+        "-Xverify:none"
     )
 }

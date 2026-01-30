@@ -217,3 +217,52 @@
     padding: 0.25rem 0.5rem;
   }
 }
+
+/* Empty State */
+.workflow-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  flex: 1;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+.workflow-empty svg {
+  opacity: 0.3;
+  color: var(--accent-cyan);
+}
+
+.workflow-empty h3 {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  margin: 0;
+}
+
+.workflow-empty p {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+.retry-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.retry-btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+

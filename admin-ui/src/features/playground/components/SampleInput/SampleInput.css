@@ -1,0 +1,95 @@
+.sample-input-v2 {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-secondary);
+}
+
+.sample-input-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 8px 12px;
+  background: var(--bg-tertiary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.header-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.header-left svg {
+  color: var(--text-muted);
+}
+
+.sample-title {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-secondary);
+}
+
+.json-status {
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 4px;
+  font-weight: 500;
+}
+
+.json-status.valid {
+  background: rgba(34, 197, 94, 0.15);
+  color: var(--accent-green, #22c55e);
+}
+
+.json-status.invalid {
+  background: rgba(239, 68, 68, 0.15);
+  color: var(--accent-red, #ef4444);
+}
+
+.presets-dropdown {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.preset-select {
+  appearance: none;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 4px;
+  padding: 4px 24px 4px 8px;
+  font-size: 11px;
+  color: var(--text-secondary);
+  cursor: pointer;
+  outline: none;
+  transition: all 0.15s ease;
+}
+
+.preset-select:hover {
+  border-color: var(--accent-cyan);
+}
+
+.preset-select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(0, 212, 255, 0.15);
+}
+
+.dropdown-icon {
+  position: absolute;
+  right: 6px;
+  pointer-events: none;
+  color: var(--text-muted);
+}
+
+.sample-editor-wrapper {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+/* Monaco Editor 스타일 오버라이드 */
+.sample-editor-wrapper .monaco-editor,
+.sample-editor-wrapper .monaco-editor-background {
+  background-color: var(--bg-primary) !important;
+}

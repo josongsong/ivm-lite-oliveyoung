@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { fetchApi } from '@/shared/api'
 import { QUERY_CONFIG } from '@/shared/config'
-import { Loading, PageHeader } from '@/shared/ui'
+import { ErrorBoundary, Loading, PageHeader } from '@/shared/ui'
 import { WorkflowCanvas } from './WorkflowCanvas'
 import { WorkflowDetailPanel } from './WorkflowDetailPanel'
 import type { NodeDetailResponse, WorkflowGraphResponse, WorkflowNode } from '../model/types'
@@ -23,13 +23,14 @@ export function Workflow() {
   const [entityFilter, setEntityFilter] = useState<string | null>(null)
 
   // 워크플로우 그래프 조회 (BE API)
-  const { data, isLoading, refetch, isFetching } = useQuery({
+  const { data, isLoading, isError, refetch, isFetching } = useQuery({
     queryKey: ['workflow-graph', entityFilter],
     queryFn: async () => {
       const params = entityFilter ? `?entityType=${entityFilter}` : ''
       return fetchApi<WorkflowGraphResponse>(`/workflow/graph${params}`)
     },
-    refetchInterval: QUERY_CONFIG.WORKFLOW_INTERVAL
+    refetchInterval: QUERY_CONFIG.WORKFLOW_INTERVAL,
+    retry: 1,  // 한번만 재시도
   })
 
   // 노드 상세 정보 조회 (BE API)
@@ -52,7 +53,33 @@ export function Workflow() {
 
   if (isLoading) return <Loading />
 
-  const { nodes = [], edges = [], metadata } = data ?? {}
+  // 에러 상태 처리 (백엔드 미실행 시)
+  if (isError) {
+    return (
+      <div className="workflow-page">
+        <PageHeader
+          title="Workflow Canvas"
+          subtitle="데이터 파이프라인을 시각적으로 탐색합니다"
+        />
+        <div className="workflow-empty">
+          <GitMerge size={48} />
+          <h3>백엔드 연결 대기 중</h3>
+          <p>Admin 서버가 실행되면 워크플로우가 표시됩니다</p>
+          <button onClick={() => refetch()} className="retry-btn">
+            <RefreshCw size={14} />
+            다시 시도
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  // API 응답에서 안전하게 배열 추출
+  const rawNodes = data?.nodes
+  const rawEdges = data?.edges
+  const nodes = Array.isArray(rawNodes) ? rawNodes : []
+  const edges = Array.isArray(rawEdges) ? rawEdges : []
+  const metadata = data?.metadata
 
   return (
     <div className="workflow-page">
@@ -150,12 +177,20 @@ export function Workflow() {
         {/* 상세 패널 */}
         <AnimatePresence>
           {selectedNode && (
-            <WorkflowDetailPanel
-              node={selectedNode}
-              detail={nodeDetail}
-              isLoading={isDetailLoading}
-              onClose={handleClosePanel}
-            />
+            <ErrorBoundary
+              resetKeys={[selectedNode.id]}
+              resetOnPropsChange={true}
+              onError={(error, errorInfo) => {
+                console.error('WorkflowDetailPanel error:', error, errorInfo)
+              }}
+            >
+              <WorkflowDetailPanel
+                node={selectedNode}
+                detail={nodeDetail}
+                isLoading={isDetailLoading}
+                onClose={handleClosePanel}
+              />
+            </ErrorBoundary>
           )}
         </AnimatePresence>
       </div>

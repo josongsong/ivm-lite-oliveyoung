@@ -16,7 +16,7 @@ import {
 import { fetchApi, postApi } from '@/shared/api'
 import { QUERY_CONFIG } from '@/shared/config'
 import type { BackfillJob, BackfillResponse, BackfillStatus } from '@/shared/types'
-import { fadeInUp, formatDuration, formatTimeSince, Loading, PageHeader, staggerContainer } from '@/shared/ui'
+import { ApiError, fadeInUp, formatDuration, formatTimeSince, Loading, PageHeader, staggerContainer } from '@/shared/ui'
 import './Backfill.css'
 
 function getStatusIcon(status: BackfillStatus) {
@@ -254,10 +254,11 @@ export function Backfill() {
   const [showNewJobModal, setShowNewJobModal] = useState(false)
   const queryClient = useQueryClient()
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['backfill'],
     queryFn: () => fetchApi<BackfillResponse>('/backfill'),
     refetchInterval: QUERY_CONFIG.REALTIME_INTERVAL,
+    retry: 1,
   })
 
   const pauseMutation = useMutation({
@@ -286,6 +287,15 @@ export function Backfill() {
   })
 
   if (isLoading) return <Loading />
+
+  if (isError) {
+    return (
+      <div className="page-container">
+        <PageHeader title="Backfill Jobs" subtitle="데이터 재처리 작업을 관리합니다" />
+        <ApiError onRetry={() => refetch()} />
+      </div>
+    )
+  }
 
   const activeJobs = data?.activeJobs ?? []
   const recentJobs = data?.recentJobs ?? []

@@ -20,7 +20,7 @@ import type {
   RecentOutboxResponse,
   StaleResponse,
 } from '@/shared/types'
-import { toast } from '@/shared/ui'
+import { ApiError, PageHeader, toast } from '@/shared/ui'
 import { DlqTable, FailedTable, RecentTable, StaleTable } from '../components'
 import './Outbox.css'
 
@@ -34,19 +34,22 @@ export function Outbox() {
   const { DEFAULT_LIMIT, BATCH_RETRY_LIMIT, STALE_TIMEOUT_SECONDS } = OUTBOX_CONFIG
 
   // 모든 탭 개수를 처음부터 로드 (탭 배지용)
-  const { data: recentData, isLoading: loadingRecent } = useQuery({
+  const { data: recentData, isLoading: loadingRecent, isError: errorRecent, refetch: refetchRecent } = useQuery({
     queryKey: ['outbox-recent'],
     queryFn: () => fetchApi<RecentOutboxResponse>(`/outbox/recent?limit=${DEFAULT_LIMIT}`),
+    retry: 1,
   })
 
   const { data: failedData, isLoading: loadingFailed } = useQuery({
     queryKey: ['outbox-failed'],
     queryFn: () => fetchApi<FailedResponse>(`/outbox/failed?limit=${DEFAULT_LIMIT}`),
+    retry: 1,
   })
 
   const { data: dlqData, isLoading: loadingDlq } = useQuery({
     queryKey: ['outbox-dlq'],
     queryFn: () => fetchApi<DlqResponse>(`/outbox/dlq?limit=${DEFAULT_LIMIT}`),
+    retry: 1,
   })
 
   const { data: staleData, isLoading: loadingStale } = useQuery({
@@ -88,6 +91,20 @@ export function Outbox() {
     },
   })
 
+  // 개별 Outbox 항목 처리 (Ivm.ops DSL 사용)
+  const processMutation = useMutation({
+    mutationFn: (id: string) => postApi(`/ops/outbox/${id}/process`),
+    onSuccess: (_, id) => {
+      toast.success(`항목 ${id.slice(0, 8)}... 처리 완료`)
+      queryClient.invalidateQueries({ queryKey: ['outbox-recent'] })
+      queryClient.invalidateQueries({ queryKey: ['outbox-stats'] })
+    },
+    onError: (error) => {
+      const message = error instanceof Error ? error.message : 'Failed to process entry'
+      toast.error(message)
+    },
+  })
+
   const handleViewDetail = async (id: string) => {
     try {
       const entry = await fetchApi<OutboxEntryDto>(`/outbox/${id}`)
@@ -106,6 +123,16 @@ export function Outbox() {
   ]
 
   const isLoading = loadingRecent || loadingFailed || loadingDlq || loadingStale
+
+  // 첫 번째 쿼리 에러 시 에러 UI 표시
+  if (errorRecent) {
+    return (
+      <div className="page-container">
+        <PageHeader title="Outbox" subtitle="Outbox 메시지 큐를 관리합니다" />
+        <ApiError onRetry={refetchRecent} />
+      </div>
+    )
+  }
 
   return (
     <div className="page-container">
@@ -127,73 +154,67 @@ export function Outbox() {
         </motion.p>
       </div>
 
-      {/* Tabs */}
-      <motion.div 
-        className="outbox-tabs"
+      {/* Tabs + Actions */}
+      <motion.div
+        className="outbox-tabs-row"
         initial={{ opacity: 0, y: 20 }}
         animate={{ opacity: 1, y: 0 }}
       >
-        {tabs.map((tab) => {
-          const Icon = tab.icon
-          return (
+        <div className="outbox-tabs">
+          {tabs.map((tab) => {
+            const Icon = tab.icon
+            return (
+              <button
+                key={tab.key}
+                className={`outbox-tab ${activeTab === tab.key ? 'active' : ''}`}
+                onClick={() => setActiveTab(tab.key)}
+              >
+                <Icon size={16} />
+                <span>{tab.label}</span>
+                {tab.count !== undefined && (
+                  <span className="tab-count">{tab.count}</span>
+                )}
+              </button>
+            )
+          })}
+        </div>
+        <div className="outbox-actions">
+          {activeTab === 'failed' && failedData && failedData.items.length > 0 && (
             <button
-              key={tab.key}
-              className={`outbox-tab ${activeTab === tab.key ? 'active' : ''}`}
-              onClick={() => setActiveTab(tab.key)}
+              className="btn btn-primary btn-sm"
+              onClick={() => retryAllMutation.mutate()}
+              disabled={retryAllMutation.isPending}
             >
-              <Icon size={18} />
-              <span>{tab.label}</span>
-              {tab.count !== undefined && (
-                <span className="tab-count">{tab.count}</span>
+              {retryAllMutation.isPending ? (
+                <Loader2 size={14} className="spin" />
+              ) : (
+                <RotateCcw size={14} />
               )}
+              Retry All ({failedData.items.length})
             </button>
-          )
-        })}
-      </motion.div>
-
-      {/* Actions Bar */}
-      <motion.div
-        className="actions-bar"
-        initial={{ opacity: 0 }}
-        animate={{ opacity: 1 }}
-        transition={{ delay: 0.1 }}
-      >
-        {/* GAP-1: Failed 탭 일괄 재시도 버튼 */}
-        {activeTab === 'failed' && failedData && failedData.items.length > 0 && (
+          )}
+          {activeTab === 'stale' && staleData && staleData.items.length > 0 && (
+            <button
+              className="btn btn-primary btn-sm"
+              onClick={() => releaseStale.mutate()}
+              disabled={releaseStale.isPending}
+            >
+              {releaseStale.isPending ? (
+                <Loader2 size={14} className="spin" />
+              ) : (
+                <Zap size={14} />
+              )}
+              Release All ({staleData.items.length})
+            </button>
+          )}
           <button
-            className="btn btn-primary"
-            onClick={() => retryAllMutation.mutate()}
-            disabled={retryAllMutation.isPending}
+            className="btn btn-ghost btn-sm"
+            onClick={() => queryClient.invalidateQueries()}
           >
-            {retryAllMutation.isPending ? (
-              <Loader2 size={16} className="spin" />
-            ) : (
-              <RotateCcw size={16} />
-            )}
-            Retry All ({failedData.items.length})
+            <RefreshCw size={14} />
+            새로고침
           </button>
-        )}
-        {activeTab === 'stale' && staleData && staleData.items.length > 0 && (
-          <button
-            className="btn btn-primary"
-            onClick={() => releaseStale.mutate()}
-            disabled={releaseStale.isPending}
-          >
-            {releaseStale.isPending ? (
-              <Loader2 size={16} className="spin" />
-            ) : (
-              <Zap size={16} />
-            )}
-            Release All Stale ({staleData.items.length})
-          </button>
-        )}
-        <button
-          className="btn btn-secondary"
-          onClick={() => queryClient.invalidateQueries()}
-        >
-          <RefreshCw size={16} />
-          새로고침
-        </button>
+        </div>
       </motion.div>
 
       {/* Content */}
@@ -219,6 +240,8 @@ export function Outbox() {
                 <RecentTable 
                   items={recentData?.items ?? []} 
                   onViewDetail={handleViewDetail}
+                  onProcess={(id) => processMutation.mutate(id)}
+                  processingId={processMutation.isPending ? processMutation.variables ?? null : null}
                 />
               </motion.div>
             )}

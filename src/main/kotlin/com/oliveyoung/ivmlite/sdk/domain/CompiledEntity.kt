@@ -1,12 +1,14 @@
 package com.oliveyoung.ivmlite.sdk.domain
 
+import arrow.core.Either
+import arrow.core.flatMap
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
 import com.oliveyoung.ivmlite.sdk.dsl.entity.EntityInput
 import com.oliveyoung.ivmlite.sdk.dsl.sink.SinkBuilder
 import com.oliveyoung.ivmlite.sdk.execution.DeployExecutor
 import com.oliveyoung.ivmlite.sdk.model.DeployJob
-import com.oliveyoung.ivmlite.sdk.model.DeployState
 import com.oliveyoung.ivmlite.sdk.model.SinkSpec
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import kotlinx.coroutines.runBlocking
 
 class CompiledEntity<T : EntityInput>(
@@ -19,50 +21,50 @@ class CompiledEntity<T : EntityInput>(
     val version: Long get() = compileResult.version
     val slices: List<String> get() = compileResult.slices
 
-    fun ship(): ShippedEntity<T> {
-        val executor = this.executor ?: throw IllegalStateException(
-            "DeployExecutor is not configured. Cannot execute ship() operation. " +
-            "Configure executor via Ivm.client().configure { executor = ... }"
+    fun ship(): Either<DomainError, ShippedEntity<T>> {
+        val executor = this.executor ?: return Either.Left(
+            DomainError.ConfigError("DeployExecutor is not configured. Configure executor via Ivm.client().configure { executor = ... }")
         )
         // Ship은 항상 Outbox를 통해 비동기로 처리
-        val job = runBlocking { executor.shipAsync(input, compileResult.version) }
-        // 호환성을 위해 ShipResult로 변환 (실제로는 Outbox에 저장됨)
-        val result = ShipResult(
-            entityKey = job.entityKey,
-            version = job.version.toLong(),
-            sinks = config.defaultSinks,
-            success = true,
-            error = null
-        )
-        return ShippedEntity(input, result, config)
+        return runBlocking { executor.shipAsync(input, compileResult.version) }.map { job ->
+            // 호환성을 위해 ShipResult로 변환 (실제로는 Outbox에 저장됨)
+            val result = ShipResult(
+                entityKey = job.entityKey,
+                version = job.version.toLong(),
+                sinks = config.defaultSinks,
+                success = true,
+                error = null
+            )
+            ShippedEntity(input, result, config)
+        }
     }
 
-    fun shipAsync(): DeployJob {
-        val executor = this.executor ?: throw IllegalStateException(
-            "DeployExecutor is not configured. Cannot execute shipAsync() operation. " +
-            "Configure executor via Ivm.client().configure { executor = ... }"
+    fun shipAsync(): Either<DomainError, DeployJob> {
+        val executor = this.executor ?: return Either.Left(
+            DomainError.ConfigError("DeployExecutor is not configured. Configure executor via Ivm.client().configure { executor = ... }")
         )
         return runBlocking { executor.shipAsync(input, compileResult.version) }
     }
 
-    fun ship(block: ShipModeBuilder.() -> Unit): ShipMixedResult {
-        val executor = this.executor ?: throw IllegalStateException(
-            "DeployExecutor is not configured. Cannot execute ship() operation. " +
-            "Configure executor via Ivm.client().configure { executor = ... }"
+    fun ship(block: ShipModeBuilder.() -> Unit): Either<DomainError, ShipMixedResult> {
+        val executor = this.executor ?: return Either.Left(
+            DomainError.ConfigError("DeployExecutor is not configured. Configure executor via Ivm.client().configure { executor = ... }")
         )
         val builder = ShipModeBuilder().apply(block)
-        
+
         // Ship은 항상 Outbox를 통해 비동기로 처리
         // sync 옵션도 내부적으로는 Outbox를 통해 처리됨
         val allSinks = builder.syncSinks + builder.asyncSinks
-        val asyncJob = if (allSinks.isNotEmpty()) {
+        val asyncJobResult = if (allSinks.isNotEmpty()) {
             runBlocking { executor.shipAsyncTo(input, compileResult.version, allSinks) }
         } else {
             runBlocking { executor.shipAsync(input, compileResult.version) }
         }
-        
-        // 호환성을 위해 syncResult는 null로 설정 (실제로는 모두 Outbox를 통해 처리됨)
-        return ShipMixedResult(compileResult.entityKey, compileResult.version, null, asyncJob)
+
+        return asyncJobResult.map { asyncJob ->
+            // 호환성을 위해 syncResult는 null로 설정 (실제로는 모두 Outbox를 통해 처리됨)
+            ShipMixedResult(compileResult.entityKey, compileResult.version, null, asyncJob)
+        }
     }
 }
 

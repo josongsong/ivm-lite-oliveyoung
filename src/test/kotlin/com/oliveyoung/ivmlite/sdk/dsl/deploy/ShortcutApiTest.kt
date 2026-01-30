@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.dsl.deploy
 
+import arrow.core.getOrElse
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
 import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductInput
 import com.oliveyoung.ivmlite.sdk.model.DeployState
@@ -7,6 +8,7 @@ import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * RFC-008 Section 11 Shortcut APIs 테스트
@@ -106,7 +108,7 @@ class ShortcutApiTest {
             opensearch {
                 index("products")
             }
-        }
+        }.getOrElse { fail("deployQueued failed: ${it.message}") }
 
         assertEquals("product:TEST-001", job.entityKey)
         assertNotNull(job.version)
@@ -128,7 +130,7 @@ class ShortcutApiTest {
             personalize {
                 dataset("product-interactions")
             }
-        }
+        }.getOrElse { fail("deployQueued failed: ${it.message}") }
 
         assertEquals("product:TEST-001", job.entityKey)
         assertNotNull(job.version)
@@ -155,7 +157,7 @@ class ShortcutApiTest {
         // deployQueued: compile.async + ship.async (비동기 큐 방식)
         val queuedJob = context.deployQueued {
             opensearch { index("products") }
-        }
+        }.getOrElse { fail("deployQueued failed: ${it.message}") }
         assertEquals(DeployState.QUEUED, queuedJob.state)
     }
 }

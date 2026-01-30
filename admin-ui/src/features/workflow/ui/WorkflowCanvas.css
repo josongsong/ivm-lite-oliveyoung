@@ -138,12 +138,78 @@
   cursor: grabbing;
 }
 
-/* 엣지 스타일 */
+/* ==================== SOTA급 엣지 스타일 ==================== */
+
+/* 기본 엣지 */
 .workflow-canvas .react-flow__edge {
   pointer-events: all;
+}
+
+.workflow-canvas .react-flow__edge-path {
+  stroke-width: 2;
+  transition: stroke-width 0.2s ease, stroke 0.2s ease;
 }
 
 .workflow-canvas .react-flow__edge:hover .react-flow__edge-path {
   stroke: #00d4ff;
   stroke-width: 3;
+  filter: drop-shadow(0 0 4px rgba(0, 212, 255, 0.6));
+}
+
+/* DASHED 엣지 (Join/Fanout 관계) - Cross-entity 연결 강조 */
+.workflow-canvas .react-flow__edge[style*="dashed"] .react-flow__edge-path {
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 2px rgba(136, 85, 255, 0.4));
+}
+
+.workflow-canvas .react-flow__edge[style*="dashed"]:hover .react-flow__edge-path {
+  stroke: #aa77ff;
+  filter: drop-shadow(0 0 6px rgba(170, 119, 255, 0.8));
+}
+
+/* Animated 엣지 (활성 흐름) */
+.workflow-canvas .react-flow__edge.animated .react-flow__edge-path {
+  stroke-dasharray: 8 4;
+  animation: edgeFlow 0.8s linear infinite;
+}
+
+@keyframes edgeFlow {
+  from { stroke-dashoffset: 12; }
+  to { stroke-dashoffset: 0; }
+}
+
+/* 엣지 호버 시 라벨도 강조 */
+.workflow-canvas .react-flow__edge:hover + .edge-label {
+  transform: scale(1.1);
+}
+
+/* Dimmed 노드 스타일 (선택 시 연결되지 않은 노드) */
+.workflow-canvas .react-flow__node.dimmed {
+  opacity: 0.15;
+  filter: grayscale(80%);
+  transition: opacity 0.3s ease, filter 0.3s ease;
+  pointer-events: none;
+}
+
+/* 연결된 노드는 밝게 */
+.workflow-canvas .react-flow__node:not(.dimmed) {
+  transition: opacity 0.3s ease, filter 0.3s ease;
+}
+
+/* 선택된 노드 강조 */
+.workflow-canvas .react-flow__node.selected {
+  z-index: 10;
+}
+
+.workflow-canvas .react-flow__node.selected::after {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: -4px;
+  right: -4px;
+  bottom: -4px;
+  border: 2px solid #00d4ff;
+  border-radius: 12px;
+  box-shadow: 0 0 20px rgba(0, 212, 255, 0.5);
+  pointer-events: none;
 }

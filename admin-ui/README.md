@@ -57,8 +57,51 @@ npm run dev
 npm run build
 ```
 
-빌드 결과물은 `../src/main/resources/static/admin/`에 생성됩니다.
-Kotlin 서버에서 직접 서빙됩니다.
+빌드 결과물은 `dist/`에 생성됩니다.
+
+## 🚀 배포 (분리 배포)
+
+Admin UI와 Kotlin API는 **완전히 분리**되어 배포됩니다.
+
+### 환경 변수
+
+```bash
+# .env.production 예시
+VITE_API_URL=https://api.oliveyoung.com/api
+```
+
+| 변수 | 설명 | 예시 |
+|------|------|------|
+| `VITE_API_URL` | API 서버 URL | `https://api.oliveyoung.com/api` |
+
+### 프론트엔드 배포
+
+`dist/` 폴더를 아래 서비스 중 하나에 배포:
+- **Nginx**: 정적 파일 서빙
+- **CloudFront + S3**: AWS CDN
+- **Vercel**: Zero-config 배포
+- **Netlify**: 간편 배포
+
+```nginx
+# Nginx 설정 예시
+server {
+    listen 80;
+    server_name admin.oliveyoung.com;
+    
+    location / {
+        root /var/www/admin-ui/dist;
+        try_files $uri $uri/ /index.html;  # SPA fallback
+    }
+}
+```
+
+### 백엔드 CORS 설정
+
+Kotlin 백엔드에서 프론트엔드 도메인 허용:
+
+```bash
+export CORS_ALLOWED_HOSTS=https://admin.oliveyoung.com,https://admin.staging.oliveyoung.com
+```
 
 ## 🎨 기술 스택
 

@@ -1,0 +1,84 @@
+.environment-selector {
+  position: relative;
+}
+
+.environment-selector-button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.environment-selector-button:hover {
+  border-color: var(--env-color);
+  background: rgba(var(--env-color-rgb, 0, 212, 255), 0.1);
+  color: var(--text-primary);
+}
+
+.environment-selector-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--env-color);
+  box-shadow: 0 0 8px var(--env-color);
+}
+
+.environment-selector-label {
+  font-weight: 600;
+}
+
+.environment-selector-chevron {
+  transition: transform 0.2s ease;
+  opacity: 0.6;
+}
+
+.environment-selector-chevron.open {
+  transform: rotate(180deg);
+}
+
+.environment-selector-dropdown {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  left: 0;
+  min-width: 140px;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  z-index: 1000;
+  overflow: hidden;
+}
+
+.environment-selector-option {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary);
+  font-size: 0.875rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  text-align: left;
+}
+
+.environment-selector-option:hover {
+  background: rgba(var(--env-color-rgb, 0, 212, 255), 0.1);
+  color: var(--text-primary);
+}
+
+.environment-selector-option.active {
+  background: rgba(var(--env-color-rgb, 0, 212, 255), 0.15);
+  color: var(--env-color);
+}

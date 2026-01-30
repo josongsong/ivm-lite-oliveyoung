@@ -1,5 +1,8 @@
 package com.oliveyoung.ivmlite.sdk.execution
 
+import arrow.core.Either
+import arrow.core.left
+import arrow.core.right
 import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.ShipWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
@@ -13,6 +16,7 @@ import com.oliveyoung.ivmlite.sdk.dsl.entity.CategoryInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.EntityInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductInput
 import com.oliveyoung.ivmlite.sdk.model.*
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
@@ -21,7 +25,6 @@ import com.oliveyoung.ivmlite.shared.domain.types.VersionGenerator
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
-import java.util.UUID
 
 /**
  * Deploy Executor (RFC-IMPL-011 Wave 5-L)
@@ -52,7 +55,10 @@ class DeployExecutor(
      */
     suspend fun <T : EntityInput> executeSync(input: T, spec: DeploySpec): DeployResult {
         // 1. EntityInput → RawData 변환
-        val rawDataParams = convertToRawDataParams(input)
+        val rawDataParams = when (val result = convertToRawDataParams(input)) {
+            is Either.Left -> return DeployResult.failure("unknown", "0", result.value.message ?: "Conversion failed")
+            is Either.Right -> result.value
+        }
 
         // 2. RawData Ingest (항상 동기)
         val ingestResult = ingestWorkflow.execute(
@@ -187,9 +193,12 @@ class DeployExecutor(
      * 2. COMPILE_TASK Outbox 적재
      * 3. Job 정보 반환
      */
-    suspend fun <T : EntityInput> executeAsync(input: T, spec: DeploySpec): DeployJob {
+    suspend fun <T : EntityInput> executeAsync(input: T, spec: DeploySpec): Either<DomainError, DeployJob> {
         // 1. EntityInput → RawData 변환
-        val rawDataParams = convertToRawDataParams(input)
+        val rawDataParams = when (val result = convertToRawDataParams(input)) {
+            is Either.Left -> return result
+            is Either.Right -> result.value
+        }
 
         // 2. RawData Ingest (항상 동기)
         val ingestResult = ingestWorkflow.execute(
@@ -203,7 +212,7 @@ class DeployExecutor(
 
         when (ingestResult) {
             is IngestWorkflow.Result.Err -> {
-                throw RuntimeException("Ingest failed: ${ingestResult.error}")
+                return DomainError.StorageError("Ingest failed: ${ingestResult.error}").left()
             }
             is IngestWorkflow.Result.Ok -> { /* continue */ }
         }
@@ -226,7 +235,7 @@ class DeployExecutor(
         val jobId = when (val r = outboxRepository.insert(compileTaskEntry)) {
             is OutboxRepositoryPort.Result.Ok -> r.value.id.toString()
             is OutboxRepositoryPort.Result.Err -> {
-                throw RuntimeException("Outbox insert failed: ${r.error}")
+                return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
             }
         }
 
@@ -235,13 +244,13 @@ class DeployExecutor(
             entityKey = rawDataParams.entityKey.value,
             version = rawDataParams.version.toString(),
             state = DeployState.QUEUED
-        )
+        ).right()
     }
 
     /**
      * EntityInput을 RawData 파라미터로 변환
      */
-    private fun <T : EntityInput> convertToRawDataParams(input: T): RawDataParams {
+    private fun <T : EntityInput> convertToRawDataParams(input: T): Either<DomainError, RawDataParams> {
         val tenantId = TenantId(input.tenantId)
         val version = VersionGenerator.generate() // 충돌 없는 고유 버전 (SSOT)
 
@@ -317,7 +326,7 @@ class DeployExecutor(
                 }.toString()
                 Tuple4(key, schema, schemaVer, payload)
             }
-            else -> throw IllegalArgumentException("Unsupported EntityInput type: ${input::class}")
+            else -> return DomainError.NotSupportedError("Unsupported EntityInput type: ${input::class}").left()
         }
 
         return RawDataParams(
@@ -327,7 +336,7 @@ class DeployExecutor(
             schemaId = schemaId,
             schemaVersion = schemaVersion,
             payloadJson = payloadJson
-        )
+        ).right()
     }
 
     /**
@@ -358,11 +367,11 @@ class DeployExecutor(
     /**
      * EntityInput에서 EntityKey 추출 (DRY)
      */
-    private fun <T : EntityInput> extractEntityKey(input: T): EntityKey = when (input) {
-        is ProductInput -> EntityKey("${input.entityType}:${input.sku}")
-        is BrandInput -> EntityKey("${input.entityType}:${input.brandId}")
-        is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}")
-        else -> throw IllegalArgumentException("Unsupported EntityInput type: ${input::class}")
+    private fun <T : EntityInput> extractEntityKey(input: T): Either<DomainError, EntityKey> = when (input) {
+        is ProductInput -> EntityKey("${input.entityType}:${input.sku}").right()
+        is BrandInput -> EntityKey("${input.entityType}:${input.brandId}").right()
+        is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}").right()
+        else -> DomainError.NotSupportedError("Unsupported EntityInput type: ${input::class}").left()
     }
 
     // ===== 단계별 제어 API (DX 끝판왕) =====
@@ -371,7 +380,15 @@ class DeployExecutor(
      * Ingest만 실행 (동기)
      */
     suspend fun <T : EntityInput> ingestOnly(input: T): IngestResult {
-        val rawDataParams = convertToRawDataParams(input)
+        val rawDataParams = when (val result = convertToRawDataParams(input)) {
+            is Either.Left -> return IngestResult(
+                entityKey = "unknown",
+                version = 0L,
+                success = false,
+                error = result.value.message ?: "Conversion failed"
+            )
+            is Either.Right -> result.value
+        }
 
         val ingestResult = ingestWorkflow.execute(
             tenantId = rawDataParams.tenantId,
@@ -402,7 +419,16 @@ class DeployExecutor(
      */
     suspend fun <T : EntityInput> compileOnly(input: T, version: Long): CompileResult {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = extractEntityKey(input)
+        val entityKey = when (val result = extractEntityKey(input)) {
+            is Either.Left -> return CompileResult(
+                entityKey = "unknown",
+                version = version,
+                slices = emptyList(),
+                success = false,
+                error = result.value.message ?: "EntityKey extraction failed"
+            )
+            is Either.Right -> result.value
+        }
 
         val slicingResult = slicingWorkflow.execute(
             tenantId = tenantId,
@@ -430,9 +456,12 @@ class DeployExecutor(
     /**
      * Compile 비동기 실행 (Outbox)
      */
-    suspend fun <T : EntityInput> compileAsync(input: T, version: Long): DeployJob {
+    suspend fun <T : EntityInput> compileAsync(input: T, version: Long): Either<DomainError, DeployJob> {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = extractEntityKey(input)
+        val entityKey = when (val result = extractEntityKey(input)) {
+            is Either.Left -> return result
+            is Either.Right -> result.value
+        }
 
         val compileTaskEntry = OutboxEntry.create(
             aggregateType = AggregateType.RAW_DATA,
@@ -449,7 +478,7 @@ class DeployExecutor(
 
         val jobId = when (val r = outboxRepository.insert(compileTaskEntry)) {
             is OutboxRepositoryPort.Result.Ok -> r.value.id.toString()
-            is OutboxRepositoryPort.Result.Err -> throw RuntimeException("Outbox insert failed: ${r.error}")
+            is OutboxRepositoryPort.Result.Err -> return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
         }
 
         return DeployJob(
@@ -457,34 +486,39 @@ class DeployExecutor(
             entityKey = entityKey.value,
             version = version.toString(),
             state = DeployState.QUEUED
-        )
+        ).right()
     }
 
     /**
      * Ship 실행 (항상 Outbox를 통해 비동기 처리)
-     * 
+     *
      * @deprecated 동기 실행은 제거되었습니다. 항상 Outbox를 통해 비동기로 처리됩니다.
      *             shipAsync()를 사용하세요.
      */
     @Deprecated("Ship은 항상 Outbox를 통해 비동기로 처리됩니다. shipAsync()를 사용하세요.", ReplaceWith("shipAsync(input, version)"))
-    suspend fun <T : EntityInput> shipSync(input: T, version: Long, sinkTypes: List<String>): ShipResult {
+    suspend fun <T : EntityInput> shipSync(input: T, version: Long, sinkTypes: List<String>): Either<DomainError, ShipResult> {
         // Outbox를 통해 비동기로 처리 (일관성 유지)
-        val job = shipAsync(input, version)
-        return ShipResult(
-            entityKey = job.entityKey,
-            version = job.version.toLong(),
-            sinks = sinkTypes,
-            success = true,
-            error = null
-        )
+        return when (val result = shipAsync(input, version)) {
+            is Either.Left -> result
+            is Either.Right -> ShipResult(
+                entityKey = result.value.entityKey,
+                version = result.value.version.toLong(),
+                sinks = sinkTypes,
+                success = true,
+                error = null
+            ).right()
+        }
     }
 
     /**
      * Ship 비동기 실행 (Outbox)
      */
-    suspend fun <T : EntityInput> shipAsync(input: T, version: Long): DeployJob {
+    suspend fun <T : EntityInput> shipAsync(input: T, version: Long): Either<DomainError, DeployJob> {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = extractEntityKey(input)
+        val entityKey = when (val result = extractEntityKey(input)) {
+            is Either.Left -> return result
+            is Either.Right -> result.value
+        }
 
         val shipTaskEntry = OutboxEntry.create(
             aggregateType = AggregateType.SLICE,
@@ -501,7 +535,7 @@ class DeployExecutor(
 
         val jobId = when (val r = outboxRepository.insert(shipTaskEntry)) {
             is OutboxRepositoryPort.Result.Ok -> r.value.id.toString()
-            is OutboxRepositoryPort.Result.Err -> throw RuntimeException("Outbox insert failed: ${r.error}")
+            is OutboxRepositoryPort.Result.Err -> return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
         }
 
         return DeployJob(
@@ -509,39 +543,50 @@ class DeployExecutor(
             entityKey = entityKey.value,
             version = version.toString(),
             state = DeployState.QUEUED
-        )
+        ).right()
     }
 
     /**
      * 특정 Sink만 Ship 실행 (항상 Outbox를 통해 비동기 처리)
-     * 
+     *
      * @deprecated 동기 실행은 제거되었습니다. 항상 Outbox를 통해 비동기로 처리됩니다.
      *             shipAsyncTo()를 사용하세요.
      */
     @Deprecated("Ship은 항상 Outbox를 통해 비동기로 처리됩니다. shipAsyncTo()를 사용하세요.", ReplaceWith("shipAsyncTo(input, version, sinks)"))
-    suspend fun <T : EntityInput> shipSyncTo(input: T, version: Long, sinks: List<SinkSpec>): ShipResult {
+    suspend fun <T : EntityInput> shipSyncTo(input: T, version: Long, sinks: List<SinkSpec>): Either<DomainError, ShipResult> {
         // Outbox를 통해 비동기로 처리 (일관성 유지)
-        val job = shipAsyncTo(input, version, sinks)
-        val sinkTypes = sinks.map { sinkSpecToType(it) }
-        return ShipResult(
-            entityKey = job.entityKey,
-            version = job.version.toLong(),
-            sinks = sinkTypes,
-            success = true,
-            error = null
-        )
+        return when (val result = shipAsyncTo(input, version, sinks)) {
+            is Either.Left -> result
+            is Either.Right -> {
+                val sinkTypes = sinks.map { sinkSpecToType(it) }
+                ShipResult(
+                    entityKey = result.value.entityKey,
+                    version = result.value.version.toLong(),
+                    sinks = sinkTypes,
+                    success = true,
+                    error = null
+                ).right()
+            }
+        }
     }
 
     /**
      * 특정 Sink만 비동기 Ship (Outbox)
      */
-    suspend fun <T : EntityInput> shipAsyncTo(input: T, version: Long, sinks: List<SinkSpec>): DeployJob {
+    suspend fun <T : EntityInput> shipAsyncTo(input: T, version: Long, sinks: List<SinkSpec>): Either<DomainError, DeployJob> {
         val tenantId = TenantId(input.tenantId)
-        val entityKey = extractEntityKey(input)
+        val entityKey = when (val result = extractEntityKey(input)) {
+            is Either.Left -> return result
+            is Either.Right -> result.value
+        }
+
+        if (sinks.isEmpty()) {
+            return DomainError.ValidationError("sinks", "No sinks specified").left()
+        }
 
         val jobIds = mutableListOf<String>()
 
-        sinks.forEach { sink ->
+        for (sink in sinks) {
             val shipTaskEntry = OutboxEntry.create(
                 aggregateType = AggregateType.SLICE,
                 aggregateId = "${tenantId.value}:${entityKey.value}",
@@ -556,18 +601,18 @@ class DeployExecutor(
                 }.toString()
             )
 
-            // fail-closed: 에러 발생 시 즉시 예외 던짐
+            // fail-closed: 에러 발생 시 즉시 반환
             when (val r = outboxRepository.insert(shipTaskEntry)) {
                 is OutboxRepositoryPort.Result.Ok -> jobIds.add(r.value.id.toString())
-                is OutboxRepositoryPort.Result.Err -> throw RuntimeException("Ship outbox insert failed: ${r.error}")
+                is OutboxRepositoryPort.Result.Err -> return DomainError.StorageError("Ship outbox insert failed: ${r.error}").left()
             }
         }
 
         return DeployJob(
-            jobId = jobIds.firstOrNull() ?: throw RuntimeException("No sinks specified"),
+            jobId = jobIds.first(),
             entityKey = entityKey.value,
             version = version.toString(),
             state = DeployState.QUEUED
-        )
+        ).right()
     }
 }

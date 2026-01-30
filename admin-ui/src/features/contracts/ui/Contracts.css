@@ -273,11 +273,26 @@
 .contract-card.magenta::before { background: var(--accent-magenta); }
 .contract-card.pink::before { background: #ff69b4; }
 
+/* 타입별 카드 테두리 색상 */
+.contract-card.cyan { border-color: rgba(0, 212, 255, 0.4); }
+.contract-card.purple { border-color: rgba(136, 85, 255, 0.4); }
+.contract-card.green { border-color: rgba(0, 255, 136, 0.4); }
+.contract-card.orange { border-color: rgba(255, 136, 0, 0.4); }
+.contract-card.yellow { border-color: rgba(255, 204, 0, 0.4); }
+.contract-card.magenta { border-color: rgba(255, 0, 170, 0.4); }
+.contract-card.pink { border-color: rgba(255, 105, 180, 0.4); }
+
 .contract-card:hover {
   transform: translateY(-2px);
-  border-color: var(--border-accent);
-  box-shadow: var(--shadow-md);
 }
+
+.contract-card.cyan:hover { border-color: #00d4ff; box-shadow: 0 4px 20px rgba(0, 212, 255, 0.2); }
+.contract-card.purple:hover { border-color: #8855ff; box-shadow: 0 4px 20px rgba(136, 85, 255, 0.2); }
+.contract-card.green:hover { border-color: #00ff88; box-shadow: 0 4px 20px rgba(0, 255, 136, 0.2); }
+.contract-card.orange:hover { border-color: #ff8800; box-shadow: 0 4px 20px rgba(255, 136, 0, 0.2); }
+.contract-card.yellow:hover { border-color: #ffcc00; box-shadow: 0 4px 20px rgba(255, 204, 0, 0.2); }
+.contract-card.magenta:hover { border-color: #ff00aa; box-shadow: 0 4px 20px rgba(255, 0, 170, 0.2); }
+.contract-card.pink:hover { border-color: #ff69b4; box-shadow: 0 4px 20px rgba(255, 105, 180, 0.2); }
 
 .contract-card:hover .contract-arrow {
   opacity: 1;
@@ -299,45 +314,52 @@
   letter-spacing: 0.03em;
 }
 
-.badge-cyan {
+/* cyan: #00d4ff */
+.contract-kind.badge-cyan {
   background: rgba(0, 212, 255, 0.15);
-  color: var(--accent-cyan);
+  color: #00d4ff !important;
   border: 1px solid rgba(0, 212, 255, 0.3);
 }
 
-.badge-purple {
+/* purple: #8855ff */
+.contract-kind.badge-purple {
   background: rgba(136, 85, 255, 0.15);
-  color: var(--accent-purple);
+  color: #8855ff !important;
   border: 1px solid rgba(136, 85, 255, 0.3);
 }
 
-.badge-green {
+/* green: #00ff88 */
+.contract-kind.badge-green {
   background: rgba(0, 255, 136, 0.15);
-  color: var(--accent-green);
+  color: #00ff88 !important;
   border: 1px solid rgba(0, 255, 136, 0.3);
 }
 
-.badge-orange {
+/* orange: #ff8800 */
+.contract-kind.badge-orange {
   background: rgba(255, 136, 0, 0.15);
-  color: var(--accent-orange);
+  color: #ff8800 !important;
   border: 1px solid rgba(255, 136, 0, 0.3);
 }
 
-.badge-yellow {
+/* yellow: #ffcc00 */
+.contract-kind.badge-yellow {
   background: rgba(255, 204, 0, 0.15);
-  color: var(--accent-yellow);
+  color: #ffcc00 !important;
   border: 1px solid rgba(255, 204, 0, 0.3);
 }
 
-.badge-magenta {
+/* magenta: #ff00aa */
+.contract-kind.badge-magenta {
   background: rgba(255, 0, 170, 0.15);
-  color: var(--accent-magenta);
+  color: #ff00aa !important;
   border: 1px solid rgba(255, 0, 170, 0.3);
 }
 
-.badge-pink {
+/* pink: #ff69b4 */
+.contract-kind.badge-pink {
   background: rgba(255, 105, 180, 0.15);
-  color: #ff69b4;
+  color: #ff69b4 !important;
   border: 1px solid rgba(255, 105, 180, 0.3);
 }
 

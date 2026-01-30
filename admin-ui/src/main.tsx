@@ -6,6 +6,7 @@ import { ToastContainer } from '@/shared/ui'
 import '@/app/styles/index.css'
 import '@/app/styles/App.css'
 
+// 분리 배포: basename 항상 /
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <QueryProvider>

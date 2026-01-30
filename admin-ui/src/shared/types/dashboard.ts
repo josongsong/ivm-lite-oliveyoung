@@ -36,6 +36,7 @@ export interface WorkerStatus {
 
 export interface DatabaseStats {
   rawDataCount: number
+  contractsCount: number
   outboxCount: number
   note: string
 }

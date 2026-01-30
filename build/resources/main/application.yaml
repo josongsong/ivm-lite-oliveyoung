@@ -35,6 +35,11 @@ observability:
   metricsEnabled: true
   tracingEnabled: true
   otlpEndpoint: ${OTEL_EXPORTER_OTLP_ENDPOINT:-http://localhost:4317}
+  # AWS X-Ray 사용 여부 (true면 X-Ray Daemon 직접 전송, false면 OTLP Collector 사용)
+  # 권장: false (OTLP Collector → awsxray exporter 방식)
+  useXRay: ${USE_XRAY:-false}
+  # AWS Region (X-Ray 사용 시 필요, 기본값은 dynamodb.region 사용)
+  awsRegion: ${AWS_REGION:-ap-northeast-2}
 
 worker:
   enabled: ${WORKER_ENABLED:-true}

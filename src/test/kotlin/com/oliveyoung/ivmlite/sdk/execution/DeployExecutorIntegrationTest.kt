@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.execution
 
+import arrow.core.getOrElse
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
@@ -236,7 +237,9 @@ class DeployExecutorIntegrationTest : StringSpec({
             cutoverMode = CutoverMode.Ready
         )
 
-        val job = executor.executeAsync(input, spec)
+        val job = executor.executeAsync(input, spec).getOrElse {
+            throw AssertionError("executeAsync failed: ${it.message}")
+        }
 
         // Verify job
         job.state shouldBe DeployState.QUEUED

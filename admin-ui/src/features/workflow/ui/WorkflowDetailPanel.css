@@ -359,6 +359,134 @@
   background: rgba(0, 212, 255, 0.1);
 }
 
+/* ==================== 스키마 필드 섹션 ==================== */
+.schema-fields-section {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.03) 0%, rgba(136, 85, 255, 0.03) 100%);
+  border-radius: 12px;
+  padding: 16px;
+  border: 1px solid rgba(0, 212, 255, 0.1);
+}
+
+.section-title-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  background: none;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  margin-bottom: 12px;
+}
+
+.section-title-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.75rem;
+  text-transform: uppercase;
+  color: var(--text-muted, #666);
+  letter-spacing: 0.05em;
+  font-weight: 600;
+}
+
+.section-title-toggle .chevron {
+  color: var(--text-muted, #666);
+  transition: transform 0.2s ease;
+}
+
+.section-title-toggle .chevron.expanded {
+  transform: rotate(180deg);
+}
+
+.section-title-toggle:hover .section-title-left,
+.section-title-toggle:hover .chevron {
+  color: #00d4ff;
+}
+
+.field-count {
+  background: linear-gradient(135deg, #00d4ff 0%, #8855ff 100%);
+  color: #0a0a0f;
+  font-size: 0.65rem;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 10px;
+  min-width: 20px;
+  text-align: center;
+}
+
+.fields-container {
+  overflow: hidden;
+}
+
+.fields-grid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.field-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: var(--bg-primary, #0a0a0f);
+  border: 1px solid var(--border-color, #2a2a3a);
+  border-radius: 20px;
+  font-size: 0.78rem;
+  color: var(--text-primary, #f0f0f0);
+  transition: all 0.2s ease;
+}
+
+.field-tag:hover {
+  border-color: #00d4ff;
+  background: rgba(0, 212, 255, 0.1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 212, 255, 0.15);
+}
+
+.field-tag.wildcard {
+  background: linear-gradient(135deg, rgba(0, 212, 255, 0.15) 0%, rgba(136, 85, 255, 0.15) 100%);
+  border-color: rgba(136, 85, 255, 0.3);
+}
+
+.field-tag.wildcard:hover {
+  border-color: #8855ff;
+  box-shadow: 0 4px 12px rgba(136, 85, 255, 0.2);
+}
+
+.field-icon {
+  font-size: 0.6rem;
+  color: #00d4ff;
+}
+
+.field-tag.wildcard .field-icon {
+  color: #8855ff;
+}
+
+.field-name {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.wildcard-hint {
+  margin-top: 12px;
+  padding: 8px 12px;
+  background: rgba(136, 85, 255, 0.1);
+  border-left: 2px solid #8855ff;
+  border-radius: 0 6px 6px 0;
+  font-size: 0.72rem;
+  color: var(--text-secondary, #a0a0a0);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.wildcard-hint span {
+  color: #8855ff;
+}
+
 /* 반응형 */
 @media (max-width: 768px) {
   .detail-panel {

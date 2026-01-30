@@ -47,6 +47,13 @@ slices:
         targetEntityType: BRAND
         targetKeyPattern: BRAND#{tenantId}#{value}
         required: false  # 브랜드 없어도 슬라이싱 진행
+        projection:  # 선택한 필드만 매핑 (optional)
+          mode: COPY_FIELDS
+          fields:
+            - fromTargetPath: "/brandName"
+              toOutputPath: "/brandName"  # 루트 레벨로 매핑
+            - fromTargetPath: "/brandLogoUrl"
+              toOutputPath: "/brandLogoUrl"
   - type: PRICE
     buildRules:
       type: PassThrough

@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.dsl.deploy
 
+import arrow.core.getOrElse
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
 import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductInput
 import com.oliveyoung.ivmlite.sdk.model.CompileMode
@@ -11,6 +12,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * 수학적 완결성 테스트 - 모든 Axis 조합 검증
@@ -183,7 +185,7 @@ class DeployableContextAxisCombinationTest {
         // deployQueued = compile.async + ship.async + cutover.ready
         val context = DeployableContext(testInput, testConfig)
 
-        val job = context.deployQueued { opensearch() }
+        val job = context.deployQueued { opensearch() }.getOrElse { fail("deployQueued failed: ${it.message}") }
 
         assertNotNull(job.jobId)
         assertNotNull(job.version)
@@ -202,7 +204,7 @@ class DeployableContextAxisCombinationTest {
             // compile.async() is implicit - cannot call compile.sync()
             ship.async { opensearch() }
             cutover.ready()
-        }
+        }.getOrElse { fail("deployAsync failed: ${it.message}") }
 
         assertNotNull(job.jobId)
         assertTrue(job.jobId.startsWith("job-"))
@@ -216,7 +218,7 @@ class DeployableContextAxisCombinationTest {
             // compile.async() is implicit
             // No ship configuration
             cutover.ready()
-        }
+        }.getOrElse { fail("deployAsync failed: ${it.message}") }
 
         assertNotNull(job.jobId)
     }

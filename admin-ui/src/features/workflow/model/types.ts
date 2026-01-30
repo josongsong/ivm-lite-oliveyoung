@@ -36,10 +36,15 @@ export interface WorkflowNodeData {
 // React Flow 노드 타입
 export type WorkflowNode = Node<WorkflowNodeData, WorkflowNodeType>
 
+// 엣지 스타일 타입
+export type EdgeStyleType = 'DEFAULT' | 'DASHED' | 'ANIMATED' | 'ERROR'
+
 // React Flow 엣지 타입
-export interface WorkflowEdge extends Edge {
+export interface WorkflowEdge extends Omit<Edge, 'style'> {
   animated?: boolean
-  type?: 'smoothstep' | 'bezier' | 'straight'
+  type?: 'smoothstep' | 'bezier' | 'straight' | 'labeled'
+  label?: string
+  edgeStyle?: EdgeStyleType
 }
 
 // API 응답

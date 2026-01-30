@@ -1,0 +1,804 @@
+/* DataExplorer V2 - SOTA Admin-style Data Explorer */
+
+.data-explorer-v2 {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--bg-primary);
+  overflow: hidden;
+}
+
+/* ==================== GNB (상단 네비게이션) ==================== */
+.explorer-gnb {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  flex-shrink: 0;
+}
+
+.gnb-left {
+  display: flex;
+  align-items: center;
+  min-width: 200px;
+}
+
+.gnb-center {
+  flex: 1;
+  display: flex;
+  justify-content: center;
+  max-width: 700px;
+}
+
+.gnb-right {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 120px;
+  justify-content: flex-end;
+}
+
+/* 뒤로가기 버튼 */
+.back-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.875rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.back-btn:hover {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+/* 타입 탭 */
+.type-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.25rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+}
+
+.type-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.type-tab:hover {
+  color: var(--text-secondary);
+}
+
+.type-tab.active {
+  background: var(--accent-cyan);
+  color: white;
+}
+
+.type-tab svg {
+  opacity: 0.7;
+}
+
+.type-tab.active svg {
+  opacity: 1;
+}
+
+/* 인라인 검색 바 */
+.search-bar-inline {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 1rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  transition: all 0.2s ease;
+}
+
+.search-bar-inline:focus-within {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 3px rgba(99, 179, 237, 0.15);
+}
+
+.search-bar-inline .search-icon {
+  color: var(--text-muted);
+  flex-shrink: 0;
+}
+
+.search-bar-inline input {
+  flex: 1;
+  background: transparent;
+  border: none;
+  font-size: 0.85rem;
+  color: var(--text-primary);
+  outline: none;
+}
+
+.search-bar-inline input::placeholder {
+  color: var(--text-muted);
+}
+
+.clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: var(--bg-secondary);
+  border: none;
+  border-radius: 50%;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.clear-btn:hover {
+  background: var(--status-error);
+  color: white;
+}
+
+/* 현재 엔티티 바 (상세 뷰) */
+.current-entity-bar {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+  width: 100%;
+}
+
+.entity-tabs {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.entity-tab {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.5rem 0.75rem;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.entity-tab:hover {
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+}
+
+.entity-tab.active {
+  color: var(--accent-cyan);
+  background: rgba(99, 179, 237, 0.15);
+}
+
+.entity-info {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.375rem 0.75rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-md);
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.entity-info .entity-id {
+  color: var(--text-primary);
+  font-weight: 600;
+}
+
+.entity-info .entity-version {
+  color: var(--accent-cyan);
+  font-weight: 500;
+}
+
+/* 아이콘 버튼 */
+.icon-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.icon-btn:hover:not(:disabled) {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.icon-btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.icon-btn.spinning svg {
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* 프라이머리 버튼 */
+.primary-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.primary-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 15px rgba(99, 179, 237, 0.4);
+}
+
+/* ==================== 메인 콘텐츠 ==================== */
+.explorer-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.detail-view,
+.create-view,
+.list-view {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+
+.list-view {
+  padding: 1rem 1.5rem 0;
+  gap: 1rem;
+}
+
+.detail-view {
+  padding: 1rem 1.5rem;
+  overflow: auto;
+}
+
+.create-view {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 2rem;
+}
+
+.create-view > * {
+  max-width: 700px;
+  width: 100%;
+}
+
+/* ==================== 서브 필터 바 ==================== */
+.sub-filter-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+}
+
+.filter-left {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.filter-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.75rem;
+}
+
+.filter-item svg {
+  color: var(--text-muted);
+}
+
+.filter-label {
+  color: var(--text-muted);
+}
+
+.filter-value {
+  color: var(--text-primary);
+  font-weight: 500;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-tertiary);
+  border-radius: var(--radius-sm);
+}
+
+.filter-value.accent {
+  color: var(--accent-cyan);
+}
+
+.filter-right {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.page-size-select {
+  padding: 0.375rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  cursor: pointer;
+  outline: none;
+}
+
+.page-size-select:focus {
+  border-color: var(--accent-cyan);
+}
+
+.slice-type-select {
+  padding: 0.375rem 0.75rem;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--accent-cyan);
+  border-radius: var(--radius-md);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--accent-cyan);
+  cursor: pointer;
+  outline: none;
+  min-width: 140px;
+}
+
+.slice-type-select:focus {
+  border-color: var(--accent-cyan);
+  box-shadow: 0 0 0 2px rgba(6, 182, 212, 0.2);
+}
+
+.slice-type-select option {
+  background: var(--bg-secondary);
+  color: var(--text-primary);
+}
+
+/* ==================== 테이블 ==================== */
+.table-container {
+  flex: 1;
+  overflow: auto;
+  padding: 0;
+  width: 100%;
+  background: var(--bg-secondary);
+  border-radius: var(--radius-lg);
+  border: 1px solid var(--border-color);
+}
+
+.table-loading {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 300px;
+}
+
+.data-table {
+  width: 100%;
+  border-collapse: collapse;
+  table-layout: fixed;
+}
+
+.data-table thead {
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.data-table th {
+  padding: 0.875rem 1rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-muted);
+  text-align: left;
+}
+
+.data-table th:first-child {
+  padding-left: 1.5rem;
+}
+
+.data-table th:last-child {
+  padding-right: 1.5rem;
+}
+
+.table-row {
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.table-row:hover {
+  background: var(--bg-secondary);
+}
+
+.table-row td {
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+  font-size: 0.8rem;
+  color: var(--text-secondary);
+}
+
+.table-row td:first-child {
+  padding-left: 1.5rem;
+}
+
+.table-row td:last-child {
+  padding-right: 1.5rem;
+}
+
+/* 컬럼 스타일 */
+th.col-entity,
+td.col-entity {
+  width: 25%;
+}
+
+/* .cell-flex: td 내부에서 flex 레이아웃 사용 */
+.cell-flex {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.cell-flex svg {
+  color: var(--accent-cyan);
+  flex-shrink: 0;
+}
+
+.entity-text {
+  color: var(--text-primary);
+  font-weight: 500;
+  font-family: var(--font-mono);
+  font-size: 0.8rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+th.col-version,
+td.col-version {
+  width: 80px;
+  text-align: center;
+}
+
+.version-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  background: rgba(99, 179, 237, 0.15);
+  border-radius: var(--radius-sm);
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: var(--accent-cyan);
+}
+
+th.col-schema,
+td.col-schema {
+  width: 28%;
+}
+
+.schema-text {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  display: block;
+}
+
+.status-badge {
+  display: inline-block;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.status-badge.active {
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--status-success);
+}
+
+.status-badge.draft {
+  background: rgba(255, 204, 0, 0.15);
+  color: var(--status-warning);
+}
+
+.status-badge.deprecated {
+  background: rgba(255, 68, 102, 0.15);
+  color: var(--status-error);
+}
+
+th.col-updated,
+td.col-updated {
+  width: 100px;
+}
+
+td.col-updated {
+  white-space: nowrap;
+}
+
+td.col-updated .cell-flex {
+  gap: 0.5rem;
+}
+
+td.col-updated .cell-flex svg {
+  color: var(--text-muted);
+}
+
+th.col-action,
+td.col-action {
+  width: 40px;
+  text-align: right;
+}
+
+.col-action svg {
+  color: var(--text-muted);
+  transition: all 0.15s ease;
+}
+
+.table-row:hover .col-action svg {
+  color: var(--accent-cyan);
+  transform: translateX(3px);
+}
+
+/* Empty State */
+.table-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+}
+
+.table-empty svg {
+  color: var(--text-muted);
+  opacity: 0.4;
+  margin-bottom: 1rem;
+}
+
+.table-empty h3 {
+  font-size: 1.1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem;
+}
+
+.table-empty p {
+  font-size: 0.85rem;
+  color: var(--text-muted);
+  margin: 0 0 1.5rem;
+}
+
+.empty-action-btn {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1.25rem;
+  background: linear-gradient(135deg, var(--accent-cyan), var(--accent-blue));
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.empty-action-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(99, 179, 237, 0.4);
+}
+
+/* ==================== 페이지네이션 ==================== */
+.pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  flex-shrink: 0;
+  margin-bottom: 1rem;
+}
+
+.pagination-info {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.pagination-controls {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  background: var(--bg-tertiary);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.page-btn:hover:not(:disabled) {
+  border-color: var(--accent-cyan);
+  color: var(--accent-cyan);
+}
+
+.page-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+.page-numbers {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  margin: 0 0.5rem;
+}
+
+.page-num {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 0.5rem;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.page-num:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.page-num.active {
+  background: var(--accent-cyan);
+  color: white;
+  border-color: var(--accent-cyan);
+}
+
+.page-ellipsis {
+  padding: 0 0.25rem;
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+/* ==================== 반응형 ==================== */
+@media (max-width: 1024px) {
+  .explorer-gnb {
+    flex-wrap: wrap;
+    gap: 0.75rem;
+  }
+
+  .gnb-left,
+  .gnb-right {
+    min-width: auto;
+  }
+
+  .gnb-center {
+    order: 3;
+    width: 100%;
+    max-width: none;
+  }
+
+  .type-tab span {
+    display: none;
+  }
+
+  .type-tab {
+    padding: 0.5rem 0.75rem;
+  }
+}
+
+@media (max-width: 768px) {
+  .explorer-gnb {
+    padding: 0.75rem 1rem;
+  }
+
+  .sub-filter-bar {
+    padding: 0.5rem 1rem;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+
+  .filter-left {
+    gap: 0.75rem;
+  }
+
+  .data-table th:first-child,
+  .table-row td:first-child {
+    padding-left: 1rem;
+  }
+
+  .col-schema,
+  .col-updated {
+    display: none;
+  }
+
+  .col-entity {
+    width: 60%;
+  }
+
+  .col-version {
+    width: 25%;
+  }
+
+  .col-action {
+    width: 10%;
+  }
+
+  .pagination-bar {
+    padding: 0.5rem 1rem;
+  }
+
+  .page-numbers {
+    display: none;
+  }
+}

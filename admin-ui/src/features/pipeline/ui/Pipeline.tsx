@@ -19,7 +19,7 @@ import type {
   RawDataDetailResponse,
   SliceDetailResponse,
 } from '@/shared/types'
-import { Loading, PageHeader } from '@/shared/ui'
+import { ApiError, Loading, PageHeader } from '@/shared/ui'
 import './Pipeline.css'
 
 // Stage별 아이콘 매핑
@@ -49,9 +49,10 @@ export function Pipeline() {
     }
   }, [searchParams])
 
-  const { data: overview, isLoading } = useQuery({
+  const { data: overview, isLoading, isError, refetch } = useQuery({
     queryKey: ['pipeline-overview'],
     queryFn: () => fetchApi<PipelineOverviewResponse>('/pipeline/overview'),
+    retry: 1,
   })
 
   const { data: rawDataDetail } = useQuery({
@@ -78,6 +79,15 @@ export function Pipeline() {
   }
 
   if (isLoading) return <Loading />
+
+  if (isError) {
+    return (
+      <div className="page-container">
+        <PageHeader title="Pipeline" subtitle="데이터 흐름을 시각화하고 각 단계를 모니터링합니다" />
+        <ApiError onRetry={refetch} />
+      </div>
+    )
+  }
 
   const stages = overview?.stages ?? []
 

@@ -15,7 +15,7 @@ import {
 import { fetchApi } from '@/shared/api'
 import { QUERY_CONFIG } from '@/shared/config'
 import type { ComponentHealth, HealthResponse, HealthStatus } from '@/shared/types'
-import { fadeInUp, formatUptime, Loading, PageHeader, staggerContainer } from '@/shared/ui'
+import { ApiError, fadeInUp, formatUptime, Loading, PageHeader, staggerContainer } from '@/shared/ui'
 import './Health.css'
 
 const componentIcons: Record<string, typeof Database> = {
@@ -88,13 +88,31 @@ function ComponentCard({ component }: { component: ComponentHealth }) {
 }
 
 export function Health() {
-  const { data: health, isLoading } = useQuery({
+  const { data: health, isLoading, isError, refetch } = useQuery({
     queryKey: ['health'],
-    queryFn: () => fetchApi<HealthResponse>('/health'),
+    queryFn: () => fetchApi<HealthResponse>('/health', {
+      // Health API는 503(Service Unavailable)도 정상 응답으로 처리
+      // (시스템이 UNHEALTHY 상태일 때도 유효한 JSON 응답을 반환)
+      allowedStatusCodes: [503],
+    }),
     refetchInterval: QUERY_CONFIG.DASHBOARD_INTERVAL,
+    retry: 1,
   })
 
   if (isLoading) return <Loading />
+
+  if (isError) {
+    return (
+      <div className="page-container">
+        <PageHeader title="System Health" subtitle="시스템 전체 상태를 실시간으로 확인합니다" />
+        <ApiError
+          title="서버 연결 불가"
+          message="Admin 서버가 실행되면 헬스 체크가 표시됩니다"
+          onRetry={refetch}
+        />
+      </div>
+    )
+  }
 
   const overall = health?.overall ?? 'UNHEALTHY'
   const uptime = health?.uptime ?? 0

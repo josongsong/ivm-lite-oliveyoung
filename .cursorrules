@@ -12,19 +12,39 @@ RawData → Slice → View → Sink 흐름을 처리합니다.
 
 ## 빌드 & 실행 명령어
 
+> 💡 **Tip**: `just` 명령어 러너 사용 권장 (`brew install just`)
+> 
+> ```bash
+> just admin-dev      # Admin Backend 개발 모드 (Hot Reload)
+> just admin-ui-dev   # Admin Frontend 개발 모드
+> just dev            # 전체 개발 환경 가이드
+> just --list         # 모든 명령어 보기
+> ```
+
 ### 빠른 빌드 (테스트 스킵)
 ```bash
+just build           # Just 사용
+# 또는
 ./gradlew fastBuild
 ```
 
 ### Admin 앱 실행 (포트 8081)
 ```bash
-./gradlew fastAdmin    # 빠른 빌드 후 실행
-./gradlew runAdmin     # 일반 실행
+# Just 사용 (권장)
+just admin-fast      # 빠른 빌드 후 실행
+just admin           # 개발 모드
+just admin-dev       # Hot Reload 모드
+
+# 또는 Gradle 직접 사용
+./gradlew fastAdmin
+./gradlew runAdminDev
+./gradlew --no-configuration-cache --continuous runAdminDev
 ```
 
 ### Runtime API 실행 (포트 8080)
 ```bash
+just runtime         # Just 사용
+# 또는
 ./gradlew run
 ```
 
@@ -79,10 +99,14 @@ RawData → Slice → View → Sink 흐름을 처리합니다.
 
 ## Frontend (Admin UI)
 
-### 개발 서버 실행 (포트 3000)
+### 개발 서버 실행 (포트 3000, Hot Reload 자동 지원)
 ```bash
 cd admin-ui && npm run dev
 ```
+
+**접속 주소**:
+- 개발 서버: http://localhost:3000 (Vite HMR 자동 지원)
+- 프로덕션 빌드: http://localhost:8081/admin (Backend에 빌드된 정적 파일 서빙)
 
 ### 빌드
 ```bash
@@ -172,14 +196,27 @@ export DB_PASSWORD="..."
 
 ## 자주 사용하는 워크플로우
 
-### 개발 시작
+### 개발 시작 (전체 환경)
 ```bash
-# 터미널 1: Backend
-./gradlew fastAdmin
+# Just 사용 (권장)
+just dev  # 실행 가이드 표시
 
-# 터미널 2: Frontend
-cd admin-ui && npm run dev
+# 터미널 1: Backend (Hot Reload)
+just admin-dev
+
+# 터미널 2: Frontend (Hot Reload)
+just admin-ui-dev
 ```
+
+**접속 주소**:
+- Frontend 개발 서버: http://localhost:3000 (Vite HMR 자동 지원)
+- Backend API: http://localhost:8081/api
+- 프로덕션 빌드: http://localhost:8081/admin
+
+**참고**: 
+- Backend Hot Reload: 파일 변경 시 자동으로 재빌드 및 재시작됩니다
+- Frontend Hot Reload: Vite가 자동으로 HMR(Hot Module Replacement) 지원
+- 포트 충돌 시: `just kill-ports` 또는 `lsof -ti:8081 | xargs kill -9`
 
 ### 코드 수정 후 확인
 ```bash

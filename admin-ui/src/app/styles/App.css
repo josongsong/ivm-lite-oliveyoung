@@ -115,18 +115,19 @@ table {
 }
 
 th, td {
-  padding: 1rem 1.5rem;
+  padding: 0.75rem 1rem;
   text-align: left;
   border-bottom: 1px solid var(--border-color);
+  font-size: 0.8125rem;
 }
 
 th {
   background: rgba(0, 0, 0, 0.2);
-  font-size: 0.75rem;
+  font-size: 0.6875rem;
   font-weight: 600;
   text-transform: uppercase;
   letter-spacing: 0.05em;
-  color: var(--text-secondary);
+  color: var(--text-muted);
 }
 
 tr:hover {

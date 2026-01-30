@@ -1,5 +1,9 @@
 package com.oliveyoung.ivmlite.sdk.client
 
+import arrow.core.Either
+import arrow.core.left
+import arrow.core.right
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import io.ktor.client.*
 import io.ktor.client.call.*
 import io.ktor.client.engine.cio.*
@@ -39,7 +43,7 @@ class HttpIvmClient(
         schemaId: String,
         schemaVersion: String,
         payload: JsonObject
-    ): IngestResponse {
+    ): Either<DomainError, IngestResponse> {
         val response = httpClient.post("${config.baseUrl}/api/v1/ingest") {
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject {
@@ -58,9 +62,9 @@ class HttpIvmClient(
                 tenantId = tenantId,
                 entityKey = entityKey,
                 version = version
-            )
+            ).right()
         } else {
-            throw RuntimeException("Ingest failed: ${response.status}")
+            DomainError.StorageError("Ingest failed: ${response.status}").left()
         }
     }
 
@@ -71,7 +75,7 @@ class HttpIvmClient(
         tenantId: String,
         entityKey: String,
         version: Long
-    ): SliceResponse {
+    ): Either<DomainError, SliceResponse> {
         val response = httpClient.post("${config.baseUrl}/api/v1/slice") {
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject {
@@ -84,16 +88,16 @@ class HttpIvmClient(
         return if (response.status.isSuccess()) {
             val body = response.body<Map<String, Any>>()
             val sliceTypes = (body["sliceTypes"] as? List<*>)
-                ?: throw RuntimeException("Missing required field 'sliceTypes' in slice response")
+                ?: return DomainError.ValidationError("sliceTypes", "Missing required field 'sliceTypes' in slice response").left()
             val count = (body["count"] as? Number)?.toInt()
-                ?: throw RuntimeException("Missing required field 'count' in slice response")
+                ?: return DomainError.ValidationError("count", "Missing required field 'count' in slice response").left()
             SliceResponse(
                 success = true,
                 sliceTypes = sliceTypes.map { it.toString() },
                 count = count
-            )
+            ).right()
         } else {
-            throw RuntimeException("Slice failed: ${response.status}")
+            DomainError.StorageError("Slice failed: ${response.status}").left()
         }
     }
 
@@ -105,7 +109,7 @@ class HttpIvmClient(
         viewId: String,
         entityKey: String,
         version: Long
-    ): QueryResponse {
+    ): Either<DomainError, QueryResponse> {
         val response = httpClient.post("${config.baseUrl}/api/v2/query") {
             contentType(ContentType.Application.Json)
             setBody(buildJsonObject {
@@ -119,14 +123,14 @@ class HttpIvmClient(
         return if (response.status.isSuccess()) {
             val body = response.body<Map<String, Any>>()
             val data = body["data"] as? String
-                ?: throw RuntimeException("Missing required field 'data' in query response")
+                ?: return DomainError.ValidationError("data", "Missing required field 'data' in query response").left()
             QueryResponse(
                 success = true,
                 data = data,
                 meta = body["meta"] as? Map<*, *>
-            )
+            ).right()
         } else {
-            throw RuntimeException("Query failed: ${response.status}")
+            DomainError.StorageError("Query failed: ${response.status}").left()
         }
     }
 

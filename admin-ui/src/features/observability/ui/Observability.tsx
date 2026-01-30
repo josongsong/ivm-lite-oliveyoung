@@ -12,7 +12,7 @@ import {
 import { fetchApi } from '@/shared/api'
 import { QUERY_CONFIG } from '@/shared/config'
 import type { ObservabilityResponse } from '@/shared/types'
-import { fadeInUp, Loading, PageHeader, staggerContainer, StatusBadge } from '@/shared/ui'
+import { ApiError, fadeInUp, Loading, PageHeader, staggerContainer, StatusBadge } from '@/shared/ui'
 import './Observability.css'
 
 function LagTrendIcon({ trend }: { trend: string }) {
@@ -49,13 +49,23 @@ function QueueBar({ label, value, total, color }: { label: string; value: number
 }
 
 export function Observability() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError, refetch } = useQuery({
     queryKey: ['observability-dashboard'],
     queryFn: () => fetchApi<ObservabilityResponse>('/observability/dashboard'),
     refetchInterval: QUERY_CONFIG.OBSERVABILITY_INTERVAL,
+    retry: 1,
   })
 
   if (isLoading) return <Loading />
+
+  if (isError) {
+    return (
+      <div className="page-container">
+        <PageHeader title="Observability" subtitle="파이프라인 성능 지표를 실시간으로 모니터링합니다" />
+        <ApiError onRetry={() => refetch()} />
+      </div>
+    )
+  }
 
   const metrics = data?.metrics
   const lag = data?.lag

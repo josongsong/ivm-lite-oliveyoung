@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.sdk.dsl.deploy
 
+import arrow.core.Either
+import arrow.core.getOrElse
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
 import com.oliveyoung.ivmlite.sdk.dsl.entity.BrandInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.CategoryInput
@@ -17,6 +19,7 @@ import com.oliveyoung.ivmlite.sdk.model.DeploySpec
 import com.oliveyoung.ivmlite.sdk.model.DeployState
 import com.oliveyoung.ivmlite.sdk.model.ShipMode
 import com.oliveyoung.ivmlite.sdk.model.ShipSpec
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.VersionGenerator
 import kotlinx.coroutines.runBlocking
 
@@ -65,7 +68,7 @@ class DeployableContext internal constructor(
      * Async Deploy DSL (타입 안전)
      * compile.async 고정 + ship은 SinkRule 기반 자동
      */
-    fun deployAsync(block: DeployAsyncBuilder.() -> Unit): DeployJob {
+    fun deployAsync(block: DeployAsyncBuilder.() -> Unit): Either<DomainError, DeployJob> {
         val spec = DeployAsyncBuilder().apply(block).build()
         return executeAsync(spec)
     }
@@ -121,7 +124,7 @@ class DeployableContext internal constructor(
      * Shortcut: compile.async + ship.async + cutover.ready
      * 비동기 배포 + 비동기 전송
      */
-    fun deployQueued(block: SinkBuilder.() -> Unit): DeployJob {
+    fun deployQueued(block: SinkBuilder.() -> Unit): Either<DomainError, DeployJob> {
         val sinks = SinkBuilder().apply(block).build()
         val spec = DeploySpec(
             compileMode = CompileMode.Async,
@@ -149,7 +152,7 @@ class DeployableContext internal constructor(
         }
     }
 
-    private fun executeAsync(spec: DeploySpec): DeployJob {
+    private fun executeAsync(spec: DeploySpec): Either<DomainError, DeployJob> {
         validateSpec(spec)
 
         // Wave 5-L: DeployExecutor 연동
@@ -162,7 +165,7 @@ class DeployableContext internal constructor(
             val entityKey = buildEntityKey()
             val version = generateVersion()
             val jobId = generateJobId()
-            DeployJob(jobId, entityKey, version, DeployState.QUEUED)
+            Either.Right(DeployJob(jobId, entityKey, version, DeployState.QUEUED))
         }
     }
 

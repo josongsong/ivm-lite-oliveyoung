@@ -1,6 +1,8 @@
 import { create } from 'zustand'
 import { devtools, persist } from 'zustand/middleware'
 
+import type { EnvironmentType } from '@/shared/types'
+
 interface AppState {
   // UI State
   sidebarOpen: boolean
@@ -9,6 +11,10 @@ interface AppState {
   // Theme
   theme: 'dark' | 'light'
   setTheme: (theme: 'dark' | 'light') => void
+  
+  // Environment
+  environment: EnvironmentType
+  setEnvironment: (env: EnvironmentType) => void
   
   // Filters & Search
   contractSearchTerm: string
@@ -42,6 +48,10 @@ export const useAppStore = create<AppState>()(
         theme: 'dark',
         setTheme: (theme) => set({ theme }),
         
+        // Environment
+        environment: 'Dev',
+        setEnvironment: (env) => set({ environment: env }),
+        
         // Filters & Search
         contractSearchTerm: '',
         setContractSearchTerm: (term) => set({ contractSearchTerm: term }),
@@ -67,6 +77,7 @@ export const useAppStore = create<AppState>()(
           theme: state.theme,
           sidebarOpen: state.sidebarOpen,
           viewMode: state.viewMode,
+          environment: state.environment,
         }),
       }
     ),

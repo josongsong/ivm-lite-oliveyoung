@@ -1,14 +1,16 @@
 import { motion } from 'framer-motion'
-import { Eye } from 'lucide-react'
+import { Eye, Loader2, Play } from 'lucide-react'
 import type { OutboxItem } from '@/shared/types'
 import { StatusBadge } from '@/shared/ui'
 
 interface RecentTableProps {
   items: OutboxItem[]
   onViewDetail: (id: string) => void
+  onProcess?: (id: string) => void
+  processingId?: string | null
 }
 
-export function RecentTable({ items, onViewDetail }: RecentTableProps) {
+export function RecentTable({ items, onViewDetail, onProcess, processingId }: RecentTableProps) {
   return (
     <div className="table-container">
       <table>
@@ -45,9 +47,25 @@ export function RecentTable({ items, onViewDetail }: RecentTableProps) {
                 {item.processedAt ? new Date(item.processedAt).toLocaleString('ko-KR') : '-'}
               </td>
               <td>
-                <button className="btn-icon" onClick={() => onViewDetail(item.id)} title="View Detail">
-                  <Eye size={16} />
-                </button>
+                <div className="action-buttons">
+                  {item.status === 'PENDING' && onProcess && (
+                    <button
+                      className="btn-icon btn-process"
+                      onClick={() => onProcess(item.id)}
+                      disabled={processingId === item.id}
+                      title="Process Now"
+                    >
+                      {processingId === item.id ? (
+                        <Loader2 size={16} className="spin" />
+                      ) : (
+                        <Play size={16} />
+                      )}
+                    </button>
+                  )}
+                  <button className="btn-icon" onClick={() => onViewDetail(item.id)} title="View Detail">
+                    <Eye size={16} />
+                  </button>
+                </div>
               </td>
             </motion.tr>
           ))}

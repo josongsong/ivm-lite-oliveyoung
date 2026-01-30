@@ -3,18 +3,23 @@ import { motion } from 'framer-motion'
 import {
   Activity,
   Bell,
+  Database,
   FileCode2,
   GitBranch,
   GitMerge,
   HeartPulse,
   Inbox,
   LayoutDashboard,
+  Play,
   RefreshCw,
   RotateCcw,
+  Search,
+  Settings,
   Zap
 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { APP_INFO } from '@/shared/config'
+import { EnvironmentSelector } from '@/shared/ui'
 import './Layout.css'
 
 interface LayoutProps {
@@ -23,16 +28,21 @@ interface LayoutProps {
 
 const navItems = [
   { path: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
+  { path: '/explorer', label: 'Explorer', icon: Database },
   { path: '/contracts', label: 'Contracts', icon: FileCode2 },
   { path: '/pipeline', label: 'Pipeline', icon: GitBranch },
   { path: '/workflow', label: 'Workflow', icon: GitMerge },
   { path: '/outbox', label: 'Outbox', icon: Inbox },
+  { path: '/playground', label: 'Playground', icon: Play },
 ]
 
 const opsNavItems = [
+  { path: '/environment', label: 'Environment', icon: Settings },
   { path: '/health', label: 'Health', icon: HeartPulse },
   { path: '/observability', label: 'Observability', icon: Activity },
+  { path: '/traces', label: 'Traces', icon: Search },
   { path: '/alerts', label: 'Alerts', icon: Bell },
+  { path: '/webhooks', label: 'Webhooks', icon: Zap },
   { path: '/backfill', label: 'Backfill', icon: RotateCcw },
 ]
 
@@ -48,19 +58,14 @@ export function Layout({ children }: LayoutProps) {
     <div className="layout">
       <aside className="sidebar">
         <div className="sidebar-header">
-          <motion.div 
-            className="logo"
+          <motion.div
+            className="header-row"
             initial={{ scale: 0.8, opacity: 0 }}
             animate={{ scale: 1, opacity: 1 }}
             transition={{ duration: 0.5, type: 'spring' }}
           >
-            <div className="logo-icon">
-              <Zap size={24} />
-            </div>
-            <div className="logo-text">
-              <span className="logo-title">IVM Lite</span>
-              <span className="logo-subtitle">Admin Console</span>
-            </div>
+            <span className="logo-title">IVM Lite</span>
+            <EnvironmentSelector />
           </motion.div>
         </div>
 

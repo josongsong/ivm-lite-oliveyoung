@@ -71,6 +71,8 @@ data class ObservabilityConfig(
     val metricsEnabled: Boolean = true,
     val tracingEnabled: Boolean = true,
     val otlpEndpoint: String = "http://localhost:4317",
+    val useXRay: Boolean = false,
+    val awsRegion: String = "ap-northeast-2",
 )
 
 /**

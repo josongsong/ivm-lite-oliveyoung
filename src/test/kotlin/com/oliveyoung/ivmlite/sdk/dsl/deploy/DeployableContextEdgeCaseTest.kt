@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.dsl.deploy
 
+import arrow.core.getOrElse
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
 import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductInput
 import org.junit.jupiter.api.Test
@@ -8,6 +9,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertNotEquals
 import kotlin.test.assertNotNull
 import kotlin.test.assertTrue
+import kotlin.test.fail
 
 /**
  * 엣지 케이스 및 코너 케이스 테스트
@@ -88,9 +90,9 @@ class DeployableContextEdgeCaseTest {
         )
         val context = DeployableContext(input, testConfig)
 
-        val job1 = context.deployQueued { opensearch() }
-        val job2 = context.deployQueued { opensearch() }
-        val job3 = context.deployQueued { opensearch() }
+        val job1 = context.deployQueued { opensearch() }.getOrElse { fail("deployQueued failed: ${it.message}") }
+        val job2 = context.deployQueued { opensearch() }.getOrElse { fail("deployQueued failed: ${it.message}") }
+        val job3 = context.deployQueued { opensearch() }.getOrElse { fail("deployQueued failed: ${it.message}") }
 
         // All jobIds must be unique
         val jobIds = setOf(job1.jobId, job2.jobId, job3.jobId)
@@ -298,7 +300,7 @@ class DeployableContextEdgeCaseTest {
         )
         val context = DeployableContext(input, testConfig)
 
-        val job = context.deployQueued { opensearch() }
+        val job = context.deployQueued { opensearch() }.getOrElse { fail("deployQueued failed: ${it.message}") }
 
         // JobId format: job-{uuid}
         assertTrue(job.jobId.matches(Regex("^job-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")))

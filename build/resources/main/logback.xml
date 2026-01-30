@@ -21,8 +21,10 @@
     <!-- Application loggers -->
     <logger name="com.oliveyoung.ivmlite" level="DEBUG"/>
     
-    <!-- Ktor loggers -->
+    <!-- Ktor loggers (Access Log, Request/Response) -->
     <logger name="io.ktor" level="INFO"/>
+    <logger name="io.ktor.server.plugins.callloging" level="INFO"/>
+    <logger name="Application" level="DEBUG"/>
     
     <!-- Koin loggers -->
     <logger name="org.koin" level="INFO"/>
@@ -32,6 +34,9 @@
     
     <!-- HikariCP loggers -->
     <logger name="com.zaxxer.hikari" level="INFO"/>
+    
+    <!-- Netty loggers -->
+    <logger name="io.netty" level="INFO"/>
     
     <!-- Root logger -->
     <root level="INFO">
