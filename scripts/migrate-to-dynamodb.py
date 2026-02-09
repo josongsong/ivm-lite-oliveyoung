@@ -22,9 +22,10 @@ AWS_REGION = "ap-northeast-2"
 DATA_TABLE = "ivm-lite-data"
 SCHEMA_TABLE = "ivm-lite-schema-registry"
 
-# AWS 자격 증명
-AWS_ACCESS_KEY = "YOUR_AWS_ACCESS_KEY_ID"
-AWS_SECRET_KEY = "YOUR_AWS_SECRET_ACCESS_KEY"
+# AWS 자격 증명 (환경 변수에서 로드)
+import os
+AWS_ACCESS_KEY = os.getenv("AWS_ACCESS_KEY_ID", "YOUR_AWS_ACCESS_KEY_ID")
+AWS_SECRET_KEY = os.getenv("AWS_SECRET_ACCESS_KEY", "YOUR_AWS_SECRET_ACCESS_KEY")
 
 def get_pg_connection():
     """PostgreSQL 연결"""
