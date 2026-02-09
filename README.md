@@ -27,7 +27,9 @@ docker-compose up -d
 ./infra/setup-local.sh
 ```
 
-### 2) DB 마이그레이션 + jOOQ 코드 생성
+### 2) DB 마이그레이션 (선택적)
+
+**참고**: jOOQ는 PostgreSQL 어댑터에서만 사용됩니다. DynamoDB나 InMemory 어댑터를 사용하는 경우 이 단계는 필요 없습니다.
 
 ```bash
 # Flyway 마이그레이션 → jOOQ 코드 생성 → 컴파일
@@ -35,7 +37,7 @@ docker-compose up -d
 
 # 또는 개별 실행
 ./gradlew flywayMigrate   # DB 스키마 마이그레이션
-./gradlew jooqCodegen     # 타입 안전한 DB 코드 생성
+./gradlew jooqCodegen     # 타입 안전한 DB 코드 생성 (PostgreSQL 어댑터용)
 ```
 
 ### 3) 빌드 & 테스트
@@ -96,29 +98,187 @@ cd admin-ui && npm run dev
 
 ```
 src/main/kotlin/com/oliveyoung/ivmlite/
-├── apps/                        # 애플리케이션 레이어
-│   ├── admin/                   # Admin API (포트 8081)
-│   ├── runtimeapi/              # Runtime API (포트 8080)
-│   └── opscli/                  # CLI 도구
-├── pkg/                         # 도메인 패키지
-│   ├── contracts/               # Contract 도메인
-│   ├── rawdata/                 # RawData 도메인
-│   ├── slices/                  # Slice 도메인
-│   ├── views/                   # View 도메인
-│   ├── sinks/                   # Sink 도메인
-│   ├── orchestration/           # Outbox & Worker
-│   └── changeset/               # ChangeSet 빌더 도메인
-├── shared/                      # 공통 코어 (결정성/에러/타입/공통 포트)
-└── tooling/                     # DX 도구 (개발/테스트 전용)
+├── sdk/                            # SDK 레이어 (외부 개발자용)
+│   ├── Ivm.kt                     # SDK 진입점
+│   ├── client/                    # HTTP 클라이언트 (IvmClient)
+│   ├── dsl/                       # DSL 빌더 (Product, Brand, Category 등)
+│   ├── execution/                 # DeployExecutor, DeployStateMachine
+│   ├── model/                     # DeployJob, DeployResult, DeployPlan 등
+│   └── schema/                    # ViewRef, EntityRef (코드젠)
+│
+├── pkg/                           # 핵심 비즈니스 로직 (도메인 패키지)
+│   ├── orchestration/             # 워크플로우 엔진 (Cross-domain)
+│   │   └── application/
+│   │       ├── IngestWorkflow.kt  # RawData 저장 워크플로우
+│   │       ├── SlicingWorkflow.kt # Slice 생성 워크플로우
+│   │       ├── QueryViewWorkflow.kt # View 조회 워크플로우
+│   │       └── ShipWorkflow.kt    # Sink 전송 워크플로우
+│   │
+│   ├── slices/
+│   │   ├── domain/
+│   │   │   └── SlicingEngine.kt   # 슬라이싱 엔진 (RuleSet 기반)
+│   │   ├── ports/                 # SliceRepositoryPort, SlicingEnginePort
+│   │   └── adapters/              # Jooq, DynamoDB, InMemory 어댑터
+│   │
+│   ├── rawdata/                   # RawData 도메인
+│   ├── contracts/                 # Contract Registry 도메인
+│   ├── views/                     # View 도메인
+│   ├── sinks/                     # Sink 도메인
+│   ├── changeset/                 # ChangeSet 빌더 도메인
+│   ├── alerts/                    # 알림 엔진
+│   ├── backfill/                  # 백필 작업
+│   └── webhooks/                  # Webhook 관리
+│
+├── apps/                          # 애플리케이션 레이어
+│   ├── runtimeapi/                # Runtime API (포트 8080)
+│   │   ├── routes/                # HTTP 라우트
+│   │   └── wiring/                # DI 모듈 (Koin)
+│   │
+│   ├── admin/                     # Admin API (포트 8081)
+│   │   ├── routes/                # Admin API 라우트
+│   │   ├── application/          # Admin 서비스 (Dashboard, Pipeline 등)
+│   │   └── wiring/                # Admin DI 모듈
+│   │
+│   └── opscli/                    # CLI 도구
+│
+├── shared/                        # 공통 코어
+│   ├── domain/                    # 결정성, 에러, 타입
+│   ├── ports/                     # 공통 포트
+│   └── config/                    # 설정
+│
+└── tooling/                       # DX 도구 (개발/테스트 전용)
+    ├── application/               # validate-contracts 등
+    └── codegen/                   # 코드 생성 도구
 
-admin-ui/src/
-├── app/                         # 앱 설정, 라우팅
-├── features/                    # 기능별 모듈
-├── shared/                      # 공통 컴포넌트
-└── widgets/                     # 레이아웃 위젯
+admin-ui/src/                       # Admin UI (React + TypeScript)
+├── app/                           # 앱 설정, 라우팅
+├── features/                      # 기능별 모듈
+│   ├── dashboard/                 # 대시보드
+│   ├── contracts/                 # Contract 관리
+│   ├── pipeline/                  # 파이프라인 시각화
+│   ├── workflow/                  # 워크플로우 캔버스
+│   ├── outbox/                    # Outbox 관리
+│   ├── explorer/                  # 데이터 탐색기
+│   ├── playground/                # 플레이그라운드
+│   └── ...
+├── shared/                        # 공통 컴포넌트
+└── widgets/                       # 레이아웃 위젯
 ```
 
-### 아키텍처 원칙 (RFC-V4-010)
+## 핵심 컴포넌트
+
+### SDK (Software Development Kit)
+
+**위치**: `src/main/kotlin/com/oliveyoung/ivmlite/sdk/`
+
+**역할**: 외부 개발자가 사용하는 타입 안전한 API
+
+**주요 기능**:
+- **Write API**: `Ivm.product { ... }.deploy()` - 엔티티 배포
+- **Read API**: `Ivm.query(Views.Product.Pdp).key("SKU-001").get()` - 타입 안전한 조회
+- **Deploy State Machine**: 배포 상태 관리 (COMPILE → SHIP → CUTOVER)
+- **Async Deploy**: 비동기 배포 및 상태 조회
+
+**사용 예시**:
+```kotlin
+// Write
+Ivm.product {
+    tenantId = "oliveyoung"
+    sku = "SKU-001"
+    name = "비타민C"
+    price = 15000
+}.deploy()
+
+// Read (타입 안전)
+val view = Ivm.query(Views.Product.Pdp)
+    .key("SKU-001")
+    .get()
+```
+
+### 엔진 (Engine Layer)
+
+#### 1. SlicingEngine (슬라이싱 엔진)
+
+**위치**: `pkg/slices/domain/SlicingEngine.kt`
+
+**역할**: RawData → Slice 변환 (RuleSet Contract 기반)
+- RuleSet 기반 슬라이싱
+- JOIN 실행 (Light JOIN)
+- Inverted Index 생성
+- 결정성 보장 (동일 입력 → 동일 출력)
+
+#### 2. QueryViewWorkflow (뷰 조회 엔진)
+
+**위치**: `pkg/orchestration/application/QueryViewWorkflow.kt`
+
+**역할**: ViewDefinition 기반 Slice 조합
+- 여러 Slice를 조합하여 View 생성
+- MissingPolicy 처리 (FAIL_CLOSED / PARTIAL_ALLOWED)
+- Range Query, Count Query, Latest Query 지원
+
+#### 3. Workflow 엔진들
+
+| Workflow | 역할 | 위치 |
+|----------|------|------|
+| `IngestWorkflow` | RawData 저장 + Outbox 이벤트 생성 | `pkg/orchestration/application/IngestWorkflow.kt` |
+| `SlicingWorkflow` | SlicingEngine으로 Slice 생성 (FULL/INCREMENTAL) | `pkg/orchestration/application/SlicingWorkflow.kt` |
+| `QueryViewWorkflow` | ViewDefinition 기반 Slice 조회 | `pkg/orchestration/application/QueryViewWorkflow.kt` |
+| `ShipWorkflow` | SinkRule 기반 외부 시스템 전송 | `pkg/orchestration/application/ShipWorkflow.kt` |
+
+### Admin 기능
+
+**위치**: `apps/admin/` (Backend), `admin-ui/` (Frontend)
+
+**주요 기능**:
+
+1. **Dashboard** (`/dashboard`)
+   - Worker 상태 실시간 모니터링
+   - Outbox 통계 (Pending, Processing, Failed, Processed)
+   - 데이터 파이프라인 개요
+   - Slice 타입별 통계
+
+2. **Contracts 관리** (`/contracts`)
+   - Entity Schema, RuleSet, ViewDefinition, SinkRule 조회
+   - YAML 원문 및 파싱된 데이터 확인
+   - Contract 의존성 그래프 시각화
+
+3. **Pipeline 시각화** (`/pipeline`)
+   - 데이터 흐름 시각화 (Raw → Slice → View → Sink)
+   - Entity별 흐름 추적
+   - 단계별 통계 확인
+
+4. **Workflow Canvas** (`/workflow`)
+   - 파이프라인 시각화 및 편집
+   - Contract 간 의존성 그래프
+
+5. **Outbox 관리** (`/outbox`)
+   - 최근 처리된 작업 조회
+   - 실패한 작업 조회 및 재시도
+   - DLQ (Dead Letter Queue) 관리
+   - Stale 엔트리 관리
+
+6. **Data Explorer** (`/explorer`)
+   - RawData, Slice, View 조회
+   - 버전 히스토리 탐색
+   - 데이터 비교 및 차이 확인
+
+7. **Playground** (`/playground`)
+   - Contract 시뮬레이션
+   - 데이터 변환 테스트
+
+8. **Webhooks** (`/webhooks`)
+   - Webhook 등록 및 관리
+   - 전송 이력 조회
+
+9. **Alerts** (`/alerts`)
+   - 알림 규칙 관리
+   - 알림 이력 조회
+
+10. **Backfill** (`/backfill`)
+    - 재처리 작업 관리
+    - 백필 작업 실행 및 모니터링
+
+## 아키텍처 원칙 (RFC-V4-010)
 
 **핵심 규칙**:
 - **외부 진입은 orchestration만 호출** (apps는 트리거)
@@ -134,30 +294,19 @@ admin-ui/src/
 - `adapters/`: 인프라 구현 (DB, registry 등)
 - `application/`: single-domain façade (선택, orchestration에서만 호출)
 
-### Orchestration 구조 (v0 vs v1+)
+### Repository 어댑터 (선택 가능)
 
-**v0 (현재 단일 모듈)**:
-- orchestration이 "도메인 정책"을 갖지 않음 (흐름/순서/실행 정책만)
-- 파일만 배치하고 폴더 구조는 최소화
-- 네이밍: `*Workflow.kt` (IngestWorkflow, SlicingWorkflow, QueryViewWorkflow)
+프로젝트는 **Port/Adapter 패턴**을 사용하여 다양한 저장소를 지원합니다:
 
-**v1+ (필요시 확장)**:
-- 복잡한 정책/규칙/상태 머신이 생기면 그때 hexagonal 구조 추가
-- `steps/`: 내부 step 단위 (`*Step.kt`, `*Activity.kt` 등)
-- `domain/`: 정책/규칙/상태 머신
-- `ports/`: orchestration 전용 포트 (ObservabilityPort, TransactionCoordinatorPort 등)
-- **원칙**: YAGNI (You Aren't Gonna Need It) - 실제 복잡도가 생기기 전까지는 추가하지 않기
+| 도메인 | PostgreSQL (jOOQ) | DynamoDB | InMemory |
+|--------|-------------------|----------|----------|
+| RawData | `JooqRawDataRepository` | `DynamoDbRawDataRepository` | `InMemoryRawDataRepository` |
+| Slice | `JooqSliceRepository` | `DynamoDbSliceRepository` | `InMemorySliceRepository` |
+| Contract | - | `DynamoDBContractRegistryAdapter` | `LocalYamlContractRegistryAdapter` |
 
-### Tooling 역할
+**jOOQ는 선택적**: PostgreSQL 어댑터에서만 사용되며, DynamoDB나 InMemory 어댑터를 사용하는 경우 jOOQ 코드 생성이 필요 없습니다.
 
-`tooling/`은 **개발자 경험(DX) 향상**을 위한 도구들을 제공합니다:
-- **validate-contracts**: 계약 파일 검증 (YAML 파싱, 필수 필드 검증)
-- **codegen** (계획): 계약에서 Kotlin SDK + JSON Schema 타입 자동 생성
-- **simulate** (계획): 로컬에서 RawData → ChangeSet → Slices → View 시뮬레이션
-- **diff** (계획): slice_hash/view_hash 비교
-- **replay** (계획): ReplayRequestContract 기반 실행
-
-Tooling은 런타임과 분리되어 있어, 개발/테스트 단계에서만 사용됩니다.
+**DI 설정**: `apps/runtimeapi/wiring/AdapterModule.kt`에서 어댑터를 선택합니다.
 
 ## Local Infrastructure (docker-compose)
 
@@ -210,14 +359,14 @@ docker-compose up -d
 
 ## Database (Flyway + jOOQ)
 
-**타입 안전한 DB 접근** - AI가 잘못된 필드명/테이블명 쓰면 **컴파일 에러**!
+**참고**: jOOQ는 PostgreSQL 어댑터에서만 사용됩니다. DynamoDB나 InMemory 어댑터를 사용하는 경우 이 섹션은 건너뛸 수 있습니다.
 
 ### 스택
 
 | 도구 | 역할 |
 |------|------|
 | **Flyway** | DB 스키마 버전 관리 (마이그레이션) |
-| **jOOQ** | DB 스키마 → Kotlin 코드 자동 생성 |
+| **jOOQ** | DB 스키마 → Kotlin 코드 자동 생성 (PostgreSQL 어댑터용) |
 | **HikariCP** | 커넥션 풀 |
 
 ### 워크플로우
@@ -227,7 +376,7 @@ docker-compose up -d
        ↓
 2. Flyway 마이그레이션 (./gradlew flywayMigrate)
        ↓
-3. jOOQ 코드 생성 (./gradlew jooqCodegen)
+3. jOOQ 코드 생성 (./gradlew jooqCodegen) - PostgreSQL 어댑터 사용 시만 필요
        ↓
 4. 컴파일 타임에 테이블/컬럼 검증!
 ```
@@ -244,7 +393,7 @@ src/main/resources/db/migration/
 └── V006__debezium_heartbeat.sql
 ```
 
-### jOOQ 사용 예시
+### jOOQ 사용 예시 (PostgreSQL 어댑터)
 
 ```kotlin
 // 생성된 코드 import (빌드 후)
@@ -381,14 +530,46 @@ export DB_PASSWORD="..."
 - `DYNAMODB_TABLE`: DynamoDB 테이블명
 - `ADMIN_PORT`: Admin 앱 포트 (기본값: 8081)
 
+## Git Hooks 설정
+
+프로젝트에 Git hooks가 설정되어 있어 커밋/푸시 전 자동으로 검사를 수행합니다.
+
+### 설치
+
+```bash
+# Git hooks 설치 (최초 1회)
+./scripts/install-git-hooks.sh
+```
+
+### Pre-commit Hook
+
+커밋 전 자동 실행:
+- Backend: 단위 테스트 (`./gradlew unitTest`), 린트 (`./gradlew detekt`)
+- Frontend: admin-ui 파일 변경 시 타입 체크 및 린트
+
+### Pre-push Hook
+
+푸시 전 자동 실행:
+- Backend: 전체 검사 (`./gradlew checkAll`)
+- Frontend: 타입 체크 및 린트
+
+### Hooks 건너뛰기 (비권장)
+
+필요시 `--no-verify` 플래그로 건너뛸 수 있습니다:
+```bash
+git commit --no-verify
+git push --no-verify
+```
+
 ## 주의사항
 
 1. **환경변수**: .env 파일에서 로드 (source .env)
 2. Configuration Cache: 활성화되어 있음. 환경변수는 System.getenv() 대신 providers.environmentVariable() 사용 권장
 3. 통합 테스트: Docker가 필요함 (integrationTest 태스크)
-4. jOOQ 코드: ./gradlew jooqCodegen으로 DB에서 생성 (DB 연결 필요, .env 로드 필수)
+4. jOOQ 코드: PostgreSQL 어댑터 사용 시에만 필요 (`./gradlew jooqCodegen`, DB 연결 필요, .env 로드 필수)
 5. 계약 파일: src/main/resources/contracts/v1/ 에 YAML로 정의
 6. 보안: AWS 자격 증명은 환경 변수로 관리하며, Git에 커밋하지 않도록 주의
+7. Git Hooks: 최초 클론 후 `./scripts/install-git-hooks.sh` 실행 권장
 
 ## 자주 사용하는 워크플로우
 

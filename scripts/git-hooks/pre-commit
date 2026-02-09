@@ -1,0 +1,50 @@
+#!/bin/bash
+# Pre-commit hook for IVM-Lite project
+# Backend: unitTest, detekt
+# Frontend: lint, typecheck (if admin-ui files changed)
+
+set -e
+
+echo "Running pre-commit checks..."
+
+# Check if admin-ui files changed
+ADMIN_UI_CHANGED=$(git diff --cached --name-only --diff-filter=ACM | grep -E "^admin-ui/" | wc -l)
+
+# Backend checks
+echo "Checking backend..."
+./gradlew unitTest --quiet || {
+    echo "Backend unit tests failed. Please fix before committing."
+    exit 1
+}
+
+./gradlew detekt --quiet || {
+    echo "Backend lint (detekt) failed. Please fix before committing."
+    exit 1
+}
+
+# Frontend checks (only if admin-ui files changed)
+if [ "$ADMIN_UI_CHANGED" -gt 0 ]; then
+    echo "Checking frontend (admin-ui files changed)..."
+    cd admin-ui
+    
+    if ! command -v pnpm &> /dev/null; then
+        echo "Warning: pnpm not found. Skipping frontend checks."
+        cd ..
+    else
+        pnpm run typecheck || {
+            echo "Frontend typecheck failed. Please fix before committing."
+            cd ..
+            exit 1
+        }
+        
+        pnpm run lint || {
+            echo "Frontend lint failed. Please fix before committing."
+            cd ..
+            exit 1
+        }
+        cd ..
+    fi
+fi
+
+echo "Pre-commit checks passed!"
+exit 0

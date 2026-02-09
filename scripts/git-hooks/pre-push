@@ -1,0 +1,57 @@
+#!/bin/bash
+# Pre-push hook for IVM-Lite project
+# Runs comprehensive checks before pushing to remote
+
+set -e
+
+echo "Running pre-push checks..."
+
+# Get the branch name
+BRANCH=$(git rev-parse --abbrev-ref HEAD)
+
+# Skip checks for certain branches (optional)
+# if [ "$BRANCH" = "main" ]; then
+#     echo "Running full checks for main branch..."
+# fi
+
+# Backend checks
+echo "Checking backend..."
+./gradlew checkAll --quiet || {
+    echo "Backend checks failed. Please fix before pushing."
+    echo "Run: ./gradlew checkAll"
+    exit 1
+}
+
+# Frontend checks (if admin-ui exists)
+if [ -d "admin-ui" ]; then
+    echo "Checking frontend..."
+    cd admin-ui
+    
+    if command -v pnpm &> /dev/null; then
+        pnpm run typecheck || {
+            echo "Frontend typecheck failed. Please fix before pushing."
+            cd ..
+            exit 1
+        }
+        
+        pnpm run lint || {
+            echo "Frontend lint failed. Please fix before pushing."
+            cd ..
+            exit 1
+        }
+        
+        # Build check (optional, can be slow)
+        # pnpm run build || {
+        #     echo "Frontend build failed. Please fix before pushing."
+        #     cd ..
+        #     exit 1
+        # }
+    else
+        echo "Warning: pnpm not found. Skipping frontend checks."
+    fi
+    
+    cd ..
+fi
+
+echo "Pre-push checks passed!"
+exit 0
