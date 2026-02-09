@@ -5,7 +5,7 @@ RawData → Snapshot/ChangeSet → Slice → Virtual View → (v4.1) CDC → Sin
 
 ## Quickstart
 
-### 0) AWS 자격 증명 설정 (SOTA급 자동 설정) ⭐
+### 0) AWS 자격 증명 설정 (자동 설정)
 
 ```bash
 # .env 파일 자동 생성 및 환경 변수 로드
@@ -15,9 +15,10 @@ source scripts/load-env.sh
 ./scripts/run-with-env.sh ./gradlew run
 ```
 
-> 💡 **자세한 설정 방법**: [AWS 자격 증명 설정 가이드](./docs/aws-credentials-setup.md) 참고
+**자세한 설정 방법**: [AWS 자격 증명 설정 가이드](./docs/archive/aws-credentials-setup.md) 참고
 
 ### 1) 인프라 시작
+
 ```bash
 # PostgreSQL + DynamoDB + Kafka + Debezium 시작
 docker-compose up -d
@@ -27,6 +28,7 @@ docker-compose up -d
 ```
 
 ### 2) DB 마이그레이션 + jOOQ 코드 생성
+
 ```bash
 # Flyway 마이그레이션 → jOOQ 코드 생성 → 컴파일
 ./scripts/setup-db.sh
@@ -37,33 +39,83 @@ docker-compose up -d
 ```
 
 ### 3) 빌드 & 테스트
+
 ```bash
 # 환경 변수 자동 로드 후 실행 (권장)
 ./scripts/run-with-env.sh ./gradlew test
 ./scripts/run-with-env.sh ./gradlew run --args="validate-contracts src/main/resources/contracts/v1"
 ```
 
-## Structure (RFC-V4-010: Orchestration-First Entry + Domain-Only Meaning)
+### 4) 애플리케이션 실행
+
+#### Runtime API (포트 8080)
+
+```bash
+# Just 사용 (권장)
+just runtime
+
+# 또는 Gradle 직접 사용
+./gradlew run
+```
+
+#### Admin 앱 (포트 8081)
+
+```bash
+# Just 사용 (권장)
+just admin-fast      # 빠른 빌드 후 실행
+just admin           # 개발 모드
+just admin-dev       # Hot Reload 모드
+
+# 또는 Gradle 직접 사용
+./gradlew fastAdmin
+./gradlew runAdminDev
+./gradlew --no-configuration-cache --continuous runAdminDev
+```
+
+#### Admin UI 개발 서버 (포트 3000)
+
+```bash
+# Just 사용 (권장)
+just admin-ui-dev
+
+# 또는 npm 직접 사용
+cd admin-ui && npm run dev
+```
+
+**접속 주소**:
+- Frontend 개발 서버: http://localhost:3000 (Vite HMR 자동 지원)
+- Backend API: http://localhost:8081/api
+- 프로덕션 빌드: http://localhost:8081/admin
+
+**참고**: 
+- Backend Hot Reload: 파일 변경 시 자동으로 재빌드 및 재시작됩니다
+- Frontend Hot Reload: Vite가 자동으로 HMR(Hot Module Replacement) 지원
+- 포트 충돌 시: `just kill-ports` 또는 `lsof -ti:8081 | xargs kill -9`
+
+## 프로젝트 구조
 
 ```
 src/main/kotlin/com/oliveyoung/ivmlite/
-  shared/                      # 공통 코어 (결정성/에러/타입/공통 포트)
-  package/                     # 도메인 그룹
-    rawdata/                   # RawData 저장/조회 도메인
-    changeset/                 # ChangeSet 빌더 도메인
-    contracts/                 # Contract Registry 도메인
-    slices/                    # Slice 저장/조회 도메인
-    orchestration/             # Cross-domain 워크플로우 (SSOT)
-      IngestWorkflow.kt        # 외부 진입점 (v0: 파일만)
-      SlicingWorkflow.kt
-      QueryViewWorkflow.kt
-      # v1+: 복잡도 생기면 steps/, domain/, ports/ 추가
-  tooling/                     # DX 도구 (개발/테스트 전용)
-    - validate-contracts: 계약 파일 검증
-    - 향후: codegen, simulate, diff, replay
-  apps/                        # 트리거/엔트리포인트
-    runtimeapi/                # (향후) HTTP/Worker 트리거
-    opscli/                    # 운영 CLI 진입점
+├── apps/                        # 애플리케이션 레이어
+│   ├── admin/                   # Admin API (포트 8081)
+│   ├── runtimeapi/              # Runtime API (포트 8080)
+│   └── opscli/                  # CLI 도구
+├── pkg/                         # 도메인 패키지
+│   ├── contracts/               # Contract 도메인
+│   ├── rawdata/                 # RawData 도메인
+│   ├── slices/                  # Slice 도메인
+│   ├── views/                   # View 도메인
+│   ├── sinks/                   # Sink 도메인
+│   ├── orchestration/           # Outbox & Worker
+│   └── changeset/               # ChangeSet 빌더 도메인
+├── shared/                      # 공통 코어 (결정성/에러/타입/공통 포트)
+└── tooling/                     # DX 도구 (개발/테스트 전용)
+
+admin-ui/src/
+├── app/                         # 앱 설정, 라우팅
+├── features/                    # 기능별 모듈
+├── shared/                      # 공통 컴포넌트
+└── widgets/                     # 레이아웃 위젯
 ```
 
 ### 아키텍처 원칙 (RFC-V4-010)
@@ -75,6 +127,7 @@ src/main/kotlin/com/oliveyoung/ivmlite/
 - **orchestration → orchestration 호출 금지** (깊이 제한)
 
 ### 도메인 구조
+
 각 도메인은 **In-domain Hexagonal Architecture**를 따릅니다:
 - `domain/`: 순수 의미 모델 + 불변식
 - `ports/`: 외부 의존 계약 (인터페이스)
@@ -96,6 +149,7 @@ src/main/kotlin/com/oliveyoung/ivmlite/
 - **원칙**: YAGNI (You Aren't Gonna Need It) - 실제 복잡도가 생기기 전까지는 추가하지 않기
 
 ### Tooling 역할
+
 `tooling/`은 **개발자 경험(DX) 향상**을 위한 도구들을 제공합니다:
 - **validate-contracts**: 계약 파일 검증 (YAML 파싱, 필수 필드 검증)
 - **codegen** (계획): 계약에서 Kotlin SDK + JSON Schema 타입 자동 생성
@@ -203,7 +257,7 @@ dsl.selectFrom(RAW_DATA)
     .fetch()
 
 // 잘못된 필드명 → 컴파일 에러!
-// RAW_DATA.WRONG_FIELD  // ❌ 컴파일 에러
+// RAW_DATA.WRONG_FIELD  // 컴파일 에러
 ```
 
 ## Schema Registry (Contracts)
@@ -222,7 +276,42 @@ dsl.selectFrom(RAW_DATA)
 
 자세한 내용은 [RFC-IMPL-007](docs/rfc/rfcimpl007.md) 참조.
 
-## DX
+## 개발 도구
+
+### Just 명령어 러너 (권장)
+
+`just` 명령어 러너를 사용하면 더 간편합니다 (`brew install just` 또는 `cargo install just`):
+
+```bash
+just admin-dev      # Admin Backend 개발 모드 (Hot Reload)
+just admin-ui-dev   # Admin Frontend 개발 모드
+just dev            # 전체 개발 환경 가이드
+just --list         # 모든 명령어 보기
+```
+
+### 테스트
+
+```bash
+# 기본 단위 테스트
+./gradlew test
+
+# 빠른 단위 테스트 (병렬 실행)
+./gradlew unitTest
+
+# 통합 테스트 (Docker 필요)
+./gradlew integrationTest
+
+# 특정 패키지 테스트
+./gradlew testPackage -Dpkg=slices
+./gradlew testPackage -Dpkg=contracts
+./gradlew testPackage -Dpkg=orchestration
+
+# 전체 검사 (테스트 + 린트)
+./gradlew checkAll
+```
+
+### DX 도구
+
 - `validate-contracts <dir>` : validates YAML contracts (syntax + required keys)
 
 ## Architecture Constraints (RFC-V4-010)
@@ -254,16 +343,77 @@ dsl.selectFrom(RAW_DATA)
 ### 강제되는 제약 (P0)
 
 **ArchUnit 테스트**:
-- ✅ 도메인 간 직접 import 금지 (ports 경유만)
-- ✅ apps는 orchestration만 호출 (도메인 직접 호출 금지)
-- ✅ orchestration → orchestration 호출 금지 (깊이 제한)
-- ✅ orchestration은 ports를 통해서만 도메인 호출
-- ✅ shared는 비즈니스 로직 금지
-- ✅ tooling은 런타임 도메인 호출 금지
-- ✅ orchestration 네이밍 규칙 (*Workflow)
+- 도메인 간 직접 import 금지 (ports 경유만)
+- apps는 orchestration만 호출 (도메인 직접 호출 금지)
+- orchestration → orchestration 호출 금지 (깊이 제한)
+- orchestration은 ports를 통해서만 도메인 호출
+- shared는 비즈니스 로직 금지
+- tooling은 런타임 도메인 호출 금지
+- orchestration 네이밍 규칙 (*Workflow)
 
 **Detekt 린트**:
-- ✅ 코드 품질 규칙 (복잡도, 네이밍, 라인 길이)
-- ✅ `maxIssues: 50` (점진적으로 줄여나가기)
+- 코드 품질 규칙 (복잡도, 네이밍, 라인 길이)
+- `maxIssues: 50` (점진적으로 줄여나가기)
 
 자세한 내용은 [RFC-V4-010](docs/rfc/rfc010.md) 참조.
+
+## 환경변수 설정
+
+**.env 파일에 DB 접속 정보가 있습니다. jOOQ 코드 생성, 테스트 실행 시 반드시 로드하세요.**
+
+```bash
+# .env 로드 후 Gradle 실행
+source .env && ./gradlew jooqCodegen
+source .env && ./gradlew test
+
+# 또는 export로 직접 설정
+export DB_URL="jdbc:postgresql://..."
+export DB_USER="postgres"
+export DB_PASSWORD="..."
+```
+
+.env 파일 주요 변수:
+- `DB_URL`: PostgreSQL JDBC URL
+- `DB_USER`: DB 사용자
+- `DB_PASSWORD`: DB 비밀번호
+- `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`: DynamoDB 접근용
+- `AWS_REGION`: AWS 리전 (기본값: ap-northeast-2)
+- `DYNAMODB_TABLE`: DynamoDB 테이블명
+- `ADMIN_PORT`: Admin 앱 포트 (기본값: 8081)
+
+## 주의사항
+
+1. **환경변수**: .env 파일에서 로드 (source .env)
+2. Configuration Cache: 활성화되어 있음. 환경변수는 System.getenv() 대신 providers.environmentVariable() 사용 권장
+3. 통합 테스트: Docker가 필요함 (integrationTest 태스크)
+4. jOOQ 코드: ./gradlew jooqCodegen으로 DB에서 생성 (DB 연결 필요, .env 로드 필수)
+5. 계약 파일: src/main/resources/contracts/v1/ 에 YAML로 정의
+6. 보안: AWS 자격 증명은 환경 변수로 관리하며, Git에 커밋하지 않도록 주의
+
+## 자주 사용하는 워크플로우
+
+### 개발 시작 (전체 환경)
+
+```bash
+# Just 사용 (권장)
+just dev  # 실행 가이드 표시
+
+# 터미널 1: Backend (Hot Reload)
+just admin-dev
+
+# 터미널 2: Frontend (Hot Reload)
+just admin-ui-dev
+```
+
+### 코드 수정 후 확인
+
+```bash
+./gradlew unitTest testPackage -Dpkg=수정한패키지명
+```
+
+### PR 전 체크
+
+```bash
+./gradlew checkAll
+cd admin-ui && npm run lint && npm run typecheck
+```
