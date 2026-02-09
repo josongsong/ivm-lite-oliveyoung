@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.unit
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
@@ -135,7 +136,7 @@ class OutboxIdempotencyTest : StringSpec({
         
         // 첫 번째 삽입 성공
         val result1 = repo.insert(entry1)
-        result1.shouldBeInstanceOf<OutboxRepositoryPort.Result.Ok<*>>()
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
         
         // 동일 idempotencyKey로 다른 UUID의 entry 생성
         val entry2 = OutboxEntry(
@@ -151,8 +152,8 @@ class OutboxIdempotencyTest : StringSpec({
         
         // 중복 삽입 시도
         val result2 = repo.insertAll(listOf(entry2))
-        result2.shouldBeInstanceOf<OutboxRepositoryPort.Result.Err>()
-        (result2 as OutboxRepositoryPort.Result.Err).error.shouldBeInstanceOf<DomainError.IdempotencyViolation>()
+        result2.shouldBeInstanceOf<Result.Err>()
+        (result2 as Result.Err).error.shouldBeInstanceOf<DomainError.IdempotencyViolation>()
     }
     
     "InMemoryOutboxRepository: insertAll 원자성 - 일부 중복이면 전체 실패" {
@@ -186,7 +187,7 @@ class OutboxIdempotencyTest : StringSpec({
         val result = repo.insertAll(listOf(newEntry, duplicateEntry))
         
         // 전체 실패
-        result.shouldBeInstanceOf<OutboxRepositoryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
         
         // 원자성: newEntry도 삽입되지 않음
         repo.size() shouldBe 1  // entry1만 존재
@@ -203,8 +204,8 @@ class OutboxIdempotencyTest : StringSpec({
         
         val result = repo.markFailed(entry.id, "Processing failed: timeout")
         
-        result.shouldBeInstanceOf<OutboxRepositoryPort.Result.Ok<*>>()
-        val failed = (result as OutboxRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val failed = (result as Result.Ok).value
         failed.failureReason shouldBe "Processing failed: timeout"
         failed.retryCount shouldBe 1
     }
@@ -224,9 +225,9 @@ class OutboxIdempotencyTest : StringSpec({
         repo.insert(failed.copy(id = UUID.randomUUID(), idempotencyKey = "idem_failed"))
         
         val result = repo.findPending(10)
-        result.shouldBeInstanceOf<OutboxRepositoryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
         
-        val pending = (result as OutboxRepositoryPort.Result.Ok).value
+        val pending = (result as Result.Ok).value
         pending.size shouldBe 2
         pending.all { it.status == OutboxStatus.PENDING } shouldBe true
     }
@@ -279,10 +280,10 @@ class OutboxIdempotencyTest : StringSpec({
 
             // 하나만 성공
             val successes = results.count { result ->
-                result is OutboxRepositoryPort.Result.Ok<*>
+                result is Result.Ok<*>
             }
             val failures = results.count { result ->
-                result is OutboxRepositoryPort.Result.Err
+                result is Result.Err
             }
 
             successes shouldBe 1

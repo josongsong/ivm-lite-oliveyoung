@@ -5,6 +5,7 @@ import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
 import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.shared.domain.types.VersionLong
@@ -16,7 +17,6 @@ import io.mockk.every
 import io.mockk.mockk
 import org.jooq.DSLContext
 import org.jooq.Record
-import org.jooq.Result
 import org.jooq.SelectConditionStep
 import org.jooq.SelectWhereStep
 
@@ -63,7 +63,7 @@ class JooqInvertedIndexRepositoryTest : StringSpec({
 
         val result = repo.putAllIdempotent(emptyList())
         
-        result.shouldBeInstanceOf<InvertedIndexRepositoryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<com.oliveyoung.ivmlite.shared.domain.types.Result.Ok<*>>()
     }
 })
 

@@ -1,0 +1,2 @@
+/* Loading Showcase - reuses common showcase styles */
+.loading-showcase { display: flex; flex-direction: column; gap: 2rem; }

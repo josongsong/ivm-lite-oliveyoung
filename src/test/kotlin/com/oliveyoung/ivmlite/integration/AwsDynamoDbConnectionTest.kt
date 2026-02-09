@@ -30,8 +30,10 @@ import java.net.URI
  * 테스트 실행:
  * ./scripts/run-with-env.sh ./gradlew test --tests AwsDynamoDbConnectionTest
  */
-class AwsDynamoDbConnectionTest : StringSpec({
-    
+class AwsDynamoDbConnectionTest : StringSpec(init@{
+
+    tags(IntegrationTag)
+
     // Koin 모듈 설정
     val koinModule = module {
         single<AppConfig> { ConfigLoader.load() }

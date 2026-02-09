@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
@@ -221,12 +222,12 @@ class DynamoDbE2ETest : StringSpec(init@{
                 payloadJson = productFixtureV1,
             )
         }
-        ingestResult.shouldBeInstanceOf<IngestWorkflow.Result.Ok<*>>()
+        ingestResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 2: DynamoDB에서 RawData 확인
         val rawData = runBlocking { rawDataRepo.get(tenantId, entityKey, 1L) }
-        rawData.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok<*>>()
-        val record = (rawData as com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok).value
+        rawData.shouldBeInstanceOf<Result.Ok<*>>()
+        val record = (rawData as Result.Ok).value
         record.payload shouldContain "라운드랩"
         record.payload shouldContain "자작나무 수분 선크림"
 
@@ -234,12 +235,12 @@ class DynamoDbE2ETest : StringSpec(init@{
         val sliceResult = runBlocking {
             slicingWorkflow.execute(tenantId, entityKey, 1L)
         }
-        sliceResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow.Result.Ok<*>>()
+        sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 4: DynamoDB에서 Slice 확인
         val slices = runBlocking { sliceRepo.getByVersion(tenantId, entityKey, 1L) }
-        slices.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok<*>>()
-        val sliceList = (slices as com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok).value
+        slices.shouldBeInstanceOf<Result.Ok<*>>()
+        val sliceList = (slices as Result.Ok).value
         sliceList.size shouldBe 5  // CORE, PRICE, INVENTORY, MEDIA, CATEGORY
 
         val coreSlice = sliceList.first { it.sliceType == SliceType.CORE }
@@ -272,8 +273,8 @@ class DynamoDbE2ETest : StringSpec(init@{
                 version = 1L,
             )
         }
-        queryResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Ok<*>>()
-        val response = (queryResult as com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (queryResult as Result.Ok<QueryViewWorkflow.ViewResponse>).value
             response.data shouldContain "라운드랩"
             response.data shouldContain "자작나무 수분 선크림"
         }
@@ -314,8 +315,8 @@ class DynamoDbE2ETest : StringSpec(init@{
         val slices = runBlocking {
             sliceRepo.getByVersion(tenantId, EntityKey("PRODUCT#oliveyoung#A000000001"), 1L)
         }
-        slices.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok<*>>()
-            val sliceList = (slices as com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok).value
+        slices.shouldBeInstanceOf<Result.Ok<*>>()
+            val sliceList = (slices as Result.Ok).value
             sliceList.size shouldBe 5
         }
     }
@@ -358,8 +359,8 @@ class DynamoDbE2ETest : StringSpec(init@{
             }
 
             // 역방향 인덱스 검증 (반드시 1개 이상 생성되어야 함)
-            reverseResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok<*>>()
-            val reverseOk = reverseResult as com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok
+            reverseResult.shouldBeInstanceOf<Result.Ok<*>>()
+            val reverseOk = reverseResult as Result.Ok
             val entries = reverseOk.value.entries
             println("📊 역방향 인덱스 (product_by_brand): ${entries.size}개")
             entries.forEach { entry ->
@@ -405,15 +406,15 @@ class DynamoDbE2ETest : StringSpec(init@{
                         schemaVersion = SemVer.parse("1.0.0"),
                         payloadJson = fixture,
                     )
-                    ingestResult.shouldBeInstanceOf<IngestWorkflow.Result.Ok<*>>()
+                    ingestResult.shouldBeInstanceOf<Result.Ok<*>>()
 
                     val sliceResult = slicingWorkflow.execute(tenantId, key, 1L)
-                    sliceResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow.Result.Ok<*>>()
+                    sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
 
                     // 각 Product의 Slice가 생성되었는지 확인
                     val slices = sliceRepo.getByVersion(tenantId, key, 1L)
-                    slices.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok<*>>()
-                    val sliceList = (slices as com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok).value
+                    slices.shouldBeInstanceOf<Result.Ok<*>>()
+                    val sliceList = (slices as Result.Ok).value
                     sliceList.isNotEmpty() shouldBe true
                     println("✅ Product $productId: ${sliceList.size} slices created")
                 }
@@ -469,8 +470,8 @@ class DynamoDbE2ETest : StringSpec(init@{
             }
 
             // 검증: 역방향 인덱스로 3개 Product 모두 조회되어야 함
-            fanoutResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok<*>>()
-            val okResult = fanoutResult as com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok
+            fanoutResult.shouldBeInstanceOf<Result.Ok<*>>()
+            val okResult = fanoutResult as Result.Ok
             val entries = okResult.value.entries
 
             println("📊 Brand 'roundlab' 변경 시 영향받는 Product (distinctBy 후): ${entries.size}개")
@@ -499,8 +500,8 @@ class DynamoDbE2ETest : StringSpec(init@{
             }
 
             // countByIndexType 결과 검증
-            countResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok<*>>()
-            val countOk = countResult as com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok
+            countResult.shouldBeInstanceOf<Result.Ok<*>>()
+            val countOk = countResult as Result.Ok
             val count = countOk.value
             count shouldBe 3  // 정확한 수 확인
 
@@ -521,7 +522,7 @@ class DynamoDbE2ETest : StringSpec(init@{
                     payloadJson = productFixtureV1,
                 )
             }
-            result1.shouldBeInstanceOf<IngestWorkflow.Result.Ok<*>>()
+            result1.shouldBeInstanceOf<Result.Ok<*>>()
 
             val result2 = runBlocking {
                 ingestWorkflow.execute(
@@ -533,12 +534,12 @@ class DynamoDbE2ETest : StringSpec(init@{
                     payloadJson = productFixtureV1,
                 )
             }
-            result2.shouldBeInstanceOf<IngestWorkflow.Result.Ok<*>>()
+            result2.shouldBeInstanceOf<Result.Ok<*>>()
 
             // DynamoDB에 1개만 존재하는지 검증
             val rawData = runBlocking { rawDataRepo.get(tenantId, entityKey, 1L) }
-            rawData.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok<*>>()
-            val record = (rawData as com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok).value
+            rawData.shouldBeInstanceOf<Result.Ok<*>>()
+            val record = (rawData as Result.Ok).value
             record.payload shouldContain "라운드랩"
             record.version shouldBe 1L
         }
@@ -552,8 +553,8 @@ class DynamoDbE2ETest : StringSpec(init@{
             val rawDataResult = runBlocking {
                 rawDataRepo.get(tenantId, nonExistentKey, 1L)
             }
-            rawDataResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Err>()
-            val rawDataErr = rawDataResult as com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Err
+            rawDataResult.shouldBeInstanceOf<Result.Err>()
+            val rawDataErr = rawDataResult as Result.Err
             rawDataErr.error.shouldBeInstanceOf<com.oliveyoung.ivmlite.shared.domain.errors.DomainError.NotFoundError>()
 
             // 존재하지 않는 Slice 조회 → 빈 리스트 또는 Err (구현에 따라 다름)
@@ -561,10 +562,10 @@ class DynamoDbE2ETest : StringSpec(init@{
                 sliceRepo.getByVersion(tenantId, nonExistentKey, 1L)
             }
             // DynamoDbSliceRepository는 빈 리스트를 반환할 수 있음
-            if (sliceResult is com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok) {
+            if (sliceResult is Result.Ok) {
                 sliceResult.value.isEmpty() shouldBe true  // 빈 리스트면 OK
             } else {
-                sliceResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Err>()
+                sliceResult.shouldBeInstanceOf<Result.Err>()
             }
         }
     }
@@ -581,8 +582,8 @@ class DynamoDbE2ETest : StringSpec(init@{
             }
 
             // 빈 결과는 Ok이지만 entries가 비어있어야 함
-            emptyResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok<*>>()
-            val okResult = emptyResult as com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok
+            emptyResult.shouldBeInstanceOf<Result.Ok<*>>()
+            val okResult = emptyResult as Result.Ok
             okResult.value.entries.isEmpty() shouldBe true
 
             // countByIndexType도 0 반환
@@ -593,8 +594,8 @@ class DynamoDbE2ETest : StringSpec(init@{
                     indexValue = "NONEXISTENT_BRAND",
                 )
             }
-            countResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok<*>>()
-            val countOk = countResult as com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok
+            countResult.shouldBeInstanceOf<Result.Ok<*>>()
+            val countOk = countResult as Result.Ok
             countOk.value shouldBe 0
         }
     }
@@ -632,16 +633,16 @@ class DynamoDbE2ETest : StringSpec(init@{
             val v1Slices = runBlocking {
                 sliceRepo.getByVersion(tenantId, entityKey, 1L)
             }
-            v1Slices.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok<*>>()
-            val v1List = (v1Slices as com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok).value
+            v1Slices.shouldBeInstanceOf<Result.Ok<*>>()
+            val v1List = (v1Slices as Result.Ok).value
             v1List.size shouldBe 5
             v1List.forEach { it.version shouldBe 1L }
 
             val v2Slices = runBlocking {
                 sliceRepo.getByVersion(tenantId, entityKey, 2L)
             }
-            v2Slices.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok<*>>()
-            val v2List = (v2Slices as com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok).value
+            v2Slices.shouldBeInstanceOf<Result.Ok<*>>()
+            val v2List = (v2Slices as Result.Ok).value
             v2List.size shouldBe 5
             v2List.forEach { it.version shouldBe 2L }
 
@@ -689,8 +690,8 @@ class DynamoDbE2ETest : StringSpec(init@{
                     indexValue = "brand1",
                 )
             }
-            brand1Result.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok<*>>()
-            val brand1Entries = (brand1Result as com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok).value.entries
+            brand1Result.shouldBeInstanceOf<Result.Ok<*>>()
+            val brand1Entries = (brand1Result as Result.Ok).value.entries
             brand1Entries.size shouldBe 1
             brand1Entries[0].entityKey shouldBe product1Key
 
@@ -702,8 +703,8 @@ class DynamoDbE2ETest : StringSpec(init@{
                     indexValue = "brand2",
                 )
             }
-            brand2Result.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok<*>>()
-            val brand2Entries = (brand2Result as com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok).value.entries
+            brand2Result.shouldBeInstanceOf<Result.Ok<*>>()
+            val brand2Entries = (brand2Result as Result.Ok).value.entries
             brand2Entries.size shouldBe 1
             brand2Entries[0].entityKey shouldBe product2Key
 

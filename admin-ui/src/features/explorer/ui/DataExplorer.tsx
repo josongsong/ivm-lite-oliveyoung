@@ -19,15 +19,15 @@ import {
 } from 'lucide-react'
 import { useQuery, useQueryClient } from '@tanstack/react-query'
 import type { ExplorerTab } from '@/shared/types'
-import { Loading } from '@/shared/ui'
+import { Loading, Tabs, TabsList, TabsTrigger } from '@/shared/ui'
 import { explorerApi } from '@/shared/api'
 import {
-  LineageGraph,
   RawDataEditor,
   RawDataPanel,
   SliceList,
   ViewPreview,
 } from '../components'
+import { LineageGraph } from '@/shared/ui'
 import './DataExplorer.css'
 
 interface SearchState {
@@ -181,29 +181,13 @@ export function DataExplorer() {
               <span>목록</span>
             </button>
           ) : (
-            <div className="type-tabs">
-              <button
-                className={`type-tab ${listType === 'rawdata' ? 'active' : ''}`}
-                onClick={() => { setListType('rawdata'); setPage(1) }}
-              >
-                <Database size={16} />
-                <span>RawData</span>
-              </button>
-              <button
-                className={`type-tab ${listType === 'slices' ? 'active' : ''}`}
-                onClick={() => { setListType('slices'); setPage(1) }}
-              >
-                <Layers size={16} />
-                <span>Slices</span>
-              </button>
-              <button
-                className={`type-tab ${listType === 'views' ? 'active' : ''}`}
-                onClick={() => { setListType('views'); setPage(1) }}
-              >
-                <Eye size={16} />
-                <span>Views</span>
-              </button>
-            </div>
+            <Tabs value={listType} onValueChange={(v) => { setListType(v as ListType); setPage(1) }}>
+              <TabsList variant="segmented" responsive="iconsOnlyMd">
+                <TabsTrigger value="rawdata" icon={<Database size={16} />}>RawData</TabsTrigger>
+                <TabsTrigger value="slices" icon={<Layers size={16} />}>Slices</TabsTrigger>
+                <TabsTrigger value="views" icon={<Eye size={16} />}>Views</TabsTrigger>
+              </TabsList>
+            </Tabs>
           )}
         </div>
 

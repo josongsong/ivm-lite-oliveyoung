@@ -330,33 +330,38 @@
   justify-content: center;
   gap: 8px;
   padding: 10px 16px;
-  border-radius: 6px;
+  border-radius: var(--radius-sm, 6px);
   font-size: 0.85rem;
   font-weight: 500;
   text-decoration: none;
-  transition: all 0.2s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
   cursor: pointer;
-  border: none;
+  border: 1px solid transparent;
 }
 
 .action-btn.primary {
-  background: #00d4ff;
-  color: #0a0a0f;
+  background: linear-gradient(135deg, var(--accent-cyan, #00d4ff), var(--accent-purple, #8855ff));
+  color: white;
+  box-shadow: 0 4px 15px rgba(0, 212, 255, 0.3);
 }
 
-.action-btn.primary:hover {
-  background: #00b8e0;
+.action-btn.primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, var(--accent-cyan, #00d4ff), var(--accent-purple, #8855ff));
+  transform: translateY(-2px);
+  box-shadow: 0 8px 30px rgba(0, 212, 255, 0.5), 0 0 40px rgba(136, 85, 255, 0.3);
 }
 
 .action-btn.secondary {
-  background: var(--bg-secondary, #12121a);
-  border: 1px solid var(--border-color, #2a2a3a);
-  color: var(--text-primary, #f0f0f0);
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  color: var(--text-secondary, #8b8b9e);
 }
 
-.action-btn.secondary:hover {
-  border-color: #00d4ff;
-  background: rgba(0, 212, 255, 0.1);
+.action-btn.secondary:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  border-color: var(--accent-cyan, #00d4ff);
+  color: var(--text-primary, #f0f0f5);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.1);
 }
 
 /* ==================== 스키마 필드 섹션 ==================== */

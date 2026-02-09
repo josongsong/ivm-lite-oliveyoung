@@ -5,6 +5,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.opentelemetry.api.OpenTelemetry
@@ -57,7 +58,7 @@ class JooqRawDataRepository(
         private val CREATED_AT = DSL.field("created_at", OffsetDateTime::class.java)
     }
 
-    override suspend fun putIdempotent(record: RawDataRecord): RawDataRepositoryPort.Result<Unit> =
+    override suspend fun putIdempotent(record: RawDataRecord): Result<Unit> =
         tracer.withSpanSuspend(
             "PostgreSQL.putIdempotent",
             mapOf(
@@ -96,9 +97,9 @@ class JooqRawDataRepository(
                             record.entityKey.value,
                             record.version,
                         )
-                        return@withContext RawDataRepositoryPort.Result.Ok(Unit)
+                        return@withContext Result.Ok(Unit)
                     } else {
-                        return@withContext RawDataRepositoryPort.Result.Err(
+                        return@withContext Result.Err(
                             DomainError.InvariantViolation(
                                 "RawData invariant mismatch: hash/schema differs for " +
                                     "${record.tenantId.value}:${record.entityKey.value}@${record.version}",
@@ -128,10 +129,10 @@ class JooqRawDataRepository(
                     record.version,
                 )
 
-                    RawDataRepositoryPort.Result.Ok(Unit)
+                    Result.Ok(Unit)
                 } catch (e: Exception) {
                     logger.error("Failed to insert raw data", e)
-                    RawDataRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.StorageError("Failed to insert raw data: ${e.message}"),
                     )
                 }
@@ -142,7 +143,7 @@ class JooqRawDataRepository(
         tenantId: TenantId,
         entityKey: EntityKey,
         version: Long,
-    ): RawDataRepositoryPort.Result<RawDataRecord> = tracer.withSpanSuspend(
+    ): Result<RawDataRecord> = tracer.withSpanSuspend(
         "PostgreSQL.get",
         mapOf(
             "db.system" to "postgresql",
@@ -161,7 +162,7 @@ class JooqRawDataRepository(
                 .fetchOne()
 
             if (row == null) {
-                return@withContext RawDataRepositoryPort.Result.Err(
+                return@withContext Result.Err(
                     DomainError.NotFoundError(
                         "RawData",
                         "${tenantId.value}:${entityKey.value}@$version",
@@ -172,24 +173,24 @@ class JooqRawDataRepository(
             val content = row.get(CONTENT)?.data()
                 ?: throw DomainError.StorageError("Missing required field 'content' in raw data row")
             // DB에서 읽을 때는 "sha256:" 접두사 복원
-            val hashFromDb = row.get(CONTENT_HASH)!!
+            val hashFromDb = requireField(row.get(CONTENT_HASH), "content_hash")
             val hashWithPrefix = if (hashFromDb.startsWith("sha256:")) hashFromDb else "sha256:$hashFromDb"
             val record = RawDataRecord(
-                tenantId = TenantId(row.get(TENANT_ID)!!),
-                entityKey = EntityKey(row.get(ENTITY_KEY)!!),
-                version = row.get(VERSION)!!,
-                schemaId = row.get(SCHEMA_ID)!!,
-                schemaVersion = SemVer.parse(row.get(SCHEMA_VERSION)!!),
+                tenantId = TenantId(requireField(row.get(TENANT_ID), "tenant_id")),
+                entityKey = EntityKey(requireField(row.get(ENTITY_KEY), "entity_key")),
+                version = requireField(row.get(VERSION), "version"),
+                schemaId = requireField(row.get(SCHEMA_ID), "schema_id"),
+                schemaVersion = SemVer.parse(requireField(row.get(SCHEMA_VERSION), "schema_version")),
                 payloadHash = hashWithPrefix,
                 payload = content,
             )
 
-            RawDataRepositoryPort.Result.Ok(record)
+            Result.Ok(record)
             } catch (e: DomainError) {
-                RawDataRepositoryPort.Result.Err(e)
+                Result.Err(e)
             } catch (e: Exception) {
                 logger.error("Failed to get raw data", e)
-                RawDataRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to get raw data: ${e.message}"),
                 )
             }
@@ -199,7 +200,7 @@ class JooqRawDataRepository(
     override suspend fun getLatest(
         tenantId: TenantId,
         entityKey: EntityKey,
-    ): RawDataRepositoryPort.Result<RawDataRecord> = withContext(Dispatchers.IO) {
+    ): Result<RawDataRecord> = withContext(Dispatchers.IO) {
         try {
             val row = dsl.selectFrom(RAW_DATA)
                 .where(TENANT_ID.eq(tenantId.value))
@@ -209,7 +210,7 @@ class JooqRawDataRepository(
                 .fetchOne()
 
             if (row == null) {
-                return@withContext RawDataRepositoryPort.Result.Err(
+                return@withContext Result.Err(
                     DomainError.NotFoundError(
                         "RawData",
                         "${tenantId.value}:${entityKey.value}@latest",
@@ -218,24 +219,87 @@ class JooqRawDataRepository(
             }
 
             // DB에서 읽을 때는 "sha256:" 접두사 복원
-            val hashFromDb = row.get(CONTENT_HASH)!!
+            val hashFromDb = requireField(row.get(CONTENT_HASH), "content_hash")
             val hashWithPrefix = if (hashFromDb.startsWith("sha256:")) hashFromDb else "sha256:$hashFromDb"
             val record = RawDataRecord(
-                tenantId = TenantId(row.get(TENANT_ID)!!),
-                entityKey = EntityKey(row.get(ENTITY_KEY)!!),
-                version = row.get(VERSION)!!,
-                schemaId = row.get(SCHEMA_ID)!!,
-                schemaVersion = SemVer.parse(row.get(SCHEMA_VERSION)!!),
+                tenantId = TenantId(requireField(row.get(TENANT_ID), "tenant_id")),
+                entityKey = EntityKey(requireField(row.get(ENTITY_KEY), "entity_key")),
+                version = requireField(row.get(VERSION), "version"),
+                schemaId = requireField(row.get(SCHEMA_ID), "schema_id"),
+                schemaVersion = SemVer.parse(requireField(row.get(SCHEMA_VERSION), "schema_version")),
                 payloadHash = hashWithPrefix,
                 payload = row.get(CONTENT)?.data() ?: "{}",
             )
 
-            RawDataRepositoryPort.Result.Ok(record)
+            Result.Ok(record)
+        } catch (e: DomainError) {
+            Result.Err(e)
         } catch (e: Exception) {
             logger.error("Failed to get latest raw data", e)
-            RawDataRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to get latest raw data: ${e.message}"),
             )
         }
     }
+
+    /**
+     * 여러 엔티티의 최신 RawData 일괄 조회 (N+1 쿼리 최적화)
+     *
+     * Window Function을 사용하여 단일 쿼리로 여러 엔티티의 최신 버전 조회.
+     * ROW_NUMBER() OVER (PARTITION BY entity_key ORDER BY version DESC) = 1
+     */
+    override suspend fun batchGetLatest(
+        tenantId: TenantId,
+        entityKeys: List<EntityKey>,
+    ): Result<Map<EntityKey, RawDataRecord>> = withContext(Dispatchers.IO) {
+        if (entityKeys.isEmpty()) {
+            return@withContext Result.Ok(emptyMap())
+        }
+
+        try {
+            // Window function으로 각 entity_key별 최신 버전만 선택
+            val rowNum = DSL.rowNumber()
+                .over(DSL.partitionBy(ENTITY_KEY).orderBy(VERSION.desc()))
+                .`as`("rn")
+
+            val subquery = dsl
+                .select(ID, TENANT_ID, ENTITY_KEY, VERSION, SCHEMA_ID, SCHEMA_VERSION, CONTENT_HASH, CONTENT, rowNum)
+                .from(RAW_DATA)
+                .where(TENANT_ID.eq(tenantId.value))
+                .and(ENTITY_KEY.`in`(entityKeys.map { it.value }))
+                .asTable("ranked")
+
+            val rows = dsl
+                .selectFrom(subquery)
+                .where(DSL.field("rn", Int::class.java).eq(1))
+                .fetch()
+
+            val resultMap = rows.associate { row ->
+                val entityKeyValue = requireField(row.get(ENTITY_KEY), "entity_key")
+                val hashFromDb = requireField(row.get(CONTENT_HASH), "content_hash")
+                val hashWithPrefix = if (hashFromDb.startsWith("sha256:")) hashFromDb else "sha256:$hashFromDb"
+
+                EntityKey(entityKeyValue) to RawDataRecord(
+                    tenantId = TenantId(requireField(row.get(TENANT_ID), "tenant_id")),
+                    entityKey = EntityKey(entityKeyValue),
+                    version = requireField(row.get(VERSION), "version"),
+                    schemaId = requireField(row.get(SCHEMA_ID), "schema_id"),
+                    schemaVersion = SemVer.parse(requireField(row.get(SCHEMA_VERSION), "schema_version")),
+                    payloadHash = hashWithPrefix,
+                    payload = row.get(CONTENT)?.data() ?: "{}",
+                )
+            }
+
+            logger.debug("Batch fetched {} raw data records for {} keys", resultMap.size, entityKeys.size)
+            Result.Ok(resultMap)
+        } catch (e: Exception) {
+            logger.error("Failed to batch get latest raw data", e)
+            Result.Err(
+                DomainError.StorageError("Failed to batch get latest raw data: ${e.message}"),
+            )
+        }
+    }
+
+    private fun <T> requireField(value: T?, fieldName: String): T =
+        value ?: throw DomainError.StorageError("Required field '$fieldName' is null in raw data record")
 }

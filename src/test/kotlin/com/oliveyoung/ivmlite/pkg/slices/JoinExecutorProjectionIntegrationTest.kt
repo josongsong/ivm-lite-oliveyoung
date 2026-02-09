@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.slices
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
@@ -87,8 +88,8 @@ class JoinExecutorProjectionIntegrationTest : StringSpec({
         // 4. JOIN 실행
         val result = runBlocking { executor.executeJoins(productData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         
         // 5. 검증: brandName과 brandLogoUrl만 포함되어야 함
         val brandJson = data["brand"]!!
@@ -144,8 +145,8 @@ class JoinExecutorProjectionIntegrationTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(productData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         
         // 전체 payload 반환
         data["brand"] shouldBe """{"brandId":"이니스프리","brandName":"이니스프리","brandDesc":"설명"}"""
@@ -160,7 +161,7 @@ class JoinExecutorProjectionIntegrationTest : StringSpec({
 internal class MockRawDataRepoForProjection(
     private val data: Map<String, RawDataRecord>,
 ) : RawDataRepositoryPort {
-    override suspend fun putIdempotent(record: RawDataRecord): RawDataRepositoryPort.Result<Unit> {
+    override suspend fun putIdempotent(record: RawDataRecord): Result<Unit> {
         throw NotImplementedError("Not used in test")
     }
 
@@ -168,21 +169,31 @@ internal class MockRawDataRepoForProjection(
         tenantId: TenantId,
         entityKey: EntityKey,
         version: Long,
-    ): RawDataRepositoryPort.Result<RawDataRecord> {
+    ): Result<RawDataRecord> {
         throw NotImplementedError("Not used in test")
     }
 
     override suspend fun getLatest(
         tenantId: TenantId,
         entityKey: EntityKey,
-    ): RawDataRepositoryPort.Result<RawDataRecord> {
+    ): Result<RawDataRecord> {
         val record = data[entityKey.value]
         return if (record != null) {
-            RawDataRepositoryPort.Result.Ok(record)
+            Result.Ok(record)
         } else {
-            RawDataRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.NotFoundError("RawData", entityKey.value),
             )
         }
+    }
+
+    override suspend fun batchGetLatest(
+        tenantId: TenantId,
+        entityKeys: List<EntityKey>,
+    ): Result<Map<EntityKey, RawDataRecord>> {
+        val resultMap = entityKeys.mapNotNull { key ->
+            data[key.value]?.let { key to it }
+        }.toMap()
+        return Result.Ok(resultMap)
     }
 }

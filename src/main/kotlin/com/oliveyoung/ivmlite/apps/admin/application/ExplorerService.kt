@@ -14,6 +14,7 @@ import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.shared.domain.types.VersionGenerator
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
@@ -81,18 +82,18 @@ class ExplorerService(
         // 1. RawData Ingest
         return try {
             when (val result = workflow.execute(tenant, entity, version, schemaId, semVer, payload)) {
-                is IngestWorkflow.Result.Ok -> {
+                is Result.Ok -> {
                     // 2. 선택적 Compile (Slicing)
                     var slicesCreated = 0
                     var actuallyCompiled = false
                     if (compile && slicingWorkflow != null) {
                         try {
                             when (val slicingResult = slicingWorkflow.execute(tenant, entity, version)) {
-                                is SlicingWorkflow.Result.Ok -> {
+                                is Result.Ok -> {
                                     slicesCreated = slicingResult.value.size
                                     actuallyCompiled = true
                                 }
-                                is SlicingWorkflow.Result.Err -> {
+                                is Result.Err -> {
                                     logger.warn("Slicing error: ${slicingResult.error}")
                                 }
                             }
@@ -115,7 +116,7 @@ class ExplorerService(
                         )
                     )
                 }
-                is IngestWorkflow.Result.Err -> Result.Err(result.error)
+                is Result.Err -> Result.Err(result.error)
             }
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to ingest RawData: ${e.message}"))
@@ -272,13 +273,13 @@ class ExplorerService(
         return try {
             val record = if (version != null) {
                 when (val result = rawDataRepo.get(tenant, entity, version)) {
-                    is RawDataRepositoryPort.Result.Ok -> result.value
-                    is RawDataRepositoryPort.Result.Err -> return Result.Err(result.error)
+                    is Result.Ok -> result.value
+                    is Result.Err -> return Result.Err(result.error)
                 }
             } else {
                 when (val result = rawDataRepo.getLatest(tenant, entity)) {
-                    is RawDataRepositoryPort.Result.Ok -> result.value
-                    is RawDataRepositoryPort.Result.Err -> return Result.Err(result.error)
+                    is Result.Ok -> result.value
+                    is Result.Err -> return Result.Err(result.error)
                 }
             }
 
@@ -349,13 +350,13 @@ class ExplorerService(
         return try {
             val slices = if (version != null) {
                 when (val result = sliceRepo.getByVersion(tenant, entity, version)) {
-                    is SliceRepositoryPort.Result.Ok -> result.value
-                    is SliceRepositoryPort.Result.Err -> return Result.Err(result.error)
+                    is Result.Ok -> result.value
+                    is Result.Err -> return Result.Err(result.error)
                 }
             } else {
                 when (val result = sliceRepo.getLatestVersion(tenant, entity)) {
-                    is SliceRepositoryPort.Result.Ok -> result.value
-                    is SliceRepositoryPort.Result.Err -> return Result.Err(result.error)
+                    is Result.Ok -> result.value
+                    is Result.Err -> return Result.Err(result.error)
                 }
             }
 
@@ -400,7 +401,7 @@ class ExplorerService(
 
         return try {
             when (val res = sliceRepo.findByKeyPrefix(tenant, keyPrefix, type, limit, cursor)) {
-                is SliceRepositoryPort.Result.Ok -> {
+                is Result.Ok -> {
                     Result.Ok(
                         SliceSearchResult(
                             items = res.value.items.map { it.toExplorerSliceItem() },
@@ -409,7 +410,7 @@ class ExplorerService(
                         )
                     )
                 }
-                is SliceRepositoryPort.Result.Err -> Result.Err(res.error)
+                is Result.Err -> Result.Err(res.error)
             }
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to search Slices: ${e.message}"))
@@ -582,12 +583,12 @@ class ExplorerService(
             val entity = EntityKey(entityKey)
 
             val latestVersion = when (val result = rawDataRepo.getLatest(tenant, entity)) {
-                is RawDataRepositoryPort.Result.Ok -> result.value.version
-                is RawDataRepositoryPort.Result.Err -> return Result.Err(result.error)
+                is Result.Ok -> result.value.version
+                is Result.Err -> return Result.Err(result.error)
             }
 
             when (val result = workflow.execute(tenant, viewDefId, entity, latestVersion)) {
-                is QueryViewWorkflow.Result.Ok -> {
+                is Result.Ok -> {
                     Result.Ok(
                         ViewResult(
                             tenantId = tenantId,
@@ -601,7 +602,7 @@ class ExplorerService(
                         )
                     )
                 }
-                is QueryViewWorkflow.Result.Err -> Result.Err(result.error)
+                is Result.Err -> Result.Err(result.error)
             }
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to get View: ${e.message}"))
@@ -629,8 +630,8 @@ class ExplorerService(
                 } else {
                     rawDataRepo.getLatest(tenant, entity)
                 }) {
-                    is RawDataRepositoryPort.Result.Ok -> result.value
-                    is RawDataRepositoryPort.Result.Err -> null
+                    is Result.Ok -> result.value
+                    is Result.Err -> null
                 }
             } catch (_: Exception) {
                 null
@@ -640,8 +641,8 @@ class ExplorerService(
             val slices = try {
                 val v = version ?: rawData?.version ?: 0L
                 when (val result = sliceRepo.getByVersion(tenant, entity, v)) {
-                    is SliceRepositoryPort.Result.Ok -> result.value
-                    is SliceRepositoryPort.Result.Err -> emptyList()
+                    is Result.Ok -> result.value
+                    is Result.Err -> emptyList()
                 }
             } catch (_: Exception) {
                 emptyList<SliceRecord>()
@@ -701,8 +702,8 @@ class ExplorerService(
             val viewDefs = contractRegistry?.let {
                 try {
                     when (val result = it.listViewDefinitions()) {
-                        is ContractRegistryPort.Result.Ok -> result.value
-                        is ContractRegistryPort.Result.Err -> emptyList()
+                        is Result.Ok -> result.value
+                        is Result.Err -> emptyList()
                     }
                 } catch (_: Exception) {
                     emptyList()
@@ -932,12 +933,6 @@ class ExplorerService(
         )
     }
 
-    // ==================== Result Type ====================
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-    }
 }
 
 // ==================== Result DTOs ====================

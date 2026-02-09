@@ -1,0 +1,276 @@
+/**
+ * Live Preview Styles
+ * Phase 3-A: 실시간 미리보기 스타일
+ */
+
+/* ============================================================================
+   Live Preview Container
+   ============================================================================ */
+
+.live-preview {
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-primary);
+}
+
+/* ============================================================================
+   Toolbar
+   ============================================================================ */
+
+.live-preview-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.live-preview-toolbar-left,
+.live-preview-toolbar-right {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.live-preview-bg-option {
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.live-preview-bg-option:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.live-preview-bg-option--active {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--accent-cyan);
+}
+
+/* ============================================================================
+   Preview Canvas
+   ============================================================================ */
+
+.live-preview-canvas {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: 2rem;
+  transition: all 0.2s ease;
+}
+
+.live-preview-canvas--expanded {
+  min-height: 400px;
+}
+
+.live-preview-canvas--light {
+  background: #ffffff;
+}
+
+.live-preview-canvas--dark {
+  background: #1a1a2e;
+}
+
+.live-preview-canvas--transparent,
+.live-preview-canvas--checkerboard {
+  background-image:
+    linear-gradient(45deg, #f0f0f0 25%, transparent 25%),
+    linear-gradient(-45deg, #f0f0f0 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #f0f0f0 75%),
+    linear-gradient(-45deg, transparent 75%, #f0f0f0 75%);
+  background-size: 16px 16px;
+  background-position: 0 0, 0 8px, 8px -8px, -8px 0px;
+  background-color: #ffffff;
+}
+
+.live-preview-content {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  justify-content: center;
+}
+
+/* ============================================================================
+   Error State
+   ============================================================================ */
+
+.live-preview-error {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--color-error-light);
+  border-radius: 6px;
+  color: var(--status-error);
+}
+
+.live-preview-error-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  background: var(--status-error);
+  color: white;
+  font-size: 0.75rem;
+  font-weight: bold;
+  border-radius: 50%;
+}
+
+.live-preview-error-message {
+  font-size: 0.875rem;
+}
+
+/* ============================================================================
+   Code Block
+   ============================================================================ */
+
+.live-preview-code {
+  border-top: 1px solid var(--border-color);
+}
+
+.live-preview-code-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-secondary);
+  border-bottom: 1px solid var(--border-color);
+}
+
+.live-preview-code-label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.live-preview-code-content {
+  margin: 0;
+  padding: 1rem;
+  font-family: 'SF Mono', 'Consolas', 'Monaco', monospace;
+  font-size: 0.8125rem;
+  line-height: 1.6;
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+  overflow-x: auto;
+}
+
+.live-preview-code-content code {
+  white-space: pre;
+}
+
+/* ============================================================================
+   Variant Preview Grid
+   ============================================================================ */
+
+.variant-preview {
+  margin-top: 1.5rem;
+}
+
+.variant-preview-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.variant-preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 1rem;
+}
+
+.variant-preview-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.variant-preview-component {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 40px;
+}
+
+.variant-preview-label {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+/* ============================================================================
+   State Preview
+   ============================================================================ */
+
+.state-preview {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+
+.state-preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+}
+
+.state-preview-header {
+  display: flex;
+  align-items: baseline;
+  gap: 0.5rem;
+}
+
+.state-preview-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.state-preview-description {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.state-preview-component {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding-top: 0.5rem;
+}
+
+/* ============================================================================
+   Dark Mode Support
+   ============================================================================ */
+
+[data-theme="dark"] .live-preview-canvas--transparent,
+[data-theme="dark"] .live-preview-canvas--checkerboard {
+  background-image:
+    linear-gradient(45deg, #2a2a3e 25%, transparent 25%),
+    linear-gradient(-45deg, #2a2a3e 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, #2a2a3e 75%),
+    linear-gradient(-45deg, transparent 75%, #2a2a3e 75%);
+  background-color: #1a1a2e;
+}

@@ -6,9 +6,9 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
+import com.oliveyoung.ivmlite.shared.domain.types.Result as SharedResult
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.jsonObject
 import kotlinx.serialization.json.jsonPrimitive
@@ -44,6 +44,22 @@ object IvmOps {
     internal var outboxPollingWorker: OutboxPollingWorker? = null
     internal var sliceRepository: SliceRepositoryPort? = null
 
+    /**
+     * IvmContext에서 Ops 의존성 초기화 (권장)
+     *
+     * @example
+     * ```kotlin
+     * IvmOps.initialize(context)
+     * ```
+     */
+    fun initialize(context: com.oliveyoung.ivmlite.sdk.IvmContext) {
+        this.slicingWorkflow = context.slicingWorkflow
+        this.shipWorkflow = context.shipWorkflow
+        this.outboxRepository = context.outboxRepository
+        this.outboxPollingWorker = context.worker
+        this.sliceRepository = context.sliceRepository
+    }
+
     val worker: WorkerControl get() = WorkerControl(outboxPollingWorker)
 
     /**
@@ -57,9 +73,10 @@ object IvmOps {
      */
     suspend fun processOutbox(
         limit: Int = 100,
-        filter: ProcessFilter.() -> Unit = {}
+        @Suppress("UNUSED_PARAMETER") filter: ProcessFilter.() -> Unit = {}
     ): ProcessResult {
-        val filterConfig = ProcessFilter().apply(filter)
+        // TODO: filterConfig 필터링 로직 구현 시 활성화
+        // val filterConfig = ProcessFilter().apply(filter)
         val repo = outboxRepository
             ?: return ProcessResult.failure("OutboxRepository not configured")
 
@@ -69,76 +86,55 @@ object IvmOps {
         val shipWf = shipWorkflow
             ?: return ProcessResult.failure("ShipWorkflow not configured")
 
-        return try {
-            // PENDING 항목 조회
-            val pendingEntries = when (val result = repo.findPending(limit)) {
-                is OutboxRepositoryPort.Result.Ok -> result.value
-                is OutboxRepositoryPort.Result.Err -> {
-                    return ProcessResult.failure("Failed to find pending entries: ${result.error}")
-                }
+        // PENDING 항목 조회
+        val pendingEntries = when (val result = repo.findPending(limit)) {
+            is SharedResult.Ok -> result.value
+            is SharedResult.Err -> {
+                return ProcessResult.failure("Failed to find pending entries: ${result.error}")
             }
+        }
 
-            if (pendingEntries.isEmpty()) {
-                return ProcessResult.empty()
-            }
+        if (pendingEntries.isEmpty()) {
+            return ProcessResult.empty()
+        }
 
-            var processed = 0
-            var failed = 0
-            val details = mutableListOf<ProcessDetail>()
+        var processed = 0
+        var failed = 0
+        val details = mutableListOf<ProcessDetail>()
 
-            // 각 항목 처리 (이미 PENDING 상태이므로 바로 처리)
-            pendingEntries.forEach { entry ->
-                try {
-                    // Note: claim()은 여러 개를 한 번에 claim하는 메서드이므로,
-                    // 여기서는 이미 찾은 PENDING 항목을 바로 처리합니다.
-
-                    // Process
-                    val processResult = processEntry(entry, workflow, shipWf)
-                    when (processResult) {
-                        is ProcessEntryResult.Success -> {
-                            // Mark as processed
-                            when (val markResult = repo.markProcessed(listOf(entry.id))) {
-                                is OutboxRepositoryPort.Result.Ok -> {
-                                    processed++
-                                    details.add(ProcessDetail(
-                                        entryId = entry.id.toString(),
-                                        eventType = entry.eventType,
-                                        success = true
-                                    ))
-                                }
-                                is OutboxRepositoryPort.Result.Err -> {
-                                    logger.error("Failed to mark entry ${entry.id} as processed: ${markResult.error}")
-                                    failed++
-                                }
-                            }
-                        }
-                        is ProcessEntryResult.Failure -> {
-                            failed++
+        // 각 항목 처리 (이미 PENDING 상태이므로 바로 처리)
+        pendingEntries.forEach { entry ->
+            val entryResult = processEntrySafe(entry, workflow, shipWf)
+            when (entryResult) {
+                is ProcessEntryResult.Success -> {
+                    when (val markResult = repo.markProcessed(listOf(entry.id))) {
+                        is SharedResult.Ok -> {
+                            processed++
                             details.add(ProcessDetail(
                                 entryId = entry.id.toString(),
                                 eventType = entry.eventType,
-                                success = false,
-                                error = processResult.error
+                                success = true
                             ))
                         }
+                        is SharedResult.Err -> {
+                            logger.error("Failed to mark entry ${entry.id} as processed: ${markResult.error}")
+                            failed++
+                        }
                     }
-                } catch (e: Exception) {
-                    logger.error("Error processing entry ${entry.id}", e)
+                }
+                is ProcessEntryResult.Failure -> {
                     failed++
                     details.add(ProcessDetail(
                         entryId = entry.id.toString(),
                         eventType = entry.eventType,
                         success = false,
-                        error = e.message ?: "Unknown error"
+                        error = entryResult.error
                     ))
                 }
             }
-
-            ProcessResult.success(processed, failed, details)
-        } catch (e: Exception) {
-            logger.error("Error in processOutbox", e)
-            ProcessResult.failure("Unexpected error: ${e.message}")
         }
+
+        return ProcessResult.success(processed, failed, details)
     }
 
     /**
@@ -158,59 +154,67 @@ object IvmOps {
         val shipWf = shipWorkflow
             ?: return ProcessResult.failure("ShipWorkflow not configured")
 
-        return try {
-            // 1. 해당 ID의 Outbox 항목 조회
-            val entry = when (val result = repo.findById(id)) {
-                is OutboxRepositoryPort.Result.Ok -> result.value
-                is OutboxRepositoryPort.Result.Err -> {
-                    return ProcessResult.failure("Entry not found: ${result.error}")
-                }
-            }
+        return processOneByIdInternal(id, repo, workflow, shipWf)
+    }
 
-            // 2. PENDING 상태가 아니면 에러
-            if (entry.status.name != "PENDING") {
-                return ProcessResult.failure("Entry is not PENDING: ${entry.status}")
+    private suspend fun processOneByIdInternal(
+        id: java.util.UUID,
+        repo: OutboxRepositoryPort,
+        workflow: SlicingWorkflow,
+        shipWf: ShipWorkflow
+    ): ProcessResult = SharedResult.catch {
+        // 1. 해당 ID의 Outbox 항목 조회
+        val entry = when (val result = repo.findById(id)) {
+            is SharedResult.Ok -> result.value
+            is SharedResult.Err -> {
+                return@catch ProcessResult.failure("Entry not found: ${result.error}")
             }
+        }
 
-            // 3. 처리
-            val processResult = processEntry(entry, workflow, shipWf)
-            when (processResult) {
-                is ProcessEntryResult.Success -> {
-                    // Mark as processed
-                    when (val markResult = repo.markProcessed(listOf(entry.id))) {
-                        is OutboxRepositoryPort.Result.Ok -> {
-                            ProcessResult.success(1, 0, listOf(
-                                ProcessDetail(
-                                    entryId = entry.id.toString(),
-                                    eventType = entry.eventType,
-                                    success = true
-                                )
-                            ))
-                        }
-                        is OutboxRepositoryPort.Result.Err -> {
-                            logger.error("Failed to mark entry ${entry.id} as processed: ${markResult.error}")
-                            ProcessResult.failure("Failed to mark as processed: ${markResult.error}")
-                        }
+        // 2. PENDING 상태가 아니면 에러
+        if (entry.status.name != "PENDING") {
+            return@catch ProcessResult.failure("Entry is not PENDING: ${entry.status}")
+        }
+
+        // 3. 처리
+        val processResult = processEntrySafe(entry, workflow, shipWf)
+        when (processResult) {
+            is ProcessEntryResult.Success -> {
+                when (val markResult = repo.markProcessed(listOf(entry.id))) {
+                    is SharedResult.Ok -> {
+                        ProcessResult.success(1, 0, listOf(
+                            ProcessDetail(
+                                entryId = entry.id.toString(),
+                                eventType = entry.eventType,
+                                success = true
+                            )
+                        ))
+                    }
+                    is SharedResult.Err -> {
+                        logger.error("Failed to mark entry ${entry.id} as processed: ${markResult.error}")
+                        ProcessResult.failure("Failed to mark as processed: ${markResult.error}")
                     }
                 }
-                is ProcessEntryResult.Failure -> {
-                    // Mark as failed
-                    repo.markFailed(entry.id, processResult.error)
-                    ProcessResult.success(0, 1, listOf(
-                        ProcessDetail(
-                            entryId = entry.id.toString(),
-                            eventType = entry.eventType,
-                            success = false,
-                            error = processResult.error
-                        )
-                    ))
-                }
             }
-        } catch (e: Exception) {
-            logger.error("Error in processOneById", e)
-            ProcessResult.failure("Unexpected error: ${e.message}")
+            is ProcessEntryResult.Failure -> {
+                repo.markFailed(entry.id, processResult.error)
+                ProcessResult.success(0, 1, listOf(
+                    ProcessDetail(
+                        entryId = entry.id.toString(),
+                        eventType = entry.eventType,
+                        success = false,
+                        error = processResult.error
+                    )
+                ))
+            }
         }
-    }
+    }.fold(
+        onErr = { error ->
+            logger.error("Error in processOneById: ${error.message}")
+            ProcessResult.failure("Unexpected error: ${error.message}")
+        },
+        onOk = { it }
+    )
 
     /**
      * 특정 엔티티 재처리 (전체 파이프라인)
@@ -223,69 +227,75 @@ object IvmOps {
         val workflow = slicingWorkflow
             ?: return ReprocessResult.failure(entityKey, "SlicingWorkflow not configured")
 
-        val shipWf = shipWorkflow
-            ?: return ReprocessResult.failure(entityKey, "ShipWorkflow not configured")
+        // TODO: Ship 자동 연계 구현 시 활성화
+        // val shipWf = shipWorkflow
+        //     ?: return ReprocessResult.failure(entityKey, "ShipWorkflow not configured")
 
         val sliceRepo = sliceRepository
             ?: return ReprocessResult.failure(entityKey, "SliceRepository not configured")
 
-        return try {
-            val resolvedVersion = version ?: run {
-                // 최신 버전 조회 (첫 번째 slice의 version 사용)
-                when (val result = sliceRepo.getLatestVersion(
-                    TenantId(tenantId),
-                    EntityKey(entityKey)
-                )) {
-                    is SliceRepositoryPort.Result.Ok -> {
-                        result.value.firstOrNull()?.version
-                            ?: return ReprocessResult.failure(entityKey, "No slices found for entity")
-                    }
-                    is SliceRepositoryPort.Result.Err -> {
-                        return ReprocessResult.failure(entityKey, "Failed to get latest version: ${result.error}")
-                    }
-                }
-            }
-
-            // 1. Slice 재생성
-            val slicingResult = workflow.executeAuto(
-                tenantId = TenantId(tenantId),
-                entityKey = EntityKey(entityKey),
-                version = resolvedVersion
-            )
-
-            val stages = mutableListOf<StageResult>()
-
-            when (slicingResult) {
-                is SlicingWorkflow.Result.Ok -> {
-                    stages.add(StageResult(
-                        stage = "Slice",
-                        success = true,
-                        slicesCreated = slicingResult.value.size
-                    ))
-
-                    // 2. Ship (모든 Sink로)
-                    // TODO: SinkRule 기반으로 자동 Ship
-                    // 현재는 수동으로 Ship 호출 필요
-                }
-                is SlicingWorkflow.Result.Err -> {
-                    return ReprocessResult.failure(
-                        entityKey = entityKey,
-                        error = "Slicing failed: ${slicingResult.error}",
-                        stages = listOf(StageResult(
-                            stage = "Slice",
-                            success = false,
-                            error = slicingResult.error.toString()
-                        ))
-                    )
-                }
-            }
-
-            ReprocessResult.success(entityKey, stages)
-        } catch (e: Exception) {
-            logger.error("Error in reprocess", e)
-            ReprocessResult.failure(entityKey, "Unexpected error: ${e.message}")
-        }
+        return reprocessInternal(tenantId, entityKey, version, workflow, sliceRepo)
     }
+
+    private suspend fun reprocessInternal(
+        tenantId: String,
+        entityKey: String,
+        version: Long?,
+        workflow: SlicingWorkflow,
+        sliceRepo: SliceRepositoryPort
+    ): ReprocessResult = SharedResult.catch {
+        val resolvedVersion = version ?: run {
+            when (val result = sliceRepo.getLatestVersion(
+                TenantId(tenantId),
+                EntityKey(entityKey)
+            )) {
+                is SharedResult.Ok -> {
+                    result.value.firstOrNull()?.version
+                        ?: return@catch ReprocessResult.failure(entityKey, "No slices found for entity")
+                }
+                is SharedResult.Err -> {
+                    return@catch ReprocessResult.failure(entityKey, "Failed to get latest version: ${result.error}")
+                }
+            }
+        }
+
+        val slicingResult = workflow.executeAuto(
+            tenantId = TenantId(tenantId),
+            entityKey = EntityKey(entityKey),
+            version = resolvedVersion
+        )
+
+        val stages = mutableListOf<StageResult>()
+
+        when (slicingResult) {
+            is SharedResult.Ok -> {
+                stages.add(StageResult(
+                    stage = "Slice",
+                    success = true,
+                    slicesCreated = slicingResult.value.size
+                ))
+            }
+            is SharedResult.Err -> {
+                return@catch ReprocessResult.failure(
+                    entityKey = entityKey,
+                    error = "Slicing failed: ${slicingResult.error}",
+                    stages = listOf(StageResult(
+                        stage = "Slice",
+                        success = false,
+                        error = slicingResult.error.toString()
+                    ))
+                )
+            }
+        }
+
+        ReprocessResult.success(entityKey, stages)
+    }.fold(
+        onErr = { error ->
+            logger.error("Error in reprocess: ${error.message}")
+            ReprocessResult.failure(entityKey, "Unexpected error: ${error.message}")
+        },
+        onOk = { it }
+    )
 
     /**
      * Slice만 재생성
@@ -301,56 +311,67 @@ object IvmOps {
         val sliceRepo = sliceRepository
             ?: return ReprocessResult.failure(entityKey, "SliceRepository not configured")
 
-        return try {
-            val resolvedVersion = version ?: run {
-                when (val result = sliceRepo.getLatestVersion(
-                    TenantId(tenantId),
-                    EntityKey(entityKey)
-                )) {
-                    is SliceRepositoryPort.Result.Ok -> {
-                        result.value.firstOrNull()?.version
-                            ?: return ReprocessResult.failure(entityKey, "No slices found for entity")
-                    }
-                    is SliceRepositoryPort.Result.Err -> {
-                        return ReprocessResult.failure(entityKey, "Failed to get latest version: ${result.error}")
-                    }
-                }
-            }
-
-            val slicingResult = workflow.executeAuto(
-                tenantId = TenantId(tenantId),
-                entityKey = EntityKey(entityKey),
-                version = resolvedVersion
-            )
-
-            when (slicingResult) {
-                is SlicingWorkflow.Result.Ok -> {
-                    ReprocessResult.success(
-                        entityKey = entityKey,
-                        stages = listOf(StageResult(
-                            stage = "Slice",
-                            success = true,
-                            slicesCreated = slicingResult.value.size
-                        ))
-                    )
-                }
-                is SlicingWorkflow.Result.Err -> {
-                    ReprocessResult.failure(
-                        entityKey = entityKey,
-                        error = "Slicing failed: ${slicingResult.error}",
-                        stages = listOf(StageResult(
-                            stage = "Slice",
-                            success = false,
-                            error = slicingResult.error.toString()
-                        ))
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            logger.error("Error in reslice", e)
-            ReprocessResult.failure(entityKey, "Unexpected error: ${e.message}")
-        }
+        return resliceInternal(tenantId, entityKey, version, workflow, sliceRepo)
     }
+
+    private suspend fun resliceInternal(
+        tenantId: String,
+        entityKey: String,
+        version: Long?,
+        workflow: SlicingWorkflow,
+        sliceRepo: SliceRepositoryPort
+    ): ReprocessResult = SharedResult.catch {
+        val resolvedVersion = version ?: run {
+            when (val result = sliceRepo.getLatestVersion(
+                TenantId(tenantId),
+                EntityKey(entityKey)
+            )) {
+                is SharedResult.Ok -> {
+                    result.value.firstOrNull()?.version
+                        ?: return@catch ReprocessResult.failure(entityKey, "No slices found for entity")
+                }
+                is SharedResult.Err -> {
+                    return@catch ReprocessResult.failure(entityKey, "Failed to get latest version: ${result.error}")
+                }
+            }
+        }
+
+        val slicingResult = workflow.executeAuto(
+            tenantId = TenantId(tenantId),
+            entityKey = EntityKey(entityKey),
+            version = resolvedVersion
+        )
+
+        when (slicingResult) {
+            is SharedResult.Ok -> {
+                ReprocessResult.success(
+                    entityKey = entityKey,
+                    stages = listOf(StageResult(
+                        stage = "Slice",
+                        success = true,
+                        slicesCreated = slicingResult.value.size
+                    ))
+                )
+            }
+            is SharedResult.Err -> {
+                ReprocessResult.failure(
+                    entityKey = entityKey,
+                    error = "Slicing failed: ${slicingResult.error}",
+                    stages = listOf(StageResult(
+                        stage = "Slice",
+                        success = false,
+                        error = slicingResult.error.toString()
+                    ))
+                )
+            }
+        }
+    }.fold(
+        onErr = { error ->
+            logger.error("Error in reslice: ${error.message}")
+            ReprocessResult.failure(entityKey, "Unexpected error: ${error.message}")
+        },
+        onOk = { it }
+    )
 
     /**
      * Ship만 재실행
@@ -367,61 +388,91 @@ object IvmOps {
         val sliceRepo = sliceRepository
             ?: return ReprocessResult.failure(entityKey, "SliceRepository not configured")
 
-        return try {
-            val resolvedVersion = version ?: run {
-                when (val result = sliceRepo.getLatestVersion(
-                    TenantId(tenantId),
-                    EntityKey(entityKey)
-                )) {
-                    is SliceRepositoryPort.Result.Ok -> {
-                        result.value.firstOrNull()?.version
-                            ?: return ReprocessResult.failure(entityKey, "No slices found for entity")
-                    }
-                    is SliceRepositoryPort.Result.Err -> {
-                        return ReprocessResult.failure(entityKey, "Failed to get latest version: ${result.error}")
-                    }
-                }
-            }
-
-            val sinks = sinkTypes ?: listOf("opensearch", "personalize") // 기본값
-
-            val shipResult = shipWf.executeToMultipleSinks(
-                tenantId = TenantId(tenantId),
-                entityKey = EntityKey(entityKey),
-                version = resolvedVersion,
-                sinkTypes = sinks
-            )
-
-            when (shipResult) {
-                is ShipWorkflow.Result.Ok -> {
-                    ReprocessResult.success(
-                        entityKey = entityKey,
-                        stages = listOf(StageResult(
-                            stage = "Ship",
-                            success = true,
-                            sinksShipped = shipResult.value.successCount
-                        ))
-                    )
-                }
-                is ShipWorkflow.Result.Err -> {
-                    ReprocessResult.failure(
-                        entityKey = entityKey,
-                        error = "Ship failed: ${shipResult.error}",
-                        stages = listOf(StageResult(
-                            stage = "Ship",
-                            success = false,
-                            error = shipResult.error.toString()
-                        ))
-                    )
-                }
-            }
-        } catch (e: Exception) {
-            logger.error("Error in reship", e)
-            ReprocessResult.failure(entityKey, "Unexpected error: ${e.message}")
-        }
+        return reshipInternal(tenantId, entityKey, version, sinkTypes, shipWf, sliceRepo)
     }
 
+    private suspend fun reshipInternal(
+        tenantId: String,
+        entityKey: String,
+        version: Long?,
+        sinkTypes: List<String>?,
+        shipWf: ShipWorkflow,
+        sliceRepo: SliceRepositoryPort
+    ): ReprocessResult = SharedResult.catch {
+        val resolvedVersion = version ?: run {
+            when (val result = sliceRepo.getLatestVersion(
+                TenantId(tenantId),
+                EntityKey(entityKey)
+            )) {
+                is SharedResult.Ok -> {
+                    result.value.firstOrNull()?.version
+                        ?: return@catch ReprocessResult.failure(entityKey, "No slices found for entity")
+                }
+                is SharedResult.Err -> {
+                    return@catch ReprocessResult.failure(entityKey, "Failed to get latest version: ${result.error}")
+                }
+            }
+        }
+
+        val sinks = sinkTypes ?: listOf("opensearch", "personalize")
+
+        val shipResult = shipWf.executeToMultipleSinks(
+            tenantId = TenantId(tenantId),
+            entityKey = EntityKey(entityKey),
+            version = resolvedVersion,
+            sinkTypes = sinks
+        )
+
+        when (shipResult) {
+            is SharedResult.Ok -> {
+                ReprocessResult.success(
+                    entityKey = entityKey,
+                    stages = listOf(StageResult(
+                        stage = "Ship",
+                        success = true,
+                        sinksShipped = shipResult.value.successCount
+                    ))
+                )
+            }
+            is SharedResult.Err -> {
+                ReprocessResult.failure(
+                    entityKey = entityKey,
+                    error = "Ship failed: ${shipResult.error}",
+                    stages = listOf(StageResult(
+                        stage = "Ship",
+                        success = false,
+                        error = shipResult.error.toString()
+                    ))
+                )
+            }
+        }
+    }.fold(
+        onErr = { error ->
+            logger.error("Error in reship: ${error.message}")
+            ReprocessResult.failure(entityKey, "Unexpected error: ${error.message}")
+        },
+        onOk = { it }
+    )
+
     // ===== Private Helpers =====
+
+    /**
+     * 예외를 안전하게 처리하는 processEntry 래퍼
+     * try-catch 대신 Result.catch 패턴 사용
+     */
+    private suspend fun processEntrySafe(
+        entry: OutboxEntry,
+        workflow: SlicingWorkflow,
+        shipWf: ShipWorkflow
+    ): ProcessEntryResult = SharedResult.catch {
+        processEntry(entry, workflow, shipWf)
+    }.fold(
+        onErr = { error ->
+            logger.error("Error processing entry ${entry.id}: ${error.message}")
+            ProcessEntryResult.Failure(error.message ?: "Unknown error")
+        },
+        onOk = { it }
+    )
 
     private suspend fun processEntry(
         entry: OutboxEntry,
@@ -439,8 +490,8 @@ object IvmOps {
                             version = payload.version
                         )
                         when (result) {
-                            is SlicingWorkflow.Result.Ok -> ProcessEntryResult.Success
-                            is SlicingWorkflow.Result.Err -> ProcessEntryResult.Failure(result.error.toString())
+                            is SharedResult.Ok -> ProcessEntryResult.Success
+                            is SharedResult.Err -> ProcessEntryResult.Failure(result.error.toString())
                         }
                     }
                     else -> ProcessEntryResult.Failure("Unknown event type: ${entry.eventType}")
@@ -457,8 +508,8 @@ object IvmOps {
                             sinkType = payload.sink ?: "opensearch"
                         )
                         when (result) {
-                            is ShipWorkflow.Result.Ok -> ProcessEntryResult.Success
-                            is ShipWorkflow.Result.Err -> ProcessEntryResult.Failure(result.error.toString())
+                            is SharedResult.Ok -> ProcessEntryResult.Success
+                            is SharedResult.Err -> ProcessEntryResult.Failure(result.error.toString())
                         }
                     }
                     else -> ProcessEntryResult.Failure("Unknown event type: ${entry.eventType}")

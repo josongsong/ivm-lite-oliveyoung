@@ -1,0 +1,23 @@
+.yaml-editor-wrapper {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+}
+
+/* Monaco Editor 테마 오버라이드 */
+.yaml-editor-wrapper .monaco-editor,
+.yaml-editor-wrapper .monaco-editor-background {
+  background-color: var(--bg-primary) !important;
+}
+
+.yaml-editor-wrapper .margin {
+  background-color: var(--bg-primary) !important;
+}
+
+.yaml-editor-wrapper .monaco-editor .line-numbers {
+  color: var(--text-muted) !important;
+}
+
+.yaml-editor-wrapper .monaco-editor .current-line ~ .line-numbers {
+  color: var(--text-secondary) !important;
+}

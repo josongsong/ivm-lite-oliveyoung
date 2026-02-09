@@ -9,6 +9,7 @@ import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -47,8 +48,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices.size shouldBe 1
         slices[0].data shouldBe """{"name":"product","price":1000}"""
         slices[0].sliceType shouldBe SharedSliceType.CORE
@@ -75,8 +76,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices.size shouldBe 1
         slices[0].sliceType shouldBe SharedSliceType.PRICE
         slices[0].data shouldBe """{"price":1000}"""
@@ -102,8 +103,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"name":"apple","price":500}"""
     }
 
@@ -132,8 +133,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices.size shouldBe 3
         slices.map { it.sliceType.name }.toSet() shouldBe setOf("CORE", "PRICE", "INVENTORY")
     }
@@ -157,10 +158,10 @@ class SlicingEngineTest : StringSpec({
         val result1 = runBlocking { engine.slice(rawData1, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
         val result2 = runBlocking { engine.slice(rawData2, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result1.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        result2.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val hash1 = (result1 as SlicingEngine.Result.Ok).value.slices[0].hash
-        val hash2 = (result2 as SlicingEngine.Result.Ok).value.slices[0].hash
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
+        val hash1 = (result1 as Result.Ok).value.slices[0].hash
+        val hash2 = (result2 as Result.Ok).value.slices[0].hash
         hash1 shouldBe hash2
     }
 
@@ -181,8 +182,8 @@ class SlicingEngineTest : StringSpec({
         val result1 = runBlocking { engine.slice(rawData1, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
         val result2 = runBlocking { engine.slice(rawData2, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        val hash1 = (result1 as SlicingEngine.Result.Ok).value.slices[0].hash
-        val hash2 = (result2 as SlicingEngine.Result.Ok).value.slices[0].hash
+        val hash1 = (result1 as Result.Ok).value.slices[0].hash
+        val hash2 = (result2 as Result.Ok).value.slices[0].hash
         hash1 shouldBe hash2
     }
 
@@ -195,8 +196,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Err>()
-        (result as SlicingEngine.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     // ==================== 6. 빈 payload → 빈 slice (에러 아님) ====================
@@ -216,8 +217,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices.size shouldBe 1
         slices[0].data shouldBe """{}"""
         slices[0].hash shouldBe Hashing.sha256Tagged("""{}""")
@@ -238,8 +239,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{}"""
     }
 
@@ -262,8 +263,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"name":"apple"}"""
     }
 
@@ -284,8 +285,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"value":"deep"}"""
     }
 
@@ -308,8 +309,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"items":[{"name":"a"},{"name":"b"}]}"""
     }
 
@@ -330,8 +331,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"names":["a","b"]}"""
     }
 
@@ -354,8 +355,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe "{}"
     }
 
@@ -376,8 +377,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe "{}"
     }
 
@@ -398,8 +399,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe "{}"
     }
 
@@ -429,8 +430,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"result":"deep"}"""
     }
 
@@ -451,8 +452,8 @@ class SlicingEngineTest : StringSpec({
             engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0")))
         }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Err>()
-        (result as SlicingEngine.Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
     }
 
     // ==================== 추가 엣지 케이스 ====================
@@ -472,8 +473,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe "{}"
     }
 
@@ -492,8 +493,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"a":1,"c":3}"""
     }
 
@@ -512,8 +513,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe "{}"
     }
 
@@ -534,8 +535,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"names":[]}"""
     }
 
@@ -558,8 +559,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"names":["a","b"]}"""
     }
 
@@ -580,8 +581,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"allItems":[{"name":"a"},{"name":"b"}]}"""
     }
 
@@ -602,8 +603,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         slices[0].data shouldBe """{"name":"test"}"""
     }
 
@@ -624,10 +625,10 @@ class SlicingEngineTest : StringSpec({
         val result1 = runBlocking { engine.slice(rawData1, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
         val result2 = runBlocking { engine.slice(rawData2, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result1.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        result2.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val hash1 = (result1 as SlicingEngine.Result.Ok).value.slices[0].hash
-        val hash2 = (result2 as SlicingEngine.Result.Ok).value.slices[0].hash
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
+        val hash1 = (result1 as Result.Ok).value.slices[0].hash
+        val hash2 = (result2 as Result.Ok).value.slices[0].hash
         hash1 shouldBe hash2
     }
 
@@ -649,8 +650,8 @@ class SlicingEngineTest : StringSpec({
 
         val result = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
 
-        result.shouldBeInstanceOf<SlicingEngine.Result.Ok<*>>()
-        val slices = (result as SlicingEngine.Result.Ok).value.slices
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
         val ids = slices[0].data
         ids.contains("\"ids\":[1,2,") shouldBe true
         ids.contains(",99,100]") shouldBe true
@@ -700,27 +701,27 @@ private fun createRuleSet(
 private class MockContractRegistry(
     private val ruleSet: RuleSetContract?,
 ) : ContractRegistryPort {
-    override suspend fun loadChangeSetContract(ref: ContractRef): ContractRegistryPort.Result<ChangeSetContract> {
+    override suspend fun loadChangeSetContract(ref: ContractRef): Result<ChangeSetContract> {
         throw NotImplementedError("Not needed for this test")
     }
 
-    override suspend fun loadJoinSpecContract(ref: ContractRef): ContractRegistryPort.Result<JoinSpecContract> {
+    override suspend fun loadJoinSpecContract(ref: ContractRef): Result<JoinSpecContract> {
         throw NotImplementedError("Not needed for this test")
     }
 
-    override suspend fun loadInvertedIndexContract(ref: ContractRef): ContractRegistryPort.Result<InvertedIndexContract> {
+    override suspend fun loadInvertedIndexContract(ref: ContractRef): Result<InvertedIndexContract> {
         throw NotImplementedError("Not needed for this test")
     }
 
-    override suspend fun loadRuleSetContract(ref: ContractRef): ContractRegistryPort.Result<RuleSetContract> {
+    override suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract> {
         return if (ruleSet != null) {
-            ContractRegistryPort.Result.Ok(ruleSet)
+            Result.Ok(ruleSet)
         } else {
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("RuleSet", ref.id))
+            Result.Err(DomainError.NotFoundError("RuleSet", ref.id))
         }
     }
 
-    override suspend fun loadViewDefinitionContract(ref: ContractRef): ContractRegistryPort.Result<ViewDefinitionContract> {
+    override suspend fun loadViewDefinitionContract(ref: ContractRef): Result<ViewDefinitionContract> {
         throw NotImplementedError("Not needed for this test")
     }
 }

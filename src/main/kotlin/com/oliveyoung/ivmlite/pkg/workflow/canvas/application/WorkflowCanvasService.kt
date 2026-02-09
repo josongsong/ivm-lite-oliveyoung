@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.observability.ports.MetricsCollectorPort
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.domain.*
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.ports.WorkflowGraphBuilderPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import java.time.Instant
 
 /**
@@ -179,13 +180,6 @@ class WorkflowCanvasService(
             errorRate = 0.0,
             throughputTrend = emptyList()
         )
-    }
-
-    // ==================== Result Type ====================
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
     }
 }
 

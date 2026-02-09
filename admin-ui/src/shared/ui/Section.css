@@ -1,0 +1,289 @@
+/**
+ * Section Component Styles
+ */
+
+/* =============================================================================
+   Section Header
+   ============================================================================= */
+
+.ui-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ui-section-header__left {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.ui-section-header__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-cyan);
+  flex-shrink: 0;
+}
+
+.ui-section-header__text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.ui-section-header__title {
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.ui-section-header__subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.ui-section-header__count {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.1);
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+  flex-shrink: 0;
+}
+
+.ui-section-header__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+
+/* Size variants */
+.ui-section-header--sm {
+  padding: 0.5rem 0;
+}
+
+.ui-section-header--sm .ui-section-header__title {
+  font-size: 0.8125rem;
+}
+
+.ui-section-header--md {
+  padding: 0.75rem 0;
+}
+
+.ui-section-header--md .ui-section-header__title {
+  font-size: 0.875rem;
+}
+
+.ui-section-header--lg {
+  padding: 1rem 0;
+}
+
+.ui-section-header--lg .ui-section-header__title {
+  font-size: 1rem;
+}
+
+/* =============================================================================
+   Collapsible Section
+   ============================================================================= */
+
+.ui-collapsible {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  background: var(--bg-card);
+  overflow: hidden;
+}
+
+.ui-collapsible--error {
+  border-color: var(--status-error);
+}
+
+.ui-collapsible--warning {
+  border-color: var(--status-warning);
+}
+
+.ui-collapsible__trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.75rem 1rem;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  color: var(--text-primary);
+  transition: background 0.15s ease;
+}
+
+.ui-collapsible__trigger:hover {
+  background: var(--bg-hover);
+}
+
+.ui-collapsible__trigger:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: -2px;
+}
+
+.ui-collapsible__chevron {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-muted);
+  transition: transform 0.2s ease;
+}
+
+.ui-collapsible__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-cyan);
+}
+
+.ui-collapsible--error .ui-collapsible__icon {
+  color: var(--status-error);
+}
+
+.ui-collapsible--warning .ui-collapsible__icon {
+  color: var(--status-warning);
+}
+
+.ui-collapsible__title {
+  font-size: 0.875rem;
+  font-weight: 500;
+  flex: 1;
+}
+
+.ui-collapsible__count {
+  font-family: var(--font-mono);
+  font-size: 0.6875rem;
+  font-weight: 500;
+  color: var(--accent-cyan);
+  background: rgba(0, 212, 255, 0.1);
+  padding: 0.125rem 0.375rem;
+  border-radius: 9999px;
+}
+
+.ui-collapsible--error .ui-collapsible__count {
+  color: var(--status-error);
+  background: rgba(255, 68, 102, 0.1);
+}
+
+.ui-collapsible__content {
+  overflow: hidden;
+}
+
+.ui-collapsible__inner {
+  padding: 0 1rem 1rem 1rem;
+  border-top: 1px solid var(--border-color);
+  padding-top: 1rem;
+}
+
+/* Size variants */
+.ui-collapsible--sm .ui-collapsible__trigger {
+  padding: 0.5rem 0.75rem;
+}
+
+.ui-collapsible--sm .ui-collapsible__title {
+  font-size: 0.8125rem;
+}
+
+.ui-collapsible--lg .ui-collapsible__trigger {
+  padding: 1rem 1.25rem;
+}
+
+.ui-collapsible--lg .ui-collapsible__title {
+  font-size: 1rem;
+}
+
+/* =============================================================================
+   Group Panel
+   ============================================================================= */
+
+.ui-group-panel {
+  border-radius: var(--radius-md);
+}
+
+.ui-group-panel--default {
+  background: transparent;
+}
+
+.ui-group-panel--outlined {
+  border: 1px solid var(--border-color);
+  background: transparent;
+}
+
+.ui-group-panel--filled {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+}
+
+.ui-group-panel .ui-section-header {
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ui-group-panel--default .ui-section-header {
+  padding: 0.75rem 0;
+  border-bottom: none;
+}
+
+.ui-group-panel__content {
+  padding: 1rem;
+}
+
+.ui-group-panel--default .ui-group-panel__content {
+  padding: 0;
+}
+
+.ui-group-panel__content--no-padding {
+  padding: 0;
+}
+
+/* =============================================================================
+   Divider
+   ============================================================================= */
+
+.ui-divider {
+  background: var(--border-color);
+}
+
+.ui-divider--horizontal {
+  height: 1px;
+  width: 100%;
+  margin: 1rem 0;
+}
+
+.ui-divider--vertical {
+  width: 1px;
+  height: 100%;
+  margin: 0 1rem;
+}
+
+.ui-divider--labeled {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  background: transparent;
+}
+
+.ui-divider__line {
+  flex: 1;
+  height: 1px;
+  background: var(--border-color);
+}
+
+.ui-divider__label {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}

@@ -18,6 +18,7 @@ import com.oliveyoung.ivmlite.sdk.schema.TypedQueryBuilder
 import com.oliveyoung.ivmlite.sdk.schema.ViewRef
 import com.oliveyoung.ivmlite.shared.config.KafkaConfig
 import com.oliveyoung.ivmlite.shared.config.WorkerConfig
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.Topic
 import kotlinx.coroutines.flow.Flow
 
@@ -54,75 +55,141 @@ import kotlinx.coroutines.flow.Flow
  * ```
  */
 object Ivm {
+    // ===== 상태 =====
+    @Volatile
+    private var initialized: Boolean = false
+
+    @Volatile
+    private var context: IvmContext = IvmContext.EMPTY
+
     @Volatile
     private var config: IvmClientConfig = IvmClientConfig()
-    
+
     @Volatile
     private var executor: DeployExecutor? = null
-    
-    // 캐싱된 클라이언트 (config/executor 변경 시 무효화)
+
     @Volatile
     private var cachedClient: IvmClient? = null
-    
-    private val lock = Any()
 
-    /**
-     * SDK 설정
-     * 
-     * 스레드 안전: synchronized로 동시 접근 보호
-     * 
-     * @example
-     * ```kotlin
-     * Ivm.configure {
-     *     tenantId = "oliveyoung"
-     * }
-     * ```
-     */
-    fun configure(block: IvmClientConfig.Builder.() -> Unit) {
-        synchronized(lock) {
-            config = IvmClientConfig.Builder().apply(block).build()
-            IvmClientConfig.global = config  // ViewRef.query() 등에서 사용
-            cachedClient = null  // 설정 변경 시 캐시 무효화
-        }
-    }
-
-    /**
-     * DeployExecutor 주입 (DI 컨테이너용)
-     * 
-     * Executor가 내부적으로 Repository를 통해 직접 DB 접근
-     * - Ingest → PostgreSQL RawData Insert
-     * - Compile → PostgreSQL Slices Insert (via SlicingWorkflow)
-     * - Ship → PostgreSQL Outbox Insert (비동기 작업용)
-     */
-    fun setExecutor(executor: DeployExecutor) {
-        synchronized(lock) {
-            this.executor = executor
-            cachedClient = null  // executor 변경 시 캐시 무효화
-        }
-    }
-    
     @Volatile
     private var queryWorkflow: com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow? = null
-    
+
     @Volatile
     private var outboxPollingWorker: com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker? = null
 
     @Volatile
     private var outboxRepository: OutboxRepositoryPort? = null
-    
+
     @Volatile
     private var kafkaConfig: KafkaConfig = KafkaConfig()
-    
+
     @Volatile
     private var workerConfig: WorkerConfig = WorkerConfig()
-    
+
+    private val lock = Any()
+
+    // ===== 신규 API: IvmContext 기반 초기화 (권장) =====
+
     /**
-     * QueryViewWorkflow 주입 (DI 컨테이너용)
-     * 
-     * Query가 내부적으로 Repository를 통해 직접 DB 접근
-     * - Query → PostgreSQL Slices Select
-     * - Contract → DynamoDB GetItem
+     * SDK 초기화 (권장 방식)
+     *
+     * IvmContext를 통해 모든 의존성을 한 번에 주입합니다.
+     *
+     * @example
+     * ```kotlin
+     * val context = IvmContext.builder()
+     *     .executor(deployExecutor)
+     *     .worker(outboxPollingWorker)
+     *     .outboxRepository(outboxRepo)
+     *     .kafkaConfig(kafkaConfig)
+     *     .workerConfig(workerConfig)
+     *     .build()
+     *
+     * Ivm.initialize(context)
+     * ```
      */
+    fun initialize(ctx: IvmContext) {
+        synchronized(lock) {
+            this.context = ctx
+            this.config = ctx.config
+            this.executor = ctx.executor
+            this.queryWorkflow = ctx.queryWorkflow
+            this.outboxPollingWorker = ctx.worker
+            this.outboxRepository = ctx.outboxRepository
+            this.kafkaConfig = ctx.kafkaConfig
+            this.workerConfig = ctx.workerConfig
+            IvmClientConfig.global = ctx.config
+            cachedClient = null
+            initialized = true
+
+            // IvmOps 자동 연동
+            com.oliveyoung.ivmlite.sdk.ops.IvmOps.initialize(ctx)
+        }
+    }
+
+    /**
+     * 현재 Context 조회
+     */
+    fun context(): IvmContext = context
+
+    /**
+     * SDK 초기화 여부 확인
+     */
+    fun isInitialized(): Boolean = initialized
+
+    /**
+     * SDK 리셋 (테스트용)
+     */
+    internal fun reset() {
+        synchronized(lock) {
+            initialized = false
+            context = IvmContext.EMPTY
+            config = IvmClientConfig()
+            executor = null
+            queryWorkflow = null
+            outboxPollingWorker = null
+            outboxRepository = null
+            kafkaConfig = KafkaConfig()
+            workerConfig = WorkerConfig()
+            cachedClient = null
+        }
+    }
+
+    // ===== 레거시 API (Deprecated - 하위 호환성) =====
+
+    /**
+     * SDK 설정
+     *
+     * @deprecated IvmContext.builder().config { ... } 사용 권장
+     */
+    @Deprecated("Use Ivm.initialize(IvmContext.builder().config { ... }.build())")
+    fun configure(block: IvmClientConfig.Builder.() -> Unit) {
+        synchronized(lock) {
+            config = IvmClientConfig.Builder().apply(block).build()
+            IvmClientConfig.global = config
+            cachedClient = null
+        }
+    }
+
+    /**
+     * DeployExecutor 주입
+     *
+     * @deprecated IvmContext.builder().executor(...) 사용 권장
+     */
+    @Deprecated("Use Ivm.initialize(IvmContext.builder().executor(...).build())")
+    fun setExecutor(executor: DeployExecutor) {
+        synchronized(lock) {
+            this.executor = executor
+            cachedClient = null
+        }
+    }
+
+    /**
+     * QueryViewWorkflow 주입
+     *
+     * @deprecated IvmContext.builder().queryWorkflow(...) 사용 권장
+     */
+    @Deprecated("Use Ivm.initialize(IvmContext.builder().queryWorkflow(...).build())")
     fun setQueryWorkflow(workflow: com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow) {
         synchronized(lock) {
             this.queryWorkflow = workflow
@@ -131,22 +198,11 @@ object Ivm {
     }
 
     /**
-     * OutboxPollingWorker 주입 (DI 컨테이너용)
-     * 
-     * SDK에서 Worker를 시작/중지할 수 있도록 합니다.
-     * 
-     * @example
-     * ```kotlin
-     * // DI 컨테이너에서 주입
-     * Ivm.setWorker(worker)
-     * 
-     * // Worker 시작
-     * Ivm.worker.start()
-     * 
-     * // Worker 중지
-     * Ivm.worker.stop()
-     * ```
+     * OutboxPollingWorker 주입
+     *
+     * @deprecated IvmContext.builder().worker(...) 사용 권장
      */
+    @Deprecated("Use Ivm.initialize(IvmContext.builder().worker(...).build())")
     fun setWorker(worker: com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker) {
         synchronized(lock) {
             this.outboxPollingWorker = worker
@@ -154,18 +210,11 @@ object Ivm {
     }
 
     /**
-     * OutboxRepository 주입 (DI 컨테이너용)
-     * 
-     * SDK에서 Outbox 이벤트를 consume할 수 있도록 합니다.
-     * 
-     * @example
-     * ```kotlin
-     * Ivm.setOutboxRepository(outboxRepo)
-     * 
-     * // 특정 토픽만 consume
-     * val entries = Ivm.consume(Topic.RAW_DATA).poll()
-     * ```
+     * OutboxRepository 주입
+     *
+     * @deprecated IvmContext.builder().outboxRepository(...) 사용 권장
      */
+    @Deprecated("Use Ivm.initialize(IvmContext.builder().outboxRepository(...).build())")
     fun setOutboxRepository(repo: OutboxRepositoryPort) {
         synchronized(lock) {
             this.outboxRepository = repo
@@ -173,12 +222,15 @@ object Ivm {
     }
 
     /**
-     * Kafka/Worker 설정 주입 (DI 컨테이너용)
+     * Kafka/Worker 설정 주입
+     *
+     * @deprecated IvmContext.builder().kafkaConfig(...).workerConfig(...) 사용 권장
      */
-    fun setConfigs(kafka: KafkaConfig, worker: WorkerConfig) {
+    @Deprecated("Use Ivm.initialize(IvmContext.builder().kafkaConfig(...).workerConfig(...).build())")
+    fun setConfigs(kafka: KafkaConfig, workerCfg: WorkerConfig) {
         synchronized(lock) {
             this.kafkaConfig = kafka
-            this.workerConfig = worker
+            this.workerConfig = workerCfg
         }
     }
 
@@ -562,8 +614,8 @@ class ConsumeBuilder(
         }
         
         return when (result) {
-            is OutboxRepositoryPort.Result.Ok -> result.value
-            is OutboxRepositoryPort.Result.Err -> emptyList()
+            is Result.Ok -> result.value
+            is Result.Err -> emptyList()
         }
     }
 

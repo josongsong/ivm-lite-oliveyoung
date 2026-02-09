@@ -1,6 +1,8 @@
 package com.oliveyoung.ivmlite.apps.admin.routes
 
 import com.oliveyoung.ivmlite.apps.admin.application.*
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -34,13 +36,13 @@ fun Route.contractRoutes() {
      */
     get("/contracts") {
         when (val result = contractService.getAllContracts()) {
-            is AdminContractService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, ContractListResponse(
                     contracts = result.value.map { it.toResponse() },
                     total = result.value.size
                 ))
             }
-            is AdminContractService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -52,13 +54,13 @@ fun Route.contractRoutes() {
      */
     get("/contracts/schemas") {
         when (val result = contractService.getByKind(ContractKind.ENTITY_SCHEMA)) {
-            is AdminContractService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, ContractListResponse(
                     contracts = result.value.map { it.toResponse() },
                     total = result.value.size
                 ))
             }
-            is AdminContractService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -70,13 +72,13 @@ fun Route.contractRoutes() {
      */
     get("/contracts/rulesets") {
         when (val result = contractService.getByKind(ContractKind.RULESET)) {
-            is AdminContractService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, ContractListResponse(
                     contracts = result.value.map { it.toResponse() },
                     total = result.value.size
                 ))
             }
-            is AdminContractService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -88,13 +90,13 @@ fun Route.contractRoutes() {
      */
     get("/contracts/views") {
         when (val result = contractService.getByKind(ContractKind.VIEW_DEFINITION)) {
-            is AdminContractService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, ContractListResponse(
                     contracts = result.value.map { it.toResponse() },
                     total = result.value.size
                 ))
             }
-            is AdminContractService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -106,13 +108,13 @@ fun Route.contractRoutes() {
      */
     get("/contracts/sinks") {
         when (val result = contractService.getByKind(ContractKind.SINK_RULE)) {
-            is AdminContractService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, ContractListResponse(
                     contracts = result.value.map { it.toResponse() },
                     total = result.value.size
                 ))
             }
-            is AdminContractService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -132,10 +134,10 @@ fun Route.contractRoutes() {
             ?: throw IllegalArgumentException("Invalid contract kind: $kindParam")
 
         when (val result = contractService.getById(kind, id)) {
-            is AdminContractService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminContractService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -147,10 +149,10 @@ fun Route.contractRoutes() {
      */
     get("/contracts/stats") {
         when (val result = contractService.getStats()) {
-            is AdminContractService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminContractService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }

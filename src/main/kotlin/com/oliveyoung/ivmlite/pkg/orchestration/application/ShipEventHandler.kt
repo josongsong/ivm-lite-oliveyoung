@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.orchestration.application
 
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -68,13 +69,13 @@ class ShipEventHandler(
         )
         
         when (result) {
-            is ShipWorkflow.Result.Ok -> {
+            is Result.Ok -> {
                 logger.info("Ship success: entity={}, sink={}, latency={}ms",
                     payload.entityKey, payload.sink, result.value.latencyMs)
                 // Job 상태 업데이트: DONE
                 deployJobRepository?.updateState(entry.id.toString(), "DONE")
             }
-            is ShipWorkflow.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Ship failed: entity={}, error={}", payload.entityKey, result.error)
                 // Job 상태 업데이트: FAILED
                 deployJobRepository?.updateState(entry.id.toString(), "FAILED", result.error.toString())
@@ -107,15 +108,15 @@ class ShipEventHandler(
         )
         
         when (result) {
-            is SlicingWorkflow.Result.Ok -> {
-                logger.info("Compile success: entity={}, slices={}", 
+            is Result.Ok -> {
+                logger.info("Compile success: entity={}, slices={}",
                     payload.entityKey, result.value.size)
-                
+
                 // Ship이 있으면 READY 상태, 없으면 DONE
                 val nextState = if (payload.shipSpec == "present") "READY" else "DONE"
                 deployJobRepository?.updateState(entry.id.toString(), nextState)
             }
-            is SlicingWorkflow.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Compile failed: entity={}, error={}", payload.entityKey, result.error)
                 deployJobRepository?.updateState(entry.id.toString(), "FAILED", result.error.toString())
                 throw OutboxPollingWorker.ProcessingException("Compile failed: ${result.error}")
@@ -159,11 +160,6 @@ interface DeployJobRepositoryPort {
     suspend fun save(job: DeployJobRecord): Result<DeployJobRecord>
     suspend fun get(jobId: String): Result<DeployJobRecord?>
     suspend fun updateState(jobId: String, state: String, error: String? = null): Result<Unit>
-    
-    sealed interface Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>
-        data class Err(val error: String) : Result<Nothing>
-    }
 }
 
 /**

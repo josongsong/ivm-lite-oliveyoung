@@ -1,0 +1,164 @@
+/**
+ * ShadowScale Component Styles
+ * Phase 4-D: Shadows Foundation
+ */
+
+/* Header */
+.shadow-scale {
+  padding: 1.5rem;
+}
+
+.shadow-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.shadow-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent-purple) 100%);
+  color: white;
+  flex-shrink: 0;
+}
+
+.shadow-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.shadow-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+  max-width: 600px;
+}
+
+/* Category */
+.shadow-category {
+  margin-bottom: 2.5rem;
+}
+
+.shadow-category-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.shadow-category-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.25rem 0;
+}
+
+/* Grid */
+.shadow-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 1rem;
+}
+
+/* Card */
+.shadow-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 1rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.shadow-card:hover {
+  border-color: var(--accent-cyan);
+  transform: translateY(-2px);
+}
+
+.shadow-preview {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100px;
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  margin-bottom: 0.75rem;
+}
+
+.shadow-preview-inner {
+  width: 60px;
+  height: 60px;
+  background: var(--bg-card);
+  border-radius: 8px;
+}
+
+/* Info */
+.shadow-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.shadow-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+}
+
+.shadow-description {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.shadow-variable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.7rem;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  color: var(--accent-cyan);
+  margin-top: 0.25rem;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Usage */
+.shadow-usage {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.shadow-usage-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.shadow-usage-code {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 0;
+  overflow-x: auto;
+}
+
+.shadow-usage-code code {
+  font-family: var(--font-mono, 'Fira Code', monospace);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre;
+}

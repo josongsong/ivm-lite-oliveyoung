@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.pkg.slices.adapters
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.InvariantViolation
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.NotFoundError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
@@ -15,33 +16,33 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
     override suspend fun healthCheck(): Boolean = true
     private val store = ConcurrentHashMap<String, SliceRecord>()
 
-    override suspend fun putAllIdempotent(slices: List<SliceRecord>): SliceRepositoryPort.Result<Unit> {
+    override suspend fun putAllIdempotent(slices: List<SliceRecord>): Result<Unit> {
         for (s in slices) {
             val k = key(s.tenantId, s.entityKey, s.version, s.sliceType)
             val prev = store.putIfAbsent(k, s)
             if (prev != null && prev.hash != s.hash) {
-                return SliceRepositoryPort.Result.Err(InvariantViolation("Slice hash mismatch for $k"))
+                return Result.Err(InvariantViolation("Slice hash mismatch for $k"))
             }
         }
-        return SliceRepositoryPort.Result.Ok(Unit)
+        return Result.Ok(Unit)
     }
 
     override suspend fun batchGet(
         tenantId: TenantId,
         keys: List<SliceRepositoryPort.SliceKey>,
         includeTombstones: Boolean,
-    ): SliceRepositoryPort.Result<List<SliceRecord>> {
+    ): Result<List<SliceRecord>> {
         val out = mutableListOf<SliceRecord>()
         for (k in keys) {
             val kk = key(k.tenantId, k.entityKey, k.version, k.sliceType)
-            val v = store[kk] ?: return SliceRepositoryPort.Result.Err(NotFoundError("Slice", kk))
+            val v = store[kk] ?: return Result.Err(NotFoundError("Slice", kk))
             // tombstone 필터링: includeTombstones=false면 삭제된 slice는 NotFound 처리
             if (!includeTombstones && v.isDeleted) {
-                return SliceRepositoryPort.Result.Err(NotFoundError("Slice", kk))
+                return Result.Err(NotFoundError("Slice", kk))
             }
             out += v
         }
-        return SliceRepositoryPort.Result.Ok(out)
+        return Result.Ok(out)
     }
 
     override suspend fun getByVersion(
@@ -49,11 +50,11 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
         entityKey: EntityKey,
         version: Long,
         includeTombstones: Boolean,
-    ): SliceRepositoryPort.Result<List<SliceRecord>> {
+    ): Result<List<SliceRecord>> {
         val result = store.values
             .filter { it.tenantId == tenantId && it.entityKey == entityKey && it.version == version }
             .filter { includeTombstones || !it.isDeleted }
-        return SliceRepositoryPort.Result.Ok(result)
+        return Result.Ok(result)
     }
 
     override suspend fun findByKeyPrefix(
@@ -62,7 +63,7 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
         sliceType: SliceType?,
         limit: Int,
         cursor: String?,
-    ): SliceRepositoryPort.Result<SliceRepositoryPort.RangeQueryResult> {
+    ): Result<SliceRepositoryPort.RangeQueryResult> {
         // 커서 파싱 (형식: entityKey|version)
         val startKey = cursor?.let {
             val parts = it.split("|")
@@ -97,7 +98,7 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
             null
         }
         
-        return SliceRepositoryPort.Result.Ok(SliceRepositoryPort.RangeQueryResult(
+        return Result.Ok(SliceRepositoryPort.RangeQueryResult(
             items = resultItems,
             nextCursor = nextCursor,
             hasMore = hasMore
@@ -108,7 +109,7 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
         tenantId: TenantId,
         keyPrefix: String?,
         sliceType: SliceType?,
-    ): SliceRepositoryPort.Result<Long> {
+    ): Result<Long> {
         val count = store.values
             .filter { it.tenantId == tenantId }
             .filter { keyPrefix == null || it.entityKey.value.startsWith(keyPrefix) }
@@ -117,27 +118,27 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
             .count()
             .toLong()
         
-        return SliceRepositoryPort.Result.Ok(count)
+        return Result.Ok(count)
     }
 
     override suspend fun getLatestVersion(
         tenantId: TenantId,
         entityKey: EntityKey,
         sliceType: SliceType?,
-    ): SliceRepositoryPort.Result<List<SliceRecord>> {
+    ): Result<List<SliceRecord>> {
         val allSlices = store.values
             .filter { it.tenantId == tenantId && it.entityKey == entityKey }
             .filter { sliceType == null || it.sliceType == sliceType }
             .filter { !it.isDeleted }
         
         if (allSlices.isEmpty()) {
-            return SliceRepositoryPort.Result.Ok(emptyList())
+            return Result.Ok(emptyList())
         }
         
         val latestVersion = allSlices.maxOf { it.version }
         val result = allSlices.filter { it.version == latestVersion }
         
-        return SliceRepositoryPort.Result.Ok(result)
+        return Result.Ok(result)
     }
 
     private fun key(t: TenantId, e: EntityKey, v: Long, st: SliceType): String =

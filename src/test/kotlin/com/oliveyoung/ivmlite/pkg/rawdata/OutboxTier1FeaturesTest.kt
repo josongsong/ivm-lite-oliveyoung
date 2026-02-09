@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.rawdata
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
@@ -44,17 +45,17 @@ class OutboxTier1FeaturesTest : StringSpec({
 
         // When: claim
         val claimResult = outboxRepo.claim(1, null, "worker-1")
-        (claimResult as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (claimResult as Result.Ok).value shouldHaveSize 1
 
         // Then: PENDING이 없어짐
         val pendingAfterClaim = outboxRepo.findPending(10)
-        (pendingAfterClaim as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (pendingAfterClaim as Result.Ok).value.shouldBeEmpty()
 
         // When: visibility timeout 경과 시뮬레이션 (30초)
         val released = outboxRepo.releaseExpiredClaims(visibilityTimeoutSeconds = 30)
         
         // Then: 아직 30초 안 지났으므로 release 안됨
-        (released as OutboxRepositoryPort.Result.Ok).value shouldBe 0
+        (released as Result.Ok).value shouldBe 0
     }
 
     "Visibility Timeout - 30초 지나면 자동 release되어 재처리 가능" {
@@ -77,11 +78,11 @@ class OutboxTier1FeaturesTest : StringSpec({
         val released = outboxRepo.releaseExpiredClaims(visibilityTimeoutSeconds = 30)
 
         // Then: 1개 release됨
-        (released as OutboxRepositoryPort.Result.Ok).value shouldBe 1
+        (released as Result.Ok).value shouldBe 1
 
         // And: PENDING 상태로 다시 조회 가능
         val pending = outboxRepo.findPending(10)
-        (pending as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (pending as Result.Ok).value shouldHaveSize 1
         pending.value[0].status shouldBe OutboxStatus.PENDING
         pending.value[0].claimedAt shouldBe null
     }
@@ -106,7 +107,7 @@ class OutboxTier1FeaturesTest : StringSpec({
         val released = outboxRepo.releaseExpiredClaims(visibilityTimeoutSeconds = 30)
 
         // Then: 0개 (PROCESSED는 release 대상 아님)
-        (released as OutboxRepositoryPort.Result.Ok).value shouldBe 0
+        (released as Result.Ok).value shouldBe 0
     }
 
     // ==================== 2. Dead Letter Queue (DLQ) ====================
@@ -131,15 +132,15 @@ class OutboxTier1FeaturesTest : StringSpec({
         val movedToDlq = outboxRepo.moveToDlq(maxRetryCount = 5)
 
         // Then: 1개 이동됨
-        (movedToDlq as OutboxRepositoryPort.Result.Ok).value shouldBe 1
+        (movedToDlq as Result.Ok).value shouldBe 1
 
         // And: 원본 테이블에서 제거됨
         val pending = outboxRepo.findPending(10)
-        (pending as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (pending as Result.Ok).value.shouldBeEmpty()
 
         // And: DLQ에서 조회 가능
         val dlqEntries = outboxRepo.findDlq(10)
-        (dlqEntries as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (dlqEntries as Result.Ok).value shouldHaveSize 1
         dlqEntries.value[0].failureReason shouldBe "Repeated failure"
     }
 
@@ -163,7 +164,7 @@ class OutboxTier1FeaturesTest : StringSpec({
         val movedToDlq = outboxRepo.moveToDlq(maxRetryCount = 5)
 
         // Then: 0개 (아직 재시도 가능)
-        (movedToDlq as OutboxRepositoryPort.Result.Ok).value shouldBe 0
+        (movedToDlq as Result.Ok).value shouldBe 0
     }
 
     "DLQ - DLQ에서 원본으로 재시도 (replay)" {
@@ -187,11 +188,11 @@ class OutboxTier1FeaturesTest : StringSpec({
         val replayed = outboxRepo.replayFromDlq(dlqEntry.id)
 
         // Then: 성공
-        (replayed as OutboxRepositoryPort.Result.Ok).value shouldBe true
+        (replayed as Result.Ok).value shouldBe true
 
         // And: 원본 테이블에 PENDING으로 복귀 (retryCount 리셋)
         val pending = outboxRepo.findPending(10)
-        (pending as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (pending as Result.Ok).value shouldHaveSize 1
         pending.value[0].status shouldBe OutboxStatus.PENDING
         pending.value[0].retryCount shouldBe 0
     }
@@ -212,7 +213,7 @@ class OutboxTier1FeaturesTest : StringSpec({
         val claimed = outboxRepo.claimByPriority(limit = 3, workerId = "worker-1")
 
         // Then: 높은 우선순위(낮은 숫자)부터
-        val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimed as Result.Ok).value
         entries shouldHaveSize 3
         entries[0].aggregateId shouldBe "tenant:high"
         entries[1].aggregateId shouldBe "tenant:medium"
@@ -231,7 +232,7 @@ class OutboxTier1FeaturesTest : StringSpec({
         val claimed = outboxRepo.claimByPriority(limit = 2, workerId = "worker-1")
 
         // Then: 먼저 생성된 것 우선
-        val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimed as Result.Ok).value
         entries[0].aggregateId shouldBe "tenant:older"
         entries[1].aggregateId shouldBe "tenant:newer"
     }
@@ -253,7 +254,7 @@ class OutboxTier1FeaturesTest : StringSpec({
         val claimed = outboxRepo.claimByPriority(limit = 2, workerId = "worker-1")
 
         // Then: 명시적 높은 우선순위가 먼저
-        val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimed as Result.Ok).value
         entries[0].aggregateId shouldBe "tenant:high"
         entries[1].aggregateId shouldBe "tenant:default"
     }
@@ -274,7 +275,7 @@ class OutboxTier1FeaturesTest : StringSpec({
         val claimed = outboxRepo.claimWithOrdering(limit = 1, workerId = "worker-1")
 
         // Then: v1만 claim됨 (v2, v3는 아직 불가)
-        val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimed as Result.Ok).value
         entries shouldHaveSize 1
         entries[0].payload shouldBe """{"version":1}"""
     }
@@ -293,7 +294,7 @@ class OutboxTier1FeaturesTest : StringSpec({
         val claimed = outboxRepo.claimWithOrdering(limit = 3, workerId = "worker-1")
 
         // Then: entity-A v1과 entity-B v1만 claim됨 (각 entity의 첫 번째만)
-        val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimed as Result.Ok).value
         entries shouldHaveSize 2
         entries.map { it.aggregateId }.toSet() shouldBe setOf("tenant:entity-A", "tenant:entity-B")
     }
@@ -308,12 +309,12 @@ class OutboxTier1FeaturesTest : StringSpec({
 
         // When: v1 claim 및 처리 완료
         val claimedV1 = outboxRepo.claimWithOrdering(limit = 1, workerId = "worker-1")
-        val v1Entry = (claimedV1 as OutboxRepositoryPort.Result.Ok).value[0]
+        val v1Entry = (claimedV1 as Result.Ok).value[0]
         outboxRepo.markProcessed(listOf(v1Entry.id))
 
         // Then: v2 claim 가능
         val claimedV2 = outboxRepo.claimWithOrdering(limit = 1, workerId = "worker-1")
-        val entries = (claimedV2 as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimedV2 as Result.Ok).value
         entries shouldHaveSize 1
         entries[0].payload shouldBe """{"version":2}"""
     }
@@ -341,7 +342,7 @@ class OutboxTier1FeaturesTest : StringSpec({
         val claimed = outboxRepo.claimWithOrdering(limit = 1, workerId = "worker-2")
 
         // Then: entity-A의 v1이 PROCESSING이므로 v2 claim 불가, 빈 결과
-        val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimed as Result.Ok).value
         entries.shouldBeEmpty()
     }
 
@@ -349,17 +350,17 @@ class OutboxTier1FeaturesTest : StringSpec({
 
     "Edge Case - 빈 테이블에서 claim" {
         val claimed = outboxRepo.claim(10, null, "worker-1")
-        (claimed as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (claimed as Result.Ok).value.shouldBeEmpty()
     }
 
     "Edge Case - DLQ 빈 상태에서 replay" {
         val replayed = outboxRepo.replayFromDlq(java.util.UUID.randomUUID())
-        (replayed as OutboxRepositoryPort.Result.Ok).value shouldBe false
+        (replayed as Result.Ok).value shouldBe false
     }
 
     "Edge Case - 음수 limit" {
         val claimed = outboxRepo.claim(-1, null, "worker-1")
-        (claimed as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (claimed as Result.Ok).value.shouldBeEmpty()
     }
 
     "Edge Case - 동시에 여러 worker가 같은 entry claim 시도" {
@@ -377,8 +378,8 @@ class OutboxTier1FeaturesTest : StringSpec({
         val claimed2 = outboxRepo.claim(1, null, "worker-2")
 
         // Then: 하나만 성공
-        val total = (claimed1 as OutboxRepositoryPort.Result.Ok).value.size +
-                    (claimed2 as OutboxRepositoryPort.Result.Ok).value.size
+        val total = (claimed1 as Result.Ok).value.size +
+                    (claimed2 as Result.Ok).value.size
         total shouldBe 1
     }
 })

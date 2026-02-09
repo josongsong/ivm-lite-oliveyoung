@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.webhooks.domain.RetryPolicy
 import com.oliveyoung.ivmlite.pkg.webhooks.domain.Webhook
 import com.oliveyoung.ivmlite.pkg.webhooks.domain.WebhookEvent
 import com.oliveyoung.ivmlite.pkg.webhooks.ports.WebhookRepositoryPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import kotlinx.serialization.encodeToString
@@ -99,7 +100,7 @@ class JooqWebhookRepository(
         }
     }
 
-    override suspend fun save(webhook: Webhook): WebhookRepositoryPort.Result = withContext(Dispatchers.IO) {
+    override suspend fun save(webhook: Webhook): Result<Webhook> = withContext(Dispatchers.IO) {
         try {
             val eventsArray = webhook.events.map { it.name }.toTypedArray()
             val filtersJson = JSONB.valueOf(json.encodeToString(webhook.filters))
@@ -141,10 +142,10 @@ class JooqWebhookRepository(
                     .execute()
             }
 
-            WebhookRepositoryPort.Result.Ok(webhook)
+            Result.Ok(webhook)
         } catch (e: Exception) {
             logger.error("[JooqWebhookRepo] save error: ${e.message}", e)
-            WebhookRepositoryPort.Result.Error(e.message ?: "Unknown error")
+            Result.Err(com.oliveyoung.ivmlite.shared.domain.errors.DomainError.StorageError(e.message ?: "Unknown error"))
         }
     }
 

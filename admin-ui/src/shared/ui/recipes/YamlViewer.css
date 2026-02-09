@@ -1,0 +1,47 @@
+/* YamlViewer - Read-only Monaco Editor for YAML */
+
+.yaml-viewer {
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-lg);
+  overflow: hidden;
+  background: #1e1e1e;
+}
+
+/* Monaco Editor 내부 스타일 조정 */
+.yaml-viewer .monaco-editor {
+  border-radius: var(--radius-lg);
+}
+
+.yaml-viewer .monaco-editor .margin {
+  background: #1e1e1e !important;
+}
+
+.yaml-viewer .monaco-editor .monaco-editor-background {
+  background: #1e1e1e !important;
+}
+
+/* 스크롤바 스타일 */
+.yaml-viewer .monaco-scrollable-element > .scrollbar > .slider {
+  background: rgba(255, 255, 255, 0.2) !important;
+  border-radius: 4px !important;
+}
+
+.yaml-viewer .monaco-scrollable-element > .scrollbar > .slider:hover {
+  background: rgba(255, 255, 255, 0.3) !important;
+}
+
+/* 선택 영역 스타일 */
+.yaml-viewer .monaco-editor .view-overlays .selected-text {
+  background: rgba(0, 212, 255, 0.2) !important;
+}
+
+/* 검색 하이라이트 */
+.yaml-viewer .monaco-editor .findMatch {
+  background: rgba(255, 204, 0, 0.3) !important;
+  border: 1px solid rgba(255, 204, 0, 0.6) !important;
+}
+
+.yaml-viewer .monaco-editor .currentFindMatch {
+  background: rgba(255, 204, 0, 0.5) !important;
+  border: 1px solid #ffcc00 !important;
+}

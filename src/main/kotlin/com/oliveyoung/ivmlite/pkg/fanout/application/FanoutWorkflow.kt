@@ -15,6 +15,7 @@ import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
@@ -198,8 +199,8 @@ class FanoutWorkflow(
     suspend fun inferDependencies(upstreamEntityType: String): Result<List<FanoutDependency>> {
         // 모든 활성 RuleSet 조회
         val ruleSets = when (val r = contractRegistry.loadRuleSetContract(V1_RULESET_REF)) {
-            is ContractRegistryPort.Result.Ok -> listOf(r.value)
-            is ContractRegistryPort.Result.Err -> return Result.Err(r.error)
+            is Result.Ok -> listOf(r.value)
+            is Result.Err -> return Result.Err(r.error)
         }
 
         val dependencies = mutableListOf<FanoutDependency>()
@@ -293,8 +294,8 @@ class FanoutWorkflow(
                 indexType = dependency.indexType,
                 indexValue = normalizedIndexValue,
             )) {
-                is InvertedIndexRepositoryPort.Result.Ok -> r.value
-                is InvertedIndexRepositoryPort.Result.Err -> {
+                is Result.Ok -> r.value
+                is Result.Err -> {
                     log.error("Failed to count fanout targets: {}", r.error)
                     return@withSpanSuspend DependencyFanoutResult(
                         dependency = dependency,
@@ -386,8 +387,8 @@ class FanoutWorkflow(
                             limit = effectiveConfig.batchSize,
                             cursor = cursor,
                         )) {
-                            is InvertedIndexRepositoryPort.Result.Ok -> r.value
-                            is InvertedIndexRepositoryPort.Result.Err -> {
+                            is Result.Ok -> r.value
+                            is Result.Err -> {
                                 log.error("Failed to query fanout targets: {}", r.error)
                                 failedCount++
                                 break
@@ -470,11 +471,11 @@ class FanoutWorkflow(
             if (targetSliceTypes.isEmpty()) {
                 // 전체 재슬라이싱
                 when (val r = slicingWorkflow.execute(tenantId, target.entityKey, newVersion)) {
-                    is SlicingWorkflow.Result.Ok -> {
+                    is Result.Ok -> {
                         log.debug("Successfully re-sliced: {}#{}", target.entityKey.value, newVersion)
                         true
                     }
-                    is SlicingWorkflow.Result.Err -> {
+                    is Result.Err -> {
                         log.error("Failed to re-slice {}: {}", target.entityKey.value, r.error)
                         false
                     }
@@ -484,11 +485,11 @@ class FanoutWorkflow(
                 // NOTE: 현재 SlicingWorkflow는 sliceType 필터를 지원하지 않음
                 // 전체 재슬라이싱 후 필요한 것만 저장하는 방식으로 구현
                 when (val r = slicingWorkflow.execute(tenantId, target.entityKey, newVersion)) {
-                    is SlicingWorkflow.Result.Ok -> {
+                    is Result.Ok -> {
                         log.debug("Successfully re-sliced (filtered): {}#{}", target.entityKey.value, newVersion)
                         true
                     }
-                    is SlicingWorkflow.Result.Err -> {
+                    is Result.Err -> {
                         log.error("Failed to re-slice {}: {}", target.entityKey.value, r.error)
                         false
                     }
@@ -561,11 +562,6 @@ class FanoutWorkflow(
         } else {
             entityKey.value  // 비표준 포맷 (방어적 코딩)
         }
-    }
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
     }
 }
 

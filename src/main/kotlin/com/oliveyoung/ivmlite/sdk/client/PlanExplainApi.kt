@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.sdk.client
 import com.oliveyoung.ivmlite.pkg.orchestration.adapters.DeployPlanRepositoryPort
 import com.oliveyoung.ivmlite.sdk.model.DeployPlan
 import com.oliveyoung.ivmlite.sdk.model.DependencyGraph
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.coroutines.runBlocking
 
 /**
@@ -26,10 +27,10 @@ class PlanExplainApi internal constructor(
         if (repository != null) {
             return runBlocking {
                 when (val result = repository.get(deployId)) {
-                    is DeployPlanRepositoryPort.Result.Ok -> {
+                    is Result.Ok -> {
                         result.value?.toDeployPlan() ?: defaultPlan(deployId)
                     }
-                    is DeployPlanRepositoryPort.Result.Err -> {
+                    is Result.Err -> {
                         defaultPlan(deployId)
                     }
                 }
@@ -48,10 +49,10 @@ class PlanExplainApi internal constructor(
         if (repository != null) {
             return runBlocking {
                 when (val result = repository.getByEntityKey(entityKey)) {
-                    is DeployPlanRepositoryPort.Result.Ok -> {
+                    is Result.Ok -> {
                         result.value.map { it.toDeployPlan() }
                     }
-                    is DeployPlanRepositoryPort.Result.Err -> {
+                    is Result.Err -> {
                         emptyList()
                     }
                 }

@@ -4,7 +4,7 @@ import { ChevronRight, Clock, FileCode2, Hash, Layers } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { explorerApi } from '@/shared/api'
 import type { SliceEntry } from '@/shared/types'
-import { JsonViewer } from './JsonViewer'
+import { JsonViewer } from '@/shared/ui'
 import { Loading } from '@/shared/ui'
 import './SliceList.css'
 

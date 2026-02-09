@@ -6,6 +6,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.mockk.coEvery
@@ -322,7 +323,7 @@ class PlaygroundServiceTest {
     @Test
     fun `diff - 기존 계약이 없을 때 새 계약으로 처리`() {
         // Given
-        every { contractService.getById(any(), any()) } returns AdminContractService.Result.Err(
+        every { contractService.getById(any(), any()) } returns Result.Err(
             DomainError.NotFoundError("Contract", "test-id")
         )
         val newYaml = """
@@ -347,7 +348,7 @@ class PlaygroundServiceTest {
             id: test-ruleset
             version: 1.0.0
         """.trimIndent()
-        every { contractService.getById(any(), any()) } returns AdminContractService.Result.Ok(
+        every { contractService.getById(any(), any()) } returns Result.Ok(
             ContractInfo(
                 kind = "RULESET",
                 id = "test-ruleset",
@@ -381,7 +382,7 @@ class PlaygroundServiceTest {
             kind: RULESET
             id: test-ruleset
         """.trimIndent()
-        every { contractService.getById(any(), any()) } returns AdminContractService.Result.Ok(
+        every { contractService.getById(any(), any()) } returns Result.Ok(
             ContractInfo(
                 kind = "RULESET",
                 id = "test-ruleset",
@@ -415,7 +416,7 @@ class PlaygroundServiceTest {
             id: test-ruleset
             version: 1.0.0
         """.trimIndent()
-        every { contractService.getById(any(), any()) } returns AdminContractService.Result.Ok(
+        every { contractService.getById(any(), any()) } returns Result.Ok(
             ContractInfo(
                 kind = "RULESET",
                 id = "test-ruleset",
@@ -460,7 +461,7 @@ class PlaygroundServiceTest {
     @Test
     fun `tryOnRealData - 존재하지 않는 엔티티 시 에러`() = runTest {
         // Given
-        coEvery { rawDataRepo.getLatest(any(), any()) } returns RawDataRepositoryPort.Result.Err(
+        coEvery { rawDataRepo.getLatest(any(), any()) } returns Result.Err(
             DomainError.NotFoundError("RawData", "entity-key")
         )
         val yaml = "kind: RULESET"
@@ -494,7 +495,7 @@ class PlaygroundServiceTest {
             payload = """{"id": "P001", "name": "Test"}""",
             payloadHash = "abc123"
         )
-        coEvery { rawDataRepo.getLatest(any(), any()) } returns RawDataRepositoryPort.Result.Ok(rawDataRecord)
+        coEvery { rawDataRepo.getLatest(any(), any()) } returns Result.Ok(rawDataRecord)
 
         // When
         val result = service.tryOnRealData(validYaml, "product:P001")
@@ -521,14 +522,15 @@ class PlaygroundServiceTest {
     @Test
     fun `ValidationError - 속성 확인`() {
         val error = ValidationError(
+            level = ValidationLevel.L0_SYNTAX,
             line = 10,
             column = 5,
             message = "Test error",
-            severity = "error"
+            fix = null
         )
         assertEquals(10, error.line)
         assertEquals(5, error.column)
-        assertEquals("error", error.severity)
+        assertEquals(ValidationLevel.L0_SYNTAX, error.level)
     }
 
     @Test

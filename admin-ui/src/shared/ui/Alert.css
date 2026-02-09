@@ -1,0 +1,218 @@
+/**
+ * Alert Component Styles
+ */
+
+/* =============================================================================
+   Base Alert
+   ============================================================================= */
+
+.ui-alert {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.75rem;
+  border-radius: var(--radius-md);
+  position: relative;
+}
+
+.ui-alert__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.ui-alert__content {
+  flex: 1;
+  min-width: 0;
+}
+
+.ui-alert__title {
+  display: block;
+  font-weight: 600;
+  margin-bottom: 0.125rem;
+}
+
+.ui-alert__message {
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+
+.ui-alert__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.ui-alert__dismiss {
+  flex-shrink: 0;
+  margin-left: auto;
+}
+
+/* =============================================================================
+   Size Variants
+   ============================================================================= */
+
+.ui-alert--sm {
+  padding: 0.5rem 0.75rem;
+  font-size: 0.8125rem;
+}
+
+.ui-alert--sm .ui-alert__icon svg {
+  width: 14px;
+  height: 14px;
+}
+
+.ui-alert--md {
+  padding: 0.75rem 1rem;
+  font-size: 0.875rem;
+}
+
+.ui-alert--md .ui-alert__icon svg {
+  width: 18px;
+  height: 18px;
+}
+
+.ui-alert--lg {
+  padding: 1rem 1.25rem;
+  font-size: 1rem;
+}
+
+.ui-alert--lg .ui-alert__icon svg {
+  width: 22px;
+  height: 22px;
+}
+
+/* =============================================================================
+   Style: Subtle (default)
+   ============================================================================= */
+
+.ui-alert--subtle.ui-alert--info {
+  background: rgba(0, 212, 255, 0.08);
+  border: 1px solid rgba(0, 212, 255, 0.2);
+  color: var(--text-primary);
+}
+
+.ui-alert--subtle.ui-alert--info .ui-alert__icon {
+  color: var(--status-info);
+}
+
+.ui-alert--subtle.ui-alert--success {
+  background: rgba(0, 255, 136, 0.08);
+  border: 1px solid rgba(0, 255, 136, 0.2);
+  color: var(--text-primary);
+}
+
+.ui-alert--subtle.ui-alert--success .ui-alert__icon {
+  color: var(--status-success);
+}
+
+.ui-alert--subtle.ui-alert--warning {
+  background: rgba(255, 204, 0, 0.08);
+  border: 1px solid rgba(255, 204, 0, 0.2);
+  color: var(--text-primary);
+}
+
+.ui-alert--subtle.ui-alert--warning .ui-alert__icon {
+  color: var(--status-warning);
+}
+
+.ui-alert--subtle.ui-alert--error {
+  background: rgba(255, 68, 102, 0.08);
+  border: 1px solid rgba(255, 68, 102, 0.2);
+  color: var(--text-primary);
+}
+
+.ui-alert--subtle.ui-alert--error .ui-alert__icon {
+  color: var(--status-error);
+}
+
+/* =============================================================================
+   Style: Filled
+   ============================================================================= */
+
+.ui-alert--filled.ui-alert--info {
+  background: var(--status-info);
+  color: var(--bg-primary);
+}
+
+.ui-alert--filled.ui-alert--success {
+  background: var(--status-success);
+  color: var(--bg-primary);
+}
+
+.ui-alert--filled.ui-alert--warning {
+  background: var(--status-warning);
+  color: var(--bg-primary);
+}
+
+.ui-alert--filled.ui-alert--error {
+  background: var(--status-error);
+  color: white;
+}
+
+.ui-alert--filled .ui-alert__icon {
+  color: inherit;
+}
+
+/* =============================================================================
+   Style: Outline
+   ============================================================================= */
+
+.ui-alert--outline {
+  background: transparent;
+}
+
+.ui-alert--outline.ui-alert--info {
+  border: 1px solid var(--status-info);
+  color: var(--status-info);
+}
+
+.ui-alert--outline.ui-alert--success {
+  border: 1px solid var(--status-success);
+  color: var(--status-success);
+}
+
+.ui-alert--outline.ui-alert--warning {
+  border: 1px solid var(--status-warning);
+  color: var(--status-warning);
+}
+
+.ui-alert--outline.ui-alert--error {
+  border: 1px solid var(--status-error);
+  color: var(--status-error);
+}
+
+/* =============================================================================
+   Banner Variant
+   ============================================================================= */
+
+.ui-banner {
+  border-radius: 0;
+  width: 100%;
+}
+
+.ui-banner--centered {
+  justify-content: center;
+  text-align: center;
+}
+
+.ui-banner--centered .ui-alert__content {
+  flex: none;
+}
+
+/* =============================================================================
+   Inline Alert
+   ============================================================================= */
+
+.ui-inline-alert {
+  display: inline-flex;
+  padding: 0.25rem 0.5rem;
+  border-radius: var(--radius-sm);
+}
+
+.ui-inline-alert .ui-alert__icon svg {
+  width: 12px;
+  height: 12px;
+}

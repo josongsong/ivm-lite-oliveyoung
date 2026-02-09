@@ -1,0 +1,43 @@
+/**
+ * PanelHeader Component Styles
+ */
+
+.ui-panel-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  color: var(--text-primary, #f0f0f5);
+}
+
+.ui-panel-header__icon {
+  color: var(--accent-cyan, #00d4ff);
+  display: flex;
+  align-items: center;
+}
+
+.ui-panel-header__title {
+  font-size: 1rem;
+  font-weight: 600;
+  margin: 0;
+  flex: 1;
+}
+
+.ui-panel-header__link {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  color: var(--text-muted, #6a6a80);
+  text-decoration: none;
+  transition: color 0.2s;
+}
+
+.ui-panel-header__link:hover {
+  color: var(--accent-cyan, #00d4ff);
+}
+
+.ui-panel-header__actions {
+  display: flex;
+  gap: 0.5rem;
+}

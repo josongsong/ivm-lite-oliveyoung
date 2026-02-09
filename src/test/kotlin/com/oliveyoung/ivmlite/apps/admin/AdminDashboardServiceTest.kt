@@ -7,6 +7,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
@@ -14,7 +15,7 @@ import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.*
 import org.jooq.DSLContext
 import org.jooq.Record
-import org.jooq.Result
+import org.jooq.Result as JooqResult
 import org.jooq.SelectSelectStep
 import org.jooq.SelectJoinStep
 import org.jooq.SelectConditionStep
@@ -65,8 +66,8 @@ class AdminDashboardServiceTest : DescribeSpec({
             val result = service.getWorkerStatus()
 
             // Then
-            result.shouldBeInstanceOf<AdminDashboardService.Result.Ok<WorkerStatus>>()
-            val status = (result as AdminDashboardService.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<WorkerStatus>>()
+            val status = (result as Result.Ok).value
             status.running shouldBe true
             status.processed shouldBe 200
             status.failed shouldBe 10
@@ -88,8 +89,8 @@ class AdminDashboardServiceTest : DescribeSpec({
             val result = service.getWorkerStatus()
 
             // Then
-            result.shouldBeInstanceOf<AdminDashboardService.Result.Ok<WorkerStatus>>()
-            val status = (result as AdminDashboardService.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<WorkerStatus>>()
+            val status = (result as Result.Ok).value
             status.running shouldBe false
         }
     }
@@ -111,14 +112,14 @@ class AdminDashboardServiceTest : DescribeSpec({
                 retryCount = 0,
                 failureReason = null
             )
-            coEvery { outboxRepo.findById(id) } returns OutboxRepositoryPort.Result.Ok(entry)
+            coEvery { outboxRepo.findById(id) } returns Result.Ok(entry)
 
             // When
             val result = service.getOutboxEntry(id)
 
             // Then
-            result.shouldBeInstanceOf<AdminDashboardService.Result.Ok<OutboxEntryDetail>>()
-            val detail = (result as AdminDashboardService.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<OutboxEntryDetail>>()
+            val detail = (result as Result.Ok).value
             detail.id shouldBe id.toString()
             detail.status shouldBe "PENDING"
             detail.aggregateType shouldBe "RAW_DATA"
@@ -127,7 +128,7 @@ class AdminDashboardServiceTest : DescribeSpec({
         it("should return error when entry not found") {
             // Given
             val id = UUID.randomUUID()
-            coEvery { outboxRepo.findById(id) } returns OutboxRepositoryPort.Result.Err(
+            coEvery { outboxRepo.findById(id) } returns Result.Err(
                 DomainError.NotFoundError("OutboxEntry", id.toString())
             )
 
@@ -135,7 +136,7 @@ class AdminDashboardServiceTest : DescribeSpec({
             val result = service.getOutboxEntry(id)
 
             // Then
-            result.shouldBeInstanceOf<AdminDashboardService.Result.Err>()
+            result.shouldBeInstanceOf<Result.Err>()
         }
     }
 
@@ -156,14 +157,14 @@ class AdminDashboardServiceTest : DescribeSpec({
                 retryCount = 1,
                 failureReason = null
             )
-            coEvery { outboxRepo.resetToPending(id) } returns OutboxRepositoryPort.Result.Ok(entry)
+            coEvery { outboxRepo.resetToPending(id) } returns Result.Ok(entry)
 
             // When
             val result = service.retryEntry(id)
 
             // Then
-            result.shouldBeInstanceOf<AdminDashboardService.Result.Ok<OutboxEntryDetail>>()
-            val detail = (result as AdminDashboardService.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<OutboxEntryDetail>>()
+            val detail = (result as Result.Ok).value
             detail.status shouldBe "PENDING"
         }
     }
@@ -171,28 +172,28 @@ class AdminDashboardServiceTest : DescribeSpec({
     describe("retryAllFailed") {
         it("should reset all failed entries") {
             // Given
-            coEvery { outboxRepo.resetAllFailed(100) } returns OutboxRepositoryPort.Result.Ok(15)
+            coEvery { outboxRepo.resetAllFailed(100) } returns Result.Ok(15)
 
             // When
             val result = service.retryAllFailed(100)
 
             // Then
-            result.shouldBeInstanceOf<AdminDashboardService.Result.Ok<Int>>()
-            (result as AdminDashboardService.Result.Ok).value shouldBe 15
+            result.shouldBeInstanceOf<Result.Ok<Int>>()
+            (result as Result.Ok).value shouldBe 15
         }
     }
 
     describe("releaseStale") {
         it("should release stale processing entries") {
             // Given
-            coEvery { outboxRepo.releaseExpiredClaims(300L) } returns OutboxRepositoryPort.Result.Ok(3)
+            coEvery { outboxRepo.releaseExpiredClaims(300L) } returns Result.Ok(3)
 
             // When
             val result = service.releaseStale(300L)
 
             // Then
-            result.shouldBeInstanceOf<AdminDashboardService.Result.Ok<Int>>()
-            (result as AdminDashboardService.Result.Ok).value shouldBe 3
+            result.shouldBeInstanceOf<Result.Ok<Int>>()
+            (result as Result.Ok).value shouldBe 3
         }
     }
 
@@ -200,14 +201,14 @@ class AdminDashboardServiceTest : DescribeSpec({
         it("should replay entry from DLQ") {
             // Given
             val id = UUID.randomUUID()
-            coEvery { outboxRepo.replayFromDlq(id) } returns OutboxRepositoryPort.Result.Ok(true)
+            coEvery { outboxRepo.replayFromDlq(id) } returns Result.Ok(true)
 
             // When
             val result = service.replayDlq(id)
 
             // Then
-            result.shouldBeInstanceOf<AdminDashboardService.Result.Ok<Boolean>>()
-            (result as AdminDashboardService.Result.Ok).value shouldBe true
+            result.shouldBeInstanceOf<Result.Ok<Boolean>>()
+            (result as Result.Ok).value shouldBe true
         }
     }
 })

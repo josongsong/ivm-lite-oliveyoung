@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
@@ -79,17 +80,17 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
 
         // 첫 번째 호출 → DynamoDB 조회 + 캐시 저장
         val result1 = adapter.loadChangeSetContract(ref)
-        result1.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
         callCounter.get() shouldBe 1
 
         // 두 번째 호출 → 캐시 hit (DynamoDB 호출 없음)
         val result2 = adapter.loadChangeSetContract(ref)
-        result2.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
         callCounter.get() shouldBe 1 // 여전히 1
 
         // 세 번째 호출 → 캐시 hit
         val result3 = adapter.loadChangeSetContract(ref)
-        result3.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result3.shouldBeInstanceOf<Result.Ok<*>>()
         callCounter.get() shouldBe 1 // 여전히 1
 
         // 캐시 통계 검증
@@ -106,7 +107,7 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
         callCounter.get() shouldBe 1
         cache.stats().misses shouldBe 1
         cache.size() shouldBe 1
@@ -154,13 +155,13 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
 
         // 첫 번째 호출 → NotFound
         val result1 = adapter.loadChangeSetContract(ref)
-        result1.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result1 as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result1.shouldBeInstanceOf<Result.Err>()
+        (result1 as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
         callCounter.get() shouldBe 1
 
         // 두 번째 호출 → 다시 DynamoDB 조회 (캐싱 안됨)
         val result2 = adapter.loadChangeSetContract(ref)
-        result2.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result2.shouldBeInstanceOf<Result.Err>()
         callCounter.get() shouldBe 2
 
         // 캐시에 저장 안됨
@@ -184,7 +185,7 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
 
         // 첫 번째 호출 → ContractError
         val result1 = adapter.loadChangeSetContract(ref)
-        result1.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result1.shouldBeInstanceOf<Result.Err>()
         callCounter.get() shouldBe 1
 
         // 두 번째 호출 → 다시 DynamoDB 조회
@@ -313,11 +314,11 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
 
         // 첫 번째 호출
         val result1 = adapter.loadJoinSpecContract(ref)
-        result1.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
 
         // 두 번째 호출 → 캐시 hit
         val result2 = adapter.loadJoinSpecContract(ref)
-        result2.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
 
         callCounter.get() shouldBe 1
         cache.stats().hits shouldBe 1
@@ -360,8 +361,8 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
         val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName, cache)
         val ref = ContractRef("changeset.v1", SemVer.parse("1.0.0"))
 
-        val result1 = adapter.loadChangeSetContract(ref) as ContractRegistryPort.Result.Ok
-        val result2 = adapter.loadChangeSetContract(ref) as ContractRegistryPort.Result.Ok
+        val result1 = adapter.loadChangeSetContract(ref) as Result.Ok
+        val result2 = adapter.loadChangeSetContract(ref) as Result.Ok
 
         result1.value shouldBe result2.value
         result1.value.meta.id shouldBe "changeset.v1"

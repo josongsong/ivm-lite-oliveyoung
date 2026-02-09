@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.slices
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
@@ -53,8 +54,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe mapOf("brand" to """{"brandName":"Nike","country":"US"}""")
     }
 
@@ -78,8 +79,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Err>()
-        val error = (result as JoinExecutor.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.JoinError>()
         error.message shouldBe "target not found: BRAND#T001#BR999"
     }
@@ -104,8 +105,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe emptyMap()
     }
 
@@ -133,8 +134,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe mapOf("brand" to """{"brandName":"Nike"}""")
     }
 
@@ -162,8 +163,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe mapOf("brand" to """{"brandName":"Nike Inc"}""")
     }
 
@@ -193,8 +194,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe mapOf("category" to """{"categoryName":"Electronics","level":1}""")
     }
 
@@ -241,8 +242,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpecs[0], joinSpecs[1])) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe mapOf(
             "brand" to """{"brandName":"Nike"}""",
             "category" to """{"categoryName":"Sports"}""",
@@ -276,8 +277,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         // 타겟의 parentBrandCode는 JOIN되지 않음 (depth=1)
         data shouldBe mapOf("brand" to """{"brandName":"Nike","parentBrandCode":"BR000"}""")
     }
@@ -302,8 +303,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Err>()
-        val error = (result as JoinExecutor.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.JoinError>()
         error.message shouldBe "required source field missing: brandCode"
     }
@@ -328,8 +329,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe emptyMap()
     }
 
@@ -367,8 +368,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, joinSpecs) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Err>()
-        val error = (result as JoinExecutor.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.JoinError>()
         error.message shouldBe "target not found: CATEGORY#T001#CAT999"
     }
@@ -407,8 +408,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, joinSpecs) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe mapOf("brand" to """{"brandName":"Nike"}""")
     }
 
@@ -436,8 +437,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe mapOf("firstItem" to """{"itemName":"First Item"}""")
     }
 
@@ -461,8 +462,8 @@ class JoinExecutorTest : StringSpec({
 
         val result = runBlocking { executor.executeJoins(sourceData, listOf(joinSpec)) }
 
-        result.shouldBeInstanceOf<JoinExecutor.Result.Ok<*>>()
-        val data = (result as JoinExecutor.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val data = (result as Result.Ok).value
         data shouldBe emptyMap()
     }
 })
@@ -494,7 +495,7 @@ private fun createRawData(
 private class MockRawDataRepo(
     private val data: Map<String, RawDataRecord>,
 ) : RawDataRepositoryPort {
-    override suspend fun putIdempotent(record: RawDataRecord): RawDataRepositoryPort.Result<Unit> {
+    override suspend fun putIdempotent(record: RawDataRecord): Result<Unit> {
         throw NotImplementedError("Not used in test")
     }
 
@@ -502,21 +503,31 @@ private class MockRawDataRepo(
         tenantId: TenantId,
         entityKey: EntityKey,
         version: Long,
-    ): RawDataRepositoryPort.Result<RawDataRecord> {
+    ): Result<RawDataRecord> {
         throw NotImplementedError("Not used in test")
     }
 
     override suspend fun getLatest(
         tenantId: TenantId,
         entityKey: EntityKey,
-    ): RawDataRepositoryPort.Result<RawDataRecord> {
+    ): Result<RawDataRecord> {
         val record = data[entityKey.value]
         return if (record != null) {
-            RawDataRepositoryPort.Result.Ok(record)
+            Result.Ok(record)
         } else {
-            RawDataRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.NotFoundError("RawData", entityKey.value),
             )
         }
+    }
+
+    override suspend fun batchGetLatest(
+        tenantId: TenantId,
+        entityKeys: List<EntityKey>,
+    ): Result<Map<EntityKey, RawDataRecord>> {
+        val resultMap = entityKeys.mapNotNull { key ->
+            data[key.value]?.let { key to it }
+        }.toMap()
+        return Result.Ok(resultMap)
     }
 }

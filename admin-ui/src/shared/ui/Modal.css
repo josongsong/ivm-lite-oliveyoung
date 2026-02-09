@@ -1,0 +1,289 @@
+/**
+ * Modal Component Styles
+ *
+ * SSOT for all modal-related styles in the application.
+ * Previously scattered across: Outbox.css, WebhooksPage.css, Backfill.css
+ *
+ * @see Modal.tsx
+ */
+
+/* ============================================
+   Overlay
+   ============================================ */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  padding: 2rem;
+}
+
+/* ============================================
+   Content Container
+   ============================================ */
+.modal-content {
+  background: var(--bg-primary, #12121a);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  border-radius: var(--radius-lg, 16px);
+  width: 100%;
+  max-width: 800px;
+  max-height: 90vh;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  color: var(--text-primary, #f0f0f5);
+  box-shadow:
+    0 25px 50px -12px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05);
+}
+
+/* Size variants */
+.modal-content--sm {
+  max-width: 480px;
+}
+
+.modal-content--md {
+  max-width: 640px;
+}
+
+.modal-content--lg {
+  max-width: 800px;
+}
+
+.modal-content--xl {
+  max-width: 1024px;
+}
+
+.modal-content--full {
+  max-width: calc(100vw - 4rem);
+  max-height: calc(100vh - 4rem);
+}
+
+/* ============================================
+   Header
+   ============================================ */
+.modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.25rem 1.5rem;
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  background: var(--bg-primary, #12121a);
+  flex-shrink: 0;
+}
+
+.modal-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0f0f5);
+  margin: 0;
+  line-height: 1.4;
+}
+
+.modal-close {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  color: var(--text-secondary, #8b8b9e);
+  border-radius: var(--radius-sm, 6px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.modal-close:hover {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  color: var(--text-primary, #f0f0f5);
+}
+
+.modal-close:focus {
+  outline: none;
+  box-shadow: 0 0 0 2px var(--accent-cyan, #00d4ff);
+}
+
+/* ============================================
+   Body
+   ============================================ */
+.modal-body {
+  padding: 1.5rem;
+  overflow-y: auto;
+  background: var(--bg-primary, #12121a);
+  color: var(--text-primary, #f0f0f5);
+  flex: 1;
+}
+
+/* Scrollbar styling for modal body */
+.modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+
+.modal-body::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.modal-body::-webkit-scrollbar-thumb {
+  background: var(--border-color, rgba(255, 255, 255, 0.1));
+  border-radius: 3px;
+}
+
+.modal-body::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted, rgba(255, 255, 255, 0.2));
+}
+
+/* ============================================
+   Footer (optional)
+   ============================================ */
+.modal-footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.75rem;
+  padding: 1rem 1.5rem;
+  border-top: 1px solid var(--border-color, rgba(255, 255, 255, 0.06));
+  background: var(--bg-primary, #12121a);
+  flex-shrink: 0;
+}
+
+/* ============================================
+   Detail Grid (commonly used in modals)
+   ============================================ */
+.modal-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.modal-detail-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.modal-detail-label {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-muted, #6b6b7b);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.modal-detail-value {
+  font-size: 0.875rem;
+  color: var(--text-primary, #f0f0f5);
+  word-break: break-all;
+}
+
+/* ============================================
+   Section (for organized content)
+   ============================================ */
+.modal-section {
+  margin-top: 1.5rem;
+}
+
+.modal-section:first-child {
+  margin-top: 0;
+}
+
+.modal-section-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-secondary, #8b8b9e);
+  margin-bottom: 0.75rem;
+}
+
+/* ============================================
+   Special content blocks
+   ============================================ */
+.modal-error-block {
+  background: rgba(255, 68, 102, 0.1);
+  border: 1px solid rgba(255, 68, 102, 0.3);
+  border-radius: var(--radius-md, 12px);
+  padding: 1rem;
+  font-size: 0.875rem;
+  color: var(--status-error, #ff4466);
+  white-space: pre-wrap;
+  word-break: break-all;
+}
+
+.modal-code-block {
+  background: var(--bg-tertiary, #1a1a24);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 12px);
+  padding: 1rem;
+  font-size: 0.75rem;
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  max-height: 300px;
+  overflow-y: auto;
+  color: var(--text-primary, #f0f0f5);
+}
+
+/* ============================================
+   Responsive
+   ============================================ */
+@media (max-width: 768px) {
+  .modal-overlay {
+    padding: 1rem;
+  }
+
+  .modal-content {
+    max-height: calc(100vh - 2rem);
+  }
+
+  .modal-detail-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .modal-header {
+    padding: 1rem;
+  }
+
+  .modal-body {
+    padding: 1rem;
+  }
+
+  .modal-footer {
+    padding: 0.75rem 1rem;
+    flex-wrap: wrap;
+  }
+}
+
+/* ============================================
+   ConfirmDialog
+   ============================================ */
+.confirm-dialog__content {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+}
+
+.confirm-dialog__icon {
+  flex-shrink: 0;
+  margin-top: 0.125rem;
+}
+
+.confirm-dialog__icon--danger {
+  color: var(--status-error, #ff4466);
+}
+
+.confirm-dialog__message {
+  margin: 0;
+  font-size: 0.9375rem;
+  line-height: 1.6;
+  color: var(--text-secondary, #8b8b9e);
+}
+
+.confirm-dialog__actions {
+  display: flex;
+  gap: 0.75rem;
+  justify-content: flex-end;
+  width: 100%;
+}

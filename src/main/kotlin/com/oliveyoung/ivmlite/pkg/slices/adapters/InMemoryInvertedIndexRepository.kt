@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.slices.adapters
 
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.InvariantViolation
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
@@ -23,25 +24,25 @@ class InMemoryInvertedIndexRepository : InvertedIndexRepositoryPort, HealthCheck
     // key: tenant|refKey|refVersion|targetKey|sliceType|indexType|indexValue
     private val store = ConcurrentHashMap<String, InvertedIndexEntry>()
 
-    override suspend fun putAllIdempotent(entries: List<InvertedIndexEntry>): InvertedIndexRepositoryPort.Result<Unit> {
+    override suspend fun putAllIdempotent(entries: List<InvertedIndexEntry>): Result<Unit> {
         for (e in entries) {
             val k = key(e)
             val prev = store.putIfAbsent(k, e)
             if (prev != null && prev.sliceHash != e.sliceHash) {
-                return InvertedIndexRepositoryPort.Result.Err(InvariantViolation("InvertedIndex hash mismatch for $k"))
+                return Result.Err(InvariantViolation("InvertedIndex hash mismatch for $k"))
             }
         }
-        return InvertedIndexRepositoryPort.Result.Ok(Unit)
+        return Result.Ok(Unit)
     }
 
-    override suspend fun listTargets(tenantId: TenantId, refPk: String, limit: Int): InvertedIndexRepositoryPort.Result<List<InvertedIndexEntry>> {
+    override suspend fun listTargets(tenantId: TenantId, refPk: String, limit: Int): Result<List<InvertedIndexEntry>> {
         val out = store.values
             .asSequence()
             .filter { it.tenantId == tenantId }
             .filter { it.refEntityKey.value.startsWith(refPk) || it.refEntityKey.value == refPk }
             .take(limit)
             .toList()
-        return InvertedIndexRepositoryPort.Result.Ok(out)
+        return Result.Ok(out)
     }
 
     /**
@@ -56,7 +57,7 @@ class InMemoryInvertedIndexRepository : InvertedIndexRepositoryPort, HealthCheck
         indexValue: String,
         limit: Int,
         cursor: String?,
-    ): InvertedIndexRepositoryPort.Result<FanoutQueryResult> {
+    ): Result<FanoutQueryResult> {
         // 1. 필터링: indexType + indexValue + tombstone=false
         val filtered = store.values
             .asSequence()
@@ -92,7 +93,7 @@ class InMemoryInvertedIndexRepository : InvertedIndexRepositoryPort, HealthCheck
             )
         }
 
-        return InvertedIndexRepositoryPort.Result.Ok(FanoutQueryResult(targets, nextCursor))
+        return Result.Ok(FanoutQueryResult(targets, nextCursor))
     }
 
     /**
@@ -102,7 +103,7 @@ class InMemoryInvertedIndexRepository : InvertedIndexRepositoryPort, HealthCheck
         tenantId: TenantId,
         indexType: String,
         indexValue: String,
-    ): InvertedIndexRepositoryPort.Result<Long> {
+    ): Result<Long> {
         val count = store.values
             .asSequence()
             .filter { it.tenantId == tenantId }
@@ -113,7 +114,7 @@ class InMemoryInvertedIndexRepository : InvertedIndexRepositoryPort, HealthCheck
             .count()
             .toLong()
 
-        return InvertedIndexRepositoryPort.Result.Ok(count)
+        return Result.Ok(count)
     }
 
     private fun key(e: InvertedIndexEntry): String =

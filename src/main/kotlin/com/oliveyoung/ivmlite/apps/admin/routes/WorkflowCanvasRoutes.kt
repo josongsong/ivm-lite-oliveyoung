@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.apps.admin.routes
 import com.oliveyoung.ivmlite.apps.admin.dto.ApiError
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.application.*
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.domain.*
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -65,10 +66,10 @@ fun Route.workflowCanvasRoutes() {
                 }
 
                 when (val result = workflowService.getNodeDetail(nodeId)) {
-                    is WorkflowCanvasService.Result.Ok -> {
+                    is Result.Ok -> {
                         call.respond(HttpStatusCode.OK, result.value.toResponse())
                     }
-                    is WorkflowCanvasService.Result.Err -> {
+                    is Result.Err -> {
                         call.respond(
                             HttpStatusCode.NotFound,
                             ApiError(code = "NOT_FOUND", message = result.error.message ?: "Node not found")

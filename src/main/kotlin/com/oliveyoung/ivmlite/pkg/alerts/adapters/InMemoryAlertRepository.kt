@@ -6,6 +6,7 @@ import com.oliveyoung.ivmlite.pkg.alerts.domain.AlertStatus
 import com.oliveyoung.ivmlite.pkg.alerts.ports.AlertFilter
 import com.oliveyoung.ivmlite.pkg.alerts.ports.AlertRepositoryPort
 import com.oliveyoung.ivmlite.pkg.alerts.ports.AlertStats
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import java.time.Instant
 import java.time.temporal.ChronoUnit
 import java.util.UUID
@@ -21,38 +22,38 @@ class InMemoryAlertRepository : AlertRepositoryPort {
     
     private val alerts = ConcurrentHashMap<UUID, Alert>()
     
-    override suspend fun save(alert: Alert): AlertRepositoryPort.Result<Alert> {
+    override suspend fun save(alert: Alert): Result<Alert> {
         alerts[alert.id] = alert
-        return AlertRepositoryPort.Result.Ok(alert)
+        return Result.Ok(alert)
     }
     
-    override suspend fun findById(id: UUID): AlertRepositoryPort.Result<Alert?> {
-        return AlertRepositoryPort.Result.Ok(alerts[id])
+    override suspend fun findById(id: UUID): Result<Alert?> {
+        return Result.Ok(alerts[id])
     }
     
-    override suspend fun findActiveByRuleId(ruleId: String): AlertRepositoryPort.Result<Alert?> {
+    override suspend fun findActiveByRuleId(ruleId: String): Result<Alert?> {
         val active = alerts.values.find { 
             it.ruleId == ruleId && it.isActive()
         }
-        return AlertRepositoryPort.Result.Ok(active)
+        return Result.Ok(active)
     }
     
-    override suspend fun findByStatus(status: AlertStatus, limit: Int): AlertRepositoryPort.Result<List<Alert>> {
+    override suspend fun findByStatus(status: AlertStatus, limit: Int): Result<List<Alert>> {
         val result = alerts.values
             .filter { it.status == status }
             .sortedByDescending { it.firedAt }
             .take(limit)
-        return AlertRepositoryPort.Result.Ok(result)
+        return Result.Ok(result)
     }
     
-    override suspend fun findAllActive(): AlertRepositoryPort.Result<List<Alert>> {
+    override suspend fun findAllActive(): Result<List<Alert>> {
         val active = alerts.values
             .filter { it.isActive() }
             .sortedByDescending { it.firedAt }
-        return AlertRepositoryPort.Result.Ok(active)
+        return Result.Ok(active)
     }
     
-    override suspend fun findByFilter(filter: AlertFilter): AlertRepositoryPort.Result<List<Alert>> {
+    override suspend fun findByFilter(filter: AlertFilter): Result<List<Alert>> {
         var result = alerts.values.asSequence()
         
         filter.statuses?.let { statuses ->
@@ -77,22 +78,22 @@ class InMemoryAlertRepository : AlertRepositoryPort {
             .take(filter.limit)
             .toList()
         
-        return AlertRepositoryPort.Result.Ok(finalResult)
+        return Result.Ok(finalResult)
     }
     
-    override suspend fun findRecent(limit: Int): AlertRepositoryPort.Result<List<Alert>> {
+    override suspend fun findRecent(limit: Int): Result<List<Alert>> {
         val recent = alerts.values
             .sortedByDescending { it.firedAt }
             .take(limit)
-        return AlertRepositoryPort.Result.Ok(recent)
+        return Result.Ok(recent)
     }
     
-    override suspend fun findExpiredSilenced(now: Instant): AlertRepositoryPort.Result<List<Alert>> {
+    override suspend fun findExpiredSilenced(now: Instant): Result<List<Alert>> {
         val expired = alerts.values.filter { it.isSilenceExpired(now) }
-        return AlertRepositoryPort.Result.Ok(expired)
+        return Result.Ok(expired)
     }
     
-    override suspend fun getStats(): AlertRepositoryPort.Result<AlertStats> {
+    override suspend fun getStats(): Result<AlertStats> {
         val allAlerts = alerts.values
         val active = allAlerts.filter { it.isActive() }
         val yesterday = Instant.now().minus(24, ChronoUnit.HOURS)
@@ -105,15 +106,15 @@ class InMemoryAlertRepository : AlertRepositoryPort {
                 it.status == AlertStatus.FIRING && it.firedAt.isAfter(yesterday)
             }
         )
-        return AlertRepositoryPort.Result.Ok(stats)
+        return Result.Ok(stats)
     }
     
-    override suspend fun deleteOlderThan(before: Instant): AlertRepositoryPort.Result<Int> {
+    override suspend fun deleteOlderThan(before: Instant): Result<Int> {
         val toDelete = alerts.values.filter { 
             it.status == AlertStatus.RESOLVED && it.resolvedAt != null && it.resolvedAt.isBefore(before)
         }
         toDelete.forEach { alerts.remove(it.id) }
-        return AlertRepositoryPort.Result.Ok(toDelete.size)
+        return Result.Ok(toDelete.size)
     }
     
     // 테스트용

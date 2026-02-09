@@ -1,0 +1,116 @@
+/**
+ * ContractNode Styles (Phase 4: Impact Graph)
+ */
+
+.contract-node {
+  padding: 0.5rem 0.75rem;
+  border-radius: 8px;
+  border: 2px solid transparent;
+  background: var(--bg-secondary);
+  min-width: 100px;
+  text-align: center;
+  font-size: 0.75rem;
+  transition: all 0.15s;
+  cursor: pointer;
+  position: relative;
+}
+
+.contract-node:hover {
+  transform: scale(1.02);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.contract-node--selected {
+  border-color: var(--primary);
+  box-shadow: 0 0 0 3px var(--primary-bg);
+}
+
+/* Kind colors */
+.contract-node--entity-schema {
+  border-color: #60a5fa;
+  background: linear-gradient(135deg, #1e3a5f 0%, #1e293b 100%);
+}
+
+.contract-node--ruleset {
+  border-color: #a78bfa;
+  background: linear-gradient(135deg, #3b2d5c 0%, #1e293b 100%);
+}
+
+.contract-node--view-definition {
+  border-color: #34d399;
+  background: linear-gradient(135deg, #1e3f3a 0%, #1e293b 100%);
+}
+
+.contract-node--sinkrule {
+  border-color: #fbbf24;
+  background: linear-gradient(135deg, #3f3a1e 0%, #1e293b 100%);
+}
+
+.contract-node--join-spec {
+  border-color: #f472b6;
+  background: linear-gradient(135deg, #3f1e35 0%, #1e293b 100%);
+}
+
+.contract-node--changeset {
+  border-color: #94a3b8;
+  background: linear-gradient(135deg, #2d3748 0%, #1e293b 100%);
+}
+
+/* Impact colors */
+.contract-node--changed {
+  border-color: #ef4444 !important;
+  background: linear-gradient(135deg, #450a0a 0%, #1e293b 100%) !important;
+}
+
+.contract-node--affected {
+  border-color: #f59e0b !important;
+  background: linear-gradient(135deg, #451a03 0%, #1e293b 100%) !important;
+}
+
+.contract-node__kind {
+  font-size: 0.625rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  color: var(--text-tertiary);
+  margin-bottom: 0.25rem;
+}
+
+.contract-node__id {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.6875rem;
+  color: var(--text-primary);
+  word-break: break-all;
+}
+
+.contract-node__impact-badge {
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  font-size: 0.5rem;
+  font-weight: 700;
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  background: #ef4444;
+  color: white;
+}
+
+.contract-node--affected .contract-node__impact-badge {
+  background: #f59e0b;
+}
+
+/* Handle styles */
+.contract-node .react-flow__handle {
+  width: 8px;
+  height: 8px;
+  background: var(--border-color);
+  border: 2px solid var(--bg-primary);
+}
+
+.contract-node .react-flow__handle-top {
+  top: -4px;
+}
+
+.contract-node .react-flow__handle-bottom {
+  bottom: -4px;
+}

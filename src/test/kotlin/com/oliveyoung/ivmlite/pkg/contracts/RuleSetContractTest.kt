@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
@@ -42,8 +43,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.id shouldBe "ruleset.core.v1"
         contract.meta.status shouldBe ContractStatus.ACTIVE
         contract.entityType shouldBe "PRODUCT"
@@ -55,8 +56,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.impactMap[SliceType.CORE] shouldBe listOf("/title", "/brand", "/price")
     }
 
@@ -66,8 +67,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.slices.isNotEmpty() shouldBe true
         val coreSlice = contract.slices.first { it.type == SliceType.CORE }
         coreSlice.buildRules.shouldBeInstanceOf<SliceBuildRules.PassThrough>()
@@ -123,8 +124,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.id shouldBe "ruleset.core.v1"
         contract.meta.status shouldBe ContractStatus.ACTIVE
         contract.entityType shouldBe "PRODUCT"
@@ -137,8 +138,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     "DynamoDB - entityType 누락 → ContractError" {
@@ -162,8 +163,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - slices 누락 → ContractError" {
@@ -187,8 +188,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - impactMap 파싱 검증" {
@@ -216,8 +217,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.impactMap[SliceType.CORE] shouldBe listOf("/title", "/brand")
         contract.impactMap[SliceType.PRICE] shouldBe listOf("/price")
     }
@@ -251,8 +252,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.joins.size shouldBe 1
         contract.joins[0].sourceSlice shouldBe SliceType.CORE
         contract.joins[0].targetEntity shouldBe "CATEGORY"
@@ -293,8 +294,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         val priceSlice = contract.slices.first { it.type == SliceType.PRICE }
         priceSlice.buildRules.shouldBeInstanceOf<SliceBuildRules.MapFields>()
         val mappings = (priceSlice.buildRules as SliceBuildRules.MapFields).mappings
@@ -332,8 +333,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         val coreSlice = contract.slices.first { it.type == SliceType.CORE }
         coreSlice.buildRules.shouldBeInstanceOf<SliceBuildRules.PassThrough>()
         (coreSlice.buildRules as SliceBuildRules.PassThrough).fields shouldBe listOf("title", "brand", "description")
@@ -361,8 +362,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - DEPRECATED status → ContractError (ACTIVE만 허용)" {
@@ -387,8 +388,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - data 누락 → ContractError" {
@@ -406,8 +407,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - malformed JSON → ContractError" {
@@ -425,8 +426,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - 알 수 없는 buildRules type → ContractError" {
@@ -459,8 +460,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - 빈 slices 배열 → 정상 로드 (빈 리스트)" {
@@ -485,8 +486,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.slices shouldBe emptyList()
     }
 
@@ -512,8 +513,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.impactMap shouldBe emptyMap()
     }
 
@@ -545,8 +546,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.indexes.size shouldBe 2
         contract.indexes[0].type shouldBe "brand"
         contract.indexes[0].selector shouldBe "$.brand"
@@ -580,8 +581,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.indexes.size shouldBe 2
         
         // references가 있는 인덱스 → 역방향 인덱스 자동 생성
@@ -617,8 +618,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.indexes.size shouldBe 2
         
         // 명시적 maxFanout
@@ -651,8 +652,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - indexes의 필수 필드 누락 (type 없음) → ContractError" {
@@ -680,8 +681,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - indexes의 필수 필드 누락 (selector 없음) → ContractError" {
@@ -709,8 +710,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - indexes.maxFanout이 음수 → 파싱은 성공하지만 런타임 검증 필요" {
@@ -739,8 +740,8 @@ class RuleSetContractTest : StringSpec({
         val result = adapter.loadRuleSetContract(ref)
 
         // 파싱은 성공 (음수도 int로 파싱 가능)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.indexes.size shouldBe 1
         // 음수 값이 그대로 저장됨 (런타임 검증은 FanoutConfig에서 수행)
         contract.indexes[0].maxFanout shouldBe -1
@@ -769,8 +770,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.indexes shouldBe emptyList()
     }
 
@@ -796,8 +797,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.indexes shouldBe emptyList()
     }
 
@@ -807,8 +808,8 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         
         // ruleset.v1.yaml에 정의된 indexes 확인
         contract.indexes.isNotEmpty() shouldBe true
@@ -861,7 +862,7 @@ class RuleSetContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 })

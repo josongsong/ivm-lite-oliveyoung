@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.AllowAllStatusGate
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus

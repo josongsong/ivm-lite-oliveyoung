@@ -6,6 +6,7 @@ import arrow.core.raise.catch
 import arrow.core.raise.either
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
 import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceBuildRules
@@ -15,6 +16,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
@@ -56,20 +58,22 @@ class PlaygroundService(
         } catch (e: MarkedYAMLException) {
             errors.add(
                 ValidationError(
+                    level = ValidationLevel.L0_SYNTAX,
                     line = e.problemMark?.line?.plus(1) ?: 0,
                     column = e.problemMark?.column?.plus(1) ?: 0,
                     message = e.problem ?: "YAML 파싱 오류",
-                    severity = "error"
+                    fix = null
                 )
             )
             null
         } catch (e: Exception) {
             errors.add(
                 ValidationError(
+                    level = ValidationLevel.L0_SYNTAX,
                     line = 1,
                     column = 1,
                     message = e.message ?: "알 수 없는 YAML 오류",
-                    severity = "error"
+                    fix = null
                 )
             )
             null
@@ -168,8 +172,8 @@ class PlaygroundService(
         // 1. 기존 계약 조회
         val existingContract = contractService?.let { service ->
             when (val result = service.getById(ContractKind.RULESET, contractId)) {
-                is AdminContractService.Result.Ok -> result.value.content
-                is AdminContractService.Result.Err -> null
+                is Result.Ok -> result.value.content
+                is Result.Err -> null
             }
         }
 
@@ -215,8 +219,8 @@ class PlaygroundService(
             ?: return DomainError.NotFoundError("RawDataRepository", "not configured").left()
 
         val rawData = when (val result = repo.getLatest(TenantId(tenantId), EntityKey(entityKey))) {
-            is RawDataRepositoryPort.Result.Ok<RawDataRecord> -> result.value
-            is RawDataRepositoryPort.Result.Err -> null
+            is Result.Ok<RawDataRecord> -> result.value
+            is Result.Err -> null
         }
 
         if (rawData == null) {
@@ -248,37 +252,37 @@ class PlaygroundService(
         // 필수 필드 검증
         val kind = parsed["kind"]?.toString()
         if (kind == null) {
-            errors.add(ValidationError(1, 1, "필수 필드 'kind' 누락", "error"))
+            errors.add(ValidationError(ValidationLevel.L1_SHAPE, 1, 1, "필수 필드 'kind' 누락", null))
         } else if (kind != "RULESET" && kind != "VIEW_DEFINITION" && kind != "ENTITY_SCHEMA" && kind != "SINK_RULE") {
             warnings.add("알 수 없는 kind: $kind (RULESET, VIEW_DEFINITION, ENTITY_SCHEMA, SINK_RULE 중 하나여야 함)")
         }
 
         val id = parsed["id"]?.toString()
         if (id == null) {
-            errors.add(ValidationError(1, 1, "필수 필드 'id' 누락", "error"))
+            errors.add(ValidationError(ValidationLevel.L1_SHAPE, 1, 1, "필수 필드 'id' 누락", null))
         }
 
         // RuleSet 특화 검증
         if (kind == "RULESET") {
             val entityType = parsed["entityType"]?.toString()
             if (entityType == null) {
-                errors.add(ValidationError(1, 1, "RULESET에 필수 필드 'entityType' 누락", "error"))
+                errors.add(ValidationError(ValidationLevel.L1_SHAPE, 1, 1, "RULESET에 필수 필드 'entityType' 누락", null))
             }
 
             @Suppress("UNCHECKED_CAST")
             val slices = parsed["slices"] as? List<Map<String, Any?>>
             if (slices == null || slices.isEmpty()) {
-                errors.add(ValidationError(1, 1, "RULESET에 'slices' 정의 필요", "error"))
+                errors.add(ValidationError(ValidationLevel.L1_SHAPE, 1, 1, "RULESET에 'slices' 정의 필요", null))
             } else {
                 slices.forEachIndexed { index, slice ->
                     val sliceType = slice["type"]?.toString()
                     if (sliceType == null) {
-                        errors.add(ValidationError(1, 1, "slices[$index]에 'type' 필드 누락", "error"))
+                        errors.add(ValidationError(ValidationLevel.L1_SHAPE, 1, 1, "slices[$index]에 'type' 필드 누락", null))
                     }
 
                     val buildRules = slice["buildRules"] as? Map<*, *>
                     if (buildRules == null) {
-                        errors.add(ValidationError(1, 1, "slices[$index]에 'buildRules' 필드 누락", "error"))
+                        errors.add(ValidationError(ValidationLevel.L1_SHAPE, 1, 1, "slices[$index]에 'buildRules' 필드 누락", null))
                     }
                 }
             }
@@ -464,19 +468,7 @@ class PlaygroundService(
 }
 
 // ==================== Domain Models ====================
-
-data class ValidationResult(
-    val valid: Boolean,
-    val errors: List<ValidationError>,
-    val warnings: List<String>,
-)
-
-data class ValidationError(
-    val line: Int,
-    val column: Int,
-    val message: String,
-    val severity: String,
-)
+// ValidationResult, ValidationError는 ContractValidationService.kt에서 정의됨
 
 data class SimulationResult(
     val success: Boolean,

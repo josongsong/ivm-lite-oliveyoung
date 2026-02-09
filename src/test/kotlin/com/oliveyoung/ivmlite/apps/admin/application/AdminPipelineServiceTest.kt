@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.apps.admin.application
 
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import org.jooq.DSLContext
 import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
@@ -8,7 +10,7 @@ import io.mockk.mockk
 import io.mockk.every
 import io.mockk.verify
 import kotlinx.coroutines.test.runTest
-import org.jooq.Result
+import org.jooq.Result as JooqResult
 import org.jooq.Record
 import org.jooq.SelectSelectStep
 import org.jooq.SelectJoinStep
@@ -39,8 +41,8 @@ class AdminPipelineServiceTest {
         val result = service.getEntityFlow("")
 
         // Then
-        assertTrue(result is AdminPipelineService.Result.Err)
-        val error = (result as AdminPipelineService.Result.Err).error
+        assertTrue(result is Result.Err)
+        val error = (result as Result.Err).error
         assertEquals("ERR_VALIDATION", error.errorCode)
     }
 
@@ -53,8 +55,8 @@ class AdminPipelineServiceTest {
         val result = service.getEntityFlow(longKey)
 
         // Then
-        assertTrue(result is AdminPipelineService.Result.Err)
-        val error = (result as AdminPipelineService.Result.Err).error
+        assertTrue(result is Result.Err)
+        val error = (result as Result.Err).error
         assertEquals("ERR_VALIDATION", error.errorCode)
     }
 
@@ -68,7 +70,7 @@ class AdminPipelineServiceTest {
 
         // Then: 에러 없이 정상 처리 (빈 결과)
         // 실제 SQL이 실행되면 mockk이 빈 결과를 반환
-        assertTrue(result is AdminPipelineService.Result.Ok || result is AdminPipelineService.Result.Err)
+        assertTrue(result is Result.Ok || result is Result.Err)
     }
 
     @Test
@@ -119,7 +121,7 @@ class AdminContractServiceTest {
         val result = service.getAllContracts()
 
         // Then
-        assertTrue(result is AdminContractService.Result.Ok)
+        assertTrue(result is Result.Ok)
         // 리소스 로딩이 안 되면 빈 목록 반환
     }
 
@@ -129,7 +131,7 @@ class AdminContractServiceTest {
         val result = service.getByKind(ContractKind.ENTITY_SCHEMA)
 
         // Then
-        assertTrue(result is AdminContractService.Result.Ok)
+        assertTrue(result is Result.Ok)
     }
 
     @Test
@@ -138,8 +140,8 @@ class AdminContractServiceTest {
         val result = service.getById(ContractKind.ENTITY_SCHEMA, "non-existent-id")
 
         // Then
-        assertTrue(result is AdminContractService.Result.Err)
-        val error = (result as AdminContractService.Result.Err).error
+        assertTrue(result is Result.Err)
+        val error = (result as Result.Err).error
         assertEquals("ERR_NOT_FOUND", error.errorCode)
     }
 
@@ -149,8 +151,8 @@ class AdminContractServiceTest {
         val result = service.getStats()
 
         // Then
-        assertTrue(result is AdminContractService.Result.Ok)
-        val stats = (result as AdminContractService.Result.Ok).value
+        assertTrue(result is Result.Ok)
+        val stats = (result as Result.Ok).value
         assertTrue(stats.total >= 0)
     }
 
@@ -160,7 +162,7 @@ class AdminContractServiceTest {
         assertEquals(ContractKind.ENTITY_SCHEMA, ContractKind.fromString("ENTITY_SCHEMA"))
         assertEquals(ContractKind.RULESET, ContractKind.fromString("RULESET"))
         assertEquals(ContractKind.VIEW_DEFINITION, ContractKind.fromString("VIEW_DEFINITION"))
-        assertEquals(ContractKind.SINK_RULE, ContractKind.fromString("SINK_RULE"))
+        assertEquals(ContractKind.SINK_RULE, ContractKind.fromString("SINKRULE"))
     }
 
     @Test

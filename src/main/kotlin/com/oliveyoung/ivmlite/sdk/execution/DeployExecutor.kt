@@ -22,6 +22,7 @@ import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.shared.domain.types.VersionGenerator
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -71,14 +72,14 @@ class DeployExecutor(
         )
 
         when (ingestResult) {
-            is IngestWorkflow.Result.Err -> {
+            is Result.Err -> {
                 return DeployResult.failure(
                     rawDataParams.entityKey.value,
                     rawDataParams.version.toString(),
                     ingestResult.error.toString()
                 )
             }
-            is IngestWorkflow.Result.Ok -> { /* continue */ }
+            is Result.Ok -> { /* continue */ }
         }
 
         // 3. Compile (Slicing)
@@ -92,14 +93,14 @@ class DeployExecutor(
                 )
 
                 when (slicingResult) {
-                    is SlicingWorkflow.Result.Err -> {
+                    is Result.Err -> {
                         return DeployResult.failure(
                             rawDataParams.entityKey.value,
                             rawDataParams.version.toString(),
                             slicingResult.error.toString()
                         )
                     }
-                    is SlicingWorkflow.Result.Ok -> { /* continue */ }
+                    is Result.Ok -> { /* continue */ }
                 }
             }
             is CompileMode.SyncWithTargets -> {
@@ -111,14 +112,14 @@ class DeployExecutor(
                 )
 
                 when (slicingResult) {
-                    is SlicingWorkflow.Result.Err -> {
+                    is Result.Err -> {
                         return DeployResult.failure(
                             rawDataParams.entityKey.value,
                             rawDataParams.version.toString(),
                             slicingResult.error.toString()
                         )
                     }
-                    is SlicingWorkflow.Result.Ok -> { /* continue */ }
+                    is Result.Ok -> { /* continue */ }
                 }
             }
             is CompileMode.Async -> {
@@ -137,14 +138,14 @@ class DeployExecutor(
                 )
 
                 when (val r = outboxRepository.insert(compileTaskEntry)) {
-                    is OutboxRepositoryPort.Result.Err -> {
+                    is Result.Err -> {
                         return DeployResult.failure(
                             rawDataParams.entityKey.value,
                             rawDataParams.version.toString(),
                             r.error.toString()
                         )
                     }
-                    is OutboxRepositoryPort.Result.Ok -> { /* continue */ }
+                    is Result.Ok -> { /* continue */ }
                 }
             }
         }
@@ -168,14 +169,14 @@ class DeployExecutor(
                 )
 
                 when (val r = outboxRepository.insert(shipTaskEntry)) {
-                    is OutboxRepositoryPort.Result.Err -> {
+                    is Result.Err -> {
                         return DeployResult.failure(
                             rawDataParams.entityKey.value,
                             rawDataParams.version.toString(),
                             "Ship outbox insert failed: ${r.error}"
                         )
                     }
-                    is OutboxRepositoryPort.Result.Ok -> { /* continue */ }
+                    is Result.Ok -> { /* continue */ }
                 }
             }
         }
@@ -211,10 +212,10 @@ class DeployExecutor(
         )
 
         when (ingestResult) {
-            is IngestWorkflow.Result.Err -> {
+            is Result.Err -> {
                 return DomainError.StorageError("Ingest failed: ${ingestResult.error}").left()
             }
-            is IngestWorkflow.Result.Ok -> { /* continue */ }
+            is Result.Ok -> { /* continue */ }
         }
 
         // 3. COMPILE_TASK Outbox 적재
@@ -233,8 +234,8 @@ class DeployExecutor(
         )
 
         val jobId = when (val r = outboxRepository.insert(compileTaskEntry)) {
-            is OutboxRepositoryPort.Result.Ok -> r.value.id.toString()
-            is OutboxRepositoryPort.Result.Err -> {
+            is Result.Ok -> r.value.id.toString()
+            is Result.Err -> {
                 return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
             }
         }
@@ -400,13 +401,13 @@ class DeployExecutor(
         )
 
         return when (ingestResult) {
-            is IngestWorkflow.Result.Err -> IngestResult(
+            is Result.Err -> IngestResult(
                 entityKey = rawDataParams.entityKey.value,
                 version = rawDataParams.version,
                 success = false,
                 error = ingestResult.error.toString()
             )
-            is IngestWorkflow.Result.Ok -> IngestResult(
+            is Result.Ok -> IngestResult(
                 entityKey = rawDataParams.entityKey.value,
                 version = rawDataParams.version,
                 success = true
@@ -437,14 +438,14 @@ class DeployExecutor(
         )
 
         return when (slicingResult) {
-            is SlicingWorkflow.Result.Err -> CompileResult(
+            is Result.Err -> CompileResult(
                 entityKey = entityKey.value,
                 version = version,
                 slices = emptyList(),
                 success = false,
                 error = slicingResult.error.toString()
             )
-            is SlicingWorkflow.Result.Ok -> CompileResult(
+            is Result.Ok -> CompileResult(
                 entityKey = entityKey.value,
                 version = version,
                 slices = slicingResult.value.map { it.sliceType.name.lowercase() },
@@ -477,8 +478,8 @@ class DeployExecutor(
         )
 
         val jobId = when (val r = outboxRepository.insert(compileTaskEntry)) {
-            is OutboxRepositoryPort.Result.Ok -> r.value.id.toString()
-            is OutboxRepositoryPort.Result.Err -> return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
+            is Result.Ok -> r.value.id.toString()
+            is Result.Err -> return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
         }
 
         return DeployJob(
@@ -534,8 +535,8 @@ class DeployExecutor(
         )
 
         val jobId = when (val r = outboxRepository.insert(shipTaskEntry)) {
-            is OutboxRepositoryPort.Result.Ok -> r.value.id.toString()
-            is OutboxRepositoryPort.Result.Err -> return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
+            is Result.Ok -> r.value.id.toString()
+            is Result.Err -> return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
         }
 
         return DeployJob(
@@ -603,8 +604,8 @@ class DeployExecutor(
 
             // fail-closed: 에러 발생 시 즉시 반환
             when (val r = outboxRepository.insert(shipTaskEntry)) {
-                is OutboxRepositoryPort.Result.Ok -> jobIds.add(r.value.id.toString())
-                is OutboxRepositoryPort.Result.Err -> return DomainError.StorageError("Ship outbox insert failed: ${r.error}").left()
+                is Result.Ok -> jobIds.add(r.value.id.toString())
+                is Result.Err -> return DomainError.StorageError("Ship outbox insert failed: ${r.error}").left()
             }
         }
 

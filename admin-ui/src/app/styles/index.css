@@ -7,7 +7,29 @@
 /* Import app styles - must be imported in main.tsx */
 
 :root {
-  /* Dark Theme - Cyberpunk/Terminal Aesthetic */
+  /* ============================================================================
+   * Base Values (Theme-independent)
+   * ============================================================================ */
+  --radius-sm: 6px;
+  --radius-md: 10px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+  
+  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+
+  /* ============================================================================
+   * Icon System (Lucide + Shared UI)
+   * - strokeWidth는 개별 컴포넌트에서 제어 (CSS로 덮어쓰지 않음)
+   * - 전역은 톤(opacity)과 모션만 SSOT로 관리
+   * ============================================================================ */
+  --ui-icon-opacity: 0.92;
+  --ui-icon-opacity-muted: 0.78;
+  --ui-icon-transition: 140ms cubic-bezier(0.4, 0, 0.2, 1);
+
+  /* ============================================================================
+   * Dark Theme - Cyberpunk Neon (Default)
+   * ============================================================================ */
   --bg-primary: #0a0a0f;
   --bg-secondary: #12121a;
   --bg-tertiary: #1a1a25;
@@ -48,14 +70,144 @@
   --shadow-lg: 0 8px 40px rgba(0, 0, 0, 0.5);
   --shadow-glow-cyan: 0 0 20px rgba(0, 212, 255, 0.3);
   --shadow-glow-magenta: 0 0 20px rgba(255, 0, 170, 0.3);
+}
+
+/* ============================================================================
+ * Light Theme - Linear/Vercel Style (Clean + Purple Accent)
+ * ============================================================================ */
+[data-theme="light"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #fafafa;
+  --bg-tertiary: #f5f5f5;
+  --bg-card: #ffffff;
+  --bg-hover: #f0f0f0;
   
-  --radius-sm: 6px;
-  --radius-md: 10px;
-  --radius-lg: 16px;
-  --radius-xl: 24px;
+  --border-color: #e5e5e5;
+  --border-accent: #d4d4d4;
   
-  --font-sans: 'Outfit', -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-mono: 'JetBrains Mono', 'Fira Code', monospace;
+  --text-primary: #0a0a0a;
+  --text-secondary: #525252;
+  --text-muted: #a3a3a3;
+  
+  /* Accent Colors - Refined */
+  --accent-cyan: #0ea5e9;
+  --accent-magenta: #ec4899;
+  --accent-green: #10b981;
+  --accent-orange: #f97316;
+  --accent-purple: #8b5cf6;
+  --accent-yellow: #eab308;
+  
+  /* Status Colors */
+  --status-success: #10b981;
+  --status-warning: #f59e0b;
+  --status-error: #ef4444;
+  --status-info: #0ea5e9;
+  --status-pending: #f97316;
+  --status-processing: #8b5cf6;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #8b5cf6 0%, #ec4899 50%, #f97316 100%);
+  --gradient-card: linear-gradient(145deg, rgba(255, 255, 255, 0.9) 0%, rgba(250, 250, 250, 0.95) 100%);
+  --gradient-glow: radial-gradient(ellipse at center, rgba(139, 92, 246, 0.05) 0%, transparent 70%);
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.1);
+  --shadow-lg: 0 8px 24px rgba(0, 0, 0, 0.12);
+  --shadow-glow-cyan: 0 0 20px rgba(14, 165, 233, 0.15);
+  --shadow-glow-magenta: 0 0 20px rgba(236, 72, 153, 0.15);
+}
+
+/* ============================================================================
+ * Light Theme - Stripe Style (Elegant Blue/Purple)
+ * ============================================================================ */
+[data-theme="light-stripe"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f9fc;
+  --bg-tertiary: #edf2f7;
+  --bg-card: #ffffff;
+  --bg-hover: #f1f5f9;
+  
+  --border-color: #e2e8f0;
+  --border-accent: #cbd5e1;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #94a3b8;
+  
+  /* Accent Colors - Stripe Palette */
+  --accent-cyan: #635bff;  /* Stripe Purple */
+  --accent-magenta: #ff5b79;
+  --accent-green: #00d4aa;
+  --accent-orange: #ff9900;
+  --accent-purple: #635bff;
+  --accent-yellow: #ffbb00;
+  
+  /* Status */
+  --status-success: #00d4aa;
+  --status-warning: #ffbb00;
+  --status-error: #ff5b79;
+  --status-info: #635bff;
+  --status-pending: #ff9900;
+  --status-processing: #635bff;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #635bff 0%, #00d4aa 100%);
+  --gradient-card: linear-gradient(145deg, #ffffff 0%, #f6f9fc 100%);
+  --gradient-glow: radial-gradient(ellipse at center, rgba(99, 91, 255, 0.05) 0%, transparent 70%);
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.06);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.08);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.1);
+  --shadow-glow-cyan: 0 0 24px rgba(99, 91, 255, 0.2);
+  --shadow-glow-magenta: 0 0 24px rgba(255, 91, 121, 0.2);
+}
+
+/* ============================================================================
+ * Light Theme - GitHub Style (Clean Minimalist)
+ * ============================================================================ */
+[data-theme="light-github"] {
+  --bg-primary: #ffffff;
+  --bg-secondary: #f6f8fa;
+  --bg-tertiary: #eaeef2;
+  --bg-card: #ffffff;
+  --bg-hover: #f3f4f6;
+  
+  --border-color: #d0d7de;
+  --border-accent: #afb8c1;
+  
+  --text-primary: #1f2328;
+  --text-secondary: #656d76;
+  --text-muted: #8c959f;
+  
+  /* Accent Colors - GitHub Blue */
+  --accent-cyan: #0969da;
+  --accent-magenta: #bf3989;
+  --accent-green: #1a7f37;
+  --accent-orange: #bc4c00;
+  --accent-purple: #8250df;
+  --accent-yellow: #9a6700;
+  
+  /* Status */
+  --status-success: #1a7f37;
+  --status-warning: #9a6700;
+  --status-error: #cf222e;
+  --status-info: #0969da;
+  --status-pending: #bc4c00;
+  --status-processing: #8250df;
+  
+  /* Gradients */
+  --gradient-primary: linear-gradient(135deg, #0969da 0%, #8250df 100%);
+  --gradient-card: linear-gradient(145deg, #ffffff 0%, #f6f8fa 100%);
+  --gradient-glow: radial-gradient(ellipse at center, rgba(9, 105, 218, 0.03) 0%, transparent 70%);
+  
+  /* Shadows */
+  --shadow-sm: 0 1px 0 rgba(31, 35, 40, 0.04);
+  --shadow-md: 0 3px 6px rgba(140, 149, 159, 0.15);
+  --shadow-lg: 0 8px 24px rgba(140, 149, 159, 0.2);
+  --shadow-glow-cyan: 0 0 0 3px rgba(9, 105, 218, 0.3);
+  --shadow-glow-magenta: 0 0 0 3px rgba(191, 57, 137, 0.3);
 }
 
 /* Reset is handled by Tailwind base, but we keep button styles */
@@ -80,7 +232,7 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Background Grid Pattern */
+/* Background Grid Pattern - Dark Theme */
 body::before {
   content: '';
   position: fixed;
@@ -96,7 +248,7 @@ body::before {
   z-index: -1;
 }
 
-/* Background Glow */
+/* Background Glow - Dark Theme */
 body::after {
   content: '';
   position: fixed;
@@ -109,6 +261,32 @@ body::after {
     radial-gradient(ellipse at 80% 80%, rgba(255, 0, 170, 0.05) 0%, transparent 50%);
   pointer-events: none;
   z-index: -2;
+}
+
+/* Light Theme - Subtle Grid */
+[data-theme="light"] body::before,
+[data-theme="light-stripe"] body::before,
+[data-theme="light-github"] body::before {
+  background-image: 
+    linear-gradient(rgba(0, 0, 0, 0.02) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 0, 0, 0.02) 1px, transparent 1px);
+}
+
+/* Light Theme - Subtle Glow */
+[data-theme="light"] body::after {
+  background: 
+    radial-gradient(ellipse at 20% 20%, rgba(139, 92, 246, 0.03) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(236, 72, 153, 0.03) 0%, transparent 50%);
+}
+
+[data-theme="light-stripe"] body::after {
+  background: 
+    radial-gradient(ellipse at 20% 20%, rgba(99, 91, 255, 0.04) 0%, transparent 50%),
+    radial-gradient(ellipse at 80% 80%, rgba(0, 212, 170, 0.04) 0%, transparent 50%);
+}
+
+[data-theme="light-github"] body::after {
+  background: none;
 }
 
 #root {
@@ -189,4 +367,57 @@ pre {
 ::selection {
   background: rgba(0, 212, 255, 0.3);
   color: var(--text-primary);
+}
+
+/* ============================================================================
+ * Icon System - Global Rules
+ * ============================================================================ */
+
+/* Lucide는 내부 path에 vector-effect를 주면 스케일링 시에도 선 두께가 안정적입니다. */
+.lucide * {
+  vector-effect: non-scaling-stroke;
+}
+
+/* 공용 아이콘 톤(세련됨의 핵심: 일관된 opacity + 미세 모션) */
+.ui-icon {
+  opacity: var(--ui-icon-opacity);
+  transition:
+    opacity var(--ui-icon-transition),
+    transform var(--ui-icon-transition);
+  transform: translateZ(0);
+}
+
+.ui-icon--muted {
+  opacity: var(--ui-icon-opacity-muted);
+}
+
+/* 버튼/아이콘버튼/인풋 아이콘은 상호작용 시 살짝 살아나게 */
+.ui-button:hover .ui-icon,
+.ui-icon-button:hover .ui-icon,
+.ui-input-container:hover .ui-input-icon .ui-icon,
+.ui-input-container:focus-within .ui-input-icon .ui-icon {
+  opacity: 1;
+}
+
+.ui-button:hover .ui-icon,
+.ui-icon-button:hover .ui-icon {
+  transform: translateY(-0.5px);
+}
+
+.ui-button:active .ui-icon,
+.ui-icon-button:active .ui-icon {
+  transform: translateY(0);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ui-icon {
+    transition: opacity 0.01ms linear;
+  }
+
+  .ui-button:hover .ui-icon,
+  .ui-icon-button:hover .ui-icon,
+  .ui-button:active .ui-icon,
+  .ui-icon-button:active .ui-icon {
+    transform: none;
+  }
 }

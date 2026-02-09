@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
@@ -23,8 +24,8 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
         runBlocking {
             val result = adapter.listContractRefs("VIEW_DEFINITION", null)
 
-            result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-            val refs = (result as ContractRegistryPort.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val refs = (result as Result.Ok).value
             refs.shouldNotBeEmpty()
 
             // view-product-core, view-product-search 등이 포함되어야 함
@@ -37,8 +38,8 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
         runBlocking {
             val result = adapter.listContractRefs("RULESET", null)
 
-            result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-            val refs = (result as ContractRegistryPort.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val refs = (result as Result.Ok).value
             refs.shouldNotBeEmpty()
         }
     }
@@ -47,8 +48,8 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
         runBlocking {
             val result = adapter.listContractRefs("VIEW_DEFINITION", ContractStatus.ACTIVE)
 
-            result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-            val refs = (result as ContractRegistryPort.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val refs = (result as Result.Ok).value
             refs.shouldNotBeEmpty()
         }
     }
@@ -57,8 +58,8 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
         runBlocking {
             val result = adapter.listContractRefs("NONEXISTENT_KIND", null)
 
-            result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-            val refs = (result as ContractRegistryPort.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val refs = (result as Result.Ok).value
             refs.size shouldBe 0
         }
     }
@@ -67,8 +68,8 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
         runBlocking {
             val result = adapter.listViewDefinitions(ContractStatus.ACTIVE)
 
-            result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-            val contracts = (result as ContractRegistryPort.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val contracts = (result as Result.Ok).value
             contracts.shouldNotBeEmpty()
 
             // 모든 계약이 ACTIVE 상태인지 확인
@@ -80,8 +81,8 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
         runBlocking {
             val result = adapter.listViewDefinitions(null)
 
-            result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-            val contracts = (result as ContractRegistryPort.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val contracts = (result as Result.Ok).value
             contracts.shouldNotBeEmpty()
         }
     }

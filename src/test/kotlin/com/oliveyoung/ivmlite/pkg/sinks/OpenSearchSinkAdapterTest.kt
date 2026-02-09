@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.sinks
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkAdapter
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPort
@@ -22,7 +23,7 @@ class SinkAdapterTest : StringSpec({
         
         val result = sink.ship(tenantId, entityKey, 1L, payload)
         
-        result shouldBe SinkPort.Result.Ok(SinkPort.ShipResult(
+        result shouldBe Result.Ok(SinkPort.ShipResult(
             entityKey = entityKey.value,
             version = 1L,
             sinkId = "test-sink/${tenantId.value}/${entityKey.value}",
@@ -47,7 +48,7 @@ class SinkAdapterTest : StringSpec({
         
         val result = sink.shipBatch(tenantId, items)
         
-        result shouldBe SinkPort.Result.Ok(SinkPort.BatchShipResult(
+        result shouldBe Result.Ok(SinkPort.BatchShipResult(
             successCount = 3,
             failedCount = 0,
             failedKeys = emptyList(),
@@ -67,7 +68,7 @@ class SinkAdapterTest : StringSpec({
         
         // 삭제
         val result = sink.delete(tenantId, entityKey)
-        result shouldBe SinkPort.Result.Ok(Unit)
+        result shouldBe Result.Ok(Unit)
         
         // 삭제 확인
         sink.get(tenantId.value, entityKey.value) shouldBe null

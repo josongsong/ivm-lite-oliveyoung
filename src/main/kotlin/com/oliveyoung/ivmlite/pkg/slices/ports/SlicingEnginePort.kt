@@ -4,7 +4,7 @@ import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 
 /**
@@ -52,14 +52,4 @@ interface SlicingEnginePort {
         val slices: List<SliceRecord>,
         val indexes: List<InvertedIndexEntry>,
     )
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-
-        inline fun <R> map(transform: (T) -> R): Result<R> = when (this) {
-            is Ok -> Ok(transform(value))
-            is Err -> this
-        }
-    }
 }

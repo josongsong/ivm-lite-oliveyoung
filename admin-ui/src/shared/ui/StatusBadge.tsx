@@ -1,7 +1,24 @@
+/**
+ * StatusBadge Component
+ *
+ * 상태 배지 컴포넌트:
+ * - 다양한 상태값 지원 (healthy, pending, failed 등)
+ * - 상태별 아이콘 자동 표시
+ * - 색상 자동 매핑
+ *
+ * @example
+ * ```tsx
+ * <StatusBadge status="healthy" />
+ * <StatusBadge status="pending" />
+ * <StatusBadge status="failed" showIcon={false} />
+ * ```
+ */
 import { AlertTriangle, CheckCircle2, Clock, Loader2, XCircle } from 'lucide-react'
 
-interface StatusBadgeProps {
+export interface StatusBadgeProps {
+  /** Status value */
   status: string
+  /** Show status icon */
   showIcon?: boolean
 }
 

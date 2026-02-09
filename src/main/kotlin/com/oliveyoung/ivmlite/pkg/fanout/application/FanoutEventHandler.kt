@@ -5,6 +5,7 @@ import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutPriority
 import com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
@@ -90,7 +91,7 @@ class FanoutEventHandler(
         )
 
         when (result) {
-            is FanoutWorkflow.Result.Ok -> {
+            is Result.Ok -> {
                 val r = result.value
                 logger.info(
                     "Fanout completed: type={}, key={}, processed={}, skipped={}, failed={}",
@@ -102,7 +103,7 @@ class FanoutEventHandler(
                     logger.warn("Fanout had {} failures for {}#{}", r.failedCount, payload.entityType, payload.entityKey)
                 }
             }
-            is FanoutWorkflow.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Fanout failed for {}#{}: {}", payload.entityType, payload.entityKey, result.error)
                 throw OutboxPollingWorker.ProcessingException("Fanout failed: ${result.error}")
             }
@@ -138,7 +139,7 @@ class FanoutEventHandler(
         )
 
         when (result) {
-            is FanoutWorkflow.Result.Ok -> {
+            is Result.Ok -> {
                 val r = result.value
                 if (r.totalAffected > 0) {
                     logger.info(
@@ -147,7 +148,7 @@ class FanoutEventHandler(
                     )
                 }
             }
-            is FanoutWorkflow.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Fanout failed for new entity {}#{}: {}", payload.entityType, payload.entityKey, result.error)
                 // 새 엔티티의 경우 fanout 실패는 치명적이지 않음 - 경고만 기록
             }
@@ -182,7 +183,7 @@ class FanoutEventHandler(
         )
 
         when (result) {
-            is FanoutWorkflow.Result.Ok -> {
+            is Result.Ok -> {
                 val r = result.value
                 if (r.totalAffected > 0) {
                     logger.warn(
@@ -191,7 +192,7 @@ class FanoutEventHandler(
                     )
                 }
             }
-            is FanoutWorkflow.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Fanout failed for deleted entity {}#{}: {}", payload.entityType, payload.entityKey, result.error)
                 throw OutboxPollingWorker.ProcessingException("Fanout failed for deleted entity: ${result.error}")
             }
@@ -225,14 +226,14 @@ class FanoutEventHandler(
         )
 
         when (result) {
-            is FanoutWorkflow.Result.Ok -> {
+            is Result.Ok -> {
                 val r = result.value
                 logger.info(
                     "Manual fanout completed: type={}, key={}, processed={}, status={}",
                     payload.entityType, payload.entityKey, r.processedCount, r.status
                 )
             }
-            is FanoutWorkflow.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Manual fanout failed for {}#{}: {}", payload.entityType, payload.entityKey, result.error)
                 throw OutboxPollingWorker.ProcessingException("Manual fanout failed: ${result.error}")
             }

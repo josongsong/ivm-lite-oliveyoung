@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.sinks.adapters
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.sinks.domain.*
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
@@ -47,30 +48,30 @@ class InMemorySinkRuleRegistry : SinkRuleRegistryPort {
     override suspend fun findByEntityAndSliceType(
         entityType: String,
         sliceType: SliceType
-    ): SinkRuleRegistryPort.Result<List<SinkRule>> {
+    ): Result<List<SinkRule>> {
         val matched = rules.values.filter { rule ->
             rule.status == SinkRuleStatus.ACTIVE &&
                 rule.input.entityTypes.contains(entityType) &&
                 rule.input.sliceTypes.contains(sliceType)
         }
-        return SinkRuleRegistryPort.Result.Ok(matched)
+        return Result.Ok(matched)
     }
 
-    override suspend fun findByEntityType(entityType: String): SinkRuleRegistryPort.Result<List<SinkRule>> {
+    override suspend fun findByEntityType(entityType: String): Result<List<SinkRule>> {
         val matched = rules.values.filter { rule ->
             rule.status == SinkRuleStatus.ACTIVE &&
                 rule.input.entityTypes.contains(entityType)
         }
-        return SinkRuleRegistryPort.Result.Ok(matched)
+        return Result.Ok(matched)
     }
 
-    override suspend fun findAllActive(): SinkRuleRegistryPort.Result<List<SinkRule>> {
+    override suspend fun findAllActive(): Result<List<SinkRule>> {
         val active = rules.values.filter { it.status == SinkRuleStatus.ACTIVE }
-        return SinkRuleRegistryPort.Result.Ok(active)
+        return Result.Ok(active)
     }
 
-    override suspend fun findById(id: String): SinkRuleRegistryPort.Result<SinkRule?> {
-        return SinkRuleRegistryPort.Result.Ok(rules[id])
+    override suspend fun findById(id: String): Result<SinkRule?> {
+        return Result.Ok(rules[id])
     }
 
     // === Test Helpers ===

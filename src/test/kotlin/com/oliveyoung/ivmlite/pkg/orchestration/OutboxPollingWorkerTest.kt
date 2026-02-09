@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
@@ -64,7 +65,7 @@ class OutboxPollingWorkerTest : StringSpec({
                     ruleSetVersion = SemVer.parse("1.0.0"),
                 ),
             )
-            SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
+            Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
         }
     }
     val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
@@ -348,7 +349,7 @@ class OutboxPollingWorkerTest : StringSpec({
 
         // 처리 전 상태 확인
         val beforePending = outboxRepo.findPending(10)
-        (beforePending as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value.size shouldBe 1
+        (beforePending as Result.Ok).value.size shouldBe 1
 
         val worker = OutboxPollingWorker(
             outboxRepo = outboxRepo,
@@ -362,7 +363,7 @@ class OutboxPollingWorkerTest : StringSpec({
 
         // 처리 후: PENDING 없음, PROCESSED 1개
         val afterPending = outboxRepo.findPending(10)
-        (afterPending as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value.size shouldBe 0
+        (afterPending as Result.Ok).value.size shouldBe 0
 
         val metrics = worker.getMetrics()
         metrics.processed shouldBe 1
@@ -454,6 +455,6 @@ class OutboxPollingWorkerTest : StringSpec({
 
         // PENDING 없음
         val pending = outboxRepo.findPending(100)
-        (pending as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value.size shouldBe 0
+        (pending as Result.Ok).value.size shouldBe 0
     }
 })

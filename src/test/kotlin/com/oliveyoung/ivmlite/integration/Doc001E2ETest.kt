@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
@@ -37,7 +38,9 @@ import kotlinx.coroutines.runBlocking
  * - PRODUCT_* View 사용
  * - 6개 SliceType (CORE, PRICE, INVENTORY, MEDIA, CATEGORY, INDEX) 검증
  */
-class Doc001E2ETest : StringSpec({
+class Doc001E2ETest : StringSpec(init@{
+
+    tags(IntegrationTag)
 
     // ==================== 실제 컴포넌트 Setup ====================
 
@@ -241,8 +244,8 @@ class Doc001E2ETest : StringSpec({
         val ref = ContractRef("ruleset.product.doc001.v1", SemVer.parse("1.0.0"))
         val result = contractRegistry.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val ruleSet = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val ruleSet = (result as Result.Ok).value
 
         ruleSet.meta.id shouldBe "ruleset.product.doc001.v1"
         ruleSet.entityType shouldBe "PRODUCT"
@@ -263,8 +266,8 @@ class Doc001E2ETest : StringSpec({
         val ref = ContractRef("view.product.core.v1", SemVer.parse("1.0.0"))
         val result = contractRegistry.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val viewDef = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val viewDef = (result as Result.Ok).value
 
         viewDef.meta.id shouldBe "view.product.core.v1"
         viewDef.requiredSlices shouldBe listOf(SliceType.CORE)
@@ -281,22 +284,22 @@ class Doc001E2ETest : StringSpec({
             schemaVersion = SemVer.parse("1.0.0"),
             payloadJson = doc001FixtureV1,
         )
-        ingestResult.shouldBeInstanceOf<IngestWorkflow.Result.Ok<*>>()
+        ingestResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 2: Slicing (DOC-001 RuleSet 사용)
         val doc001RuleSetRef = ContractRef("ruleset.product.doc001.v1", SemVer.parse("1.0.0"))
         val sliceResult = slicingWorkflow.execute(tenantId, entityKey, 1L, doc001RuleSetRef)
-        sliceResult.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 3: 생성된 Slice 검증 (6개)
-        val sliceKeys = (sliceResult as SlicingWorkflow.Result.Ok).value
+        val sliceKeys = (sliceResult as Result.Ok).value
         sliceKeys.size shouldBe 6 // CORE, PRICE, INVENTORY, MEDIA, CATEGORY, INDEX
 
         // CORE Slice 내용 검증
         val coreKey = SliceRepositoryPort.SliceKey(tenantId, entityKey, 1L, SliceType.CORE)
         val coreResult = sliceRepo.batchGet(tenantId, listOf(coreKey))
-        coreResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val coreSlice = (coreResult as SliceRepositoryPort.Result.Ok).value.first()
+        coreResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val coreSlice = (coreResult as Result.Ok).value.first()
 
         coreSlice.sliceType shouldBe SliceType.CORE
         coreSlice.data shouldContain "설화수"
@@ -306,37 +309,37 @@ class Doc001E2ETest : StringSpec({
         // PRICE Slice 검증
         val priceKey = SliceRepositoryPort.SliceKey(tenantId, entityKey, 1L, SliceType.PRICE)
         val priceResult = sliceRepo.batchGet(tenantId, listOf(priceKey))
-        priceResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val priceSlice = (priceResult as SliceRepositoryPort.Result.Ok).value.first()
+        priceResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val priceSlice = (priceResult as Result.Ok).value.first()
         priceSlice.sliceType shouldBe SliceType.PRICE
         priceSlice.data shouldContain "options"
 
         // INVENTORY Slice 검증
         val inventoryKey = SliceRepositoryPort.SliceKey(tenantId, entityKey, 1L, SliceType.INVENTORY)
         val inventoryResult = sliceRepo.batchGet(tenantId, listOf(inventoryKey))
-        inventoryResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val inventorySlice = (inventoryResult as SliceRepositoryPort.Result.Ok).value.first()
+        inventoryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val inventorySlice = (inventoryResult as Result.Ok).value.first()
         inventorySlice.sliceType shouldBe SliceType.INVENTORY
 
         // MEDIA Slice 검증
         val mediaKey = SliceRepositoryPort.SliceKey(tenantId, entityKey, 1L, SliceType.MEDIA)
         val mediaResult = sliceRepo.batchGet(tenantId, listOf(mediaKey))
-        mediaResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val mediaSlice = (mediaResult as SliceRepositoryPort.Result.Ok).value.first()
+        mediaResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val mediaSlice = (mediaResult as Result.Ok).value.first()
         mediaSlice.sliceType shouldBe SliceType.MEDIA
 
         // CATEGORY Slice 검증
         val categoryKey = SliceRepositoryPort.SliceKey(tenantId, entityKey, 1L, SliceType.CATEGORY)
         val categoryResult = sliceRepo.batchGet(tenantId, listOf(categoryKey))
-        categoryResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val categorySlice = (categoryResult as SliceRepositoryPort.Result.Ok).value.first()
+        categoryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val categorySlice = (categoryResult as Result.Ok).value.first()
         categorySlice.sliceType shouldBe SliceType.CATEGORY
 
         // INDEX Slice 검증
         val indexKey = SliceRepositoryPort.SliceKey(tenantId, entityKey, 1L, SliceType.INDEX)
         val indexResult = sliceRepo.batchGet(tenantId, listOf(indexKey))
-        indexResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val indexSlice = (indexResult as SliceRepositoryPort.Result.Ok).value.first()
+        indexResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val indexSlice = (indexResult as Result.Ok).value.first()
         indexSlice.sliceType shouldBe SliceType.INDEX
     }
 
@@ -361,8 +364,8 @@ class Doc001E2ETest : StringSpec({
             entityKey = entityKey,
             version = 1L,
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (queryResult as Result.Ok).value
         response.data shouldContain "설화수"
         response.data shouldContain "에센스 토너"
     }
@@ -388,8 +391,8 @@ class Doc001E2ETest : StringSpec({
             entityKey = entityKey,
             version = 1L,
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (queryResult as Result.Ok).value
         response.data shouldContain "설화수"
         response.data shouldContain "에센스 토너"
     }
@@ -415,8 +418,8 @@ class Doc001E2ETest : StringSpec({
             entityKey = entityKey,
             version = 1L,
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (queryResult as Result.Ok).value
         response.data shouldContain "설화수"
     }
 })

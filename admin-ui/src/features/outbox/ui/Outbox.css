@@ -116,25 +116,30 @@
   align-items: center;
   justify-content: center;
   background: transparent;
-  border: 1px solid transparent;
+  border: 1px solid var(--border-color);
   border-radius: var(--radius-sm);
-  color: var(--text-muted);
-  transition: all 0.15s ease;
+  color: var(--text-secondary);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.btn-icon:hover {
+.btn-icon:hover:not(:disabled) {
   background: var(--bg-hover);
+  border-color: var(--border-accent);
   color: var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.1);
 }
 
-.btn-icon.replay:hover {
-  color: var(--accent-green);
+.btn-icon.replay:hover:not(:disabled) {
+  color: var(--status-success);
   background: rgba(0, 255, 136, 0.1);
+  border-color: rgba(0, 255, 136, 0.3);
+  box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.2);
 }
 
 .btn-icon:disabled {
   opacity: 0.4;
   cursor: not-allowed;
+  border-color: var(--border-color);
 }
 
 /* Text Colors */
@@ -293,12 +298,15 @@
 
 .btn-icon.btn-process {
   background: transparent;
+  border: 1px solid var(--border-color);
   color: var(--accent-cyan);
 }
 
 .btn-icon.btn-process:hover:not(:disabled) {
   background: rgba(0, 212, 255, 0.1);
+  border-color: var(--accent-cyan);
   color: var(--accent-cyan);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3), 0 2px 8px rgba(0, 212, 255, 0.15);
 }
 
 .spin {

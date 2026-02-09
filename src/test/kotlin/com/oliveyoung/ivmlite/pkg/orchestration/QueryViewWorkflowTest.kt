@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
@@ -64,7 +65,7 @@ class QueryViewWorkflowTest : StringSpec({
                     ruleSetVersion = SemVer.parse("1.0.0"),
                 ),
             )
-            SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
+            Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
         }
     }
     val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
@@ -107,8 +108,8 @@ class QueryViewWorkflowTest : StringSpec({
             requiredSliceTypes = listOf(SliceType.CORE)
         )
         
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (result as QueryViewWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (result as Result.Ok).value
         response.data stringContain "viewId"
         response.data stringContain "Query Test"
     }
@@ -142,10 +143,10 @@ class QueryViewWorkflowTest : StringSpec({
             requiredSliceTypes = listOf(SliceType.CORE)
         )
         
-        result1.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        result2.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        (result1 as QueryViewWorkflow.Result.Ok).value shouldBe 
-            (result2 as QueryViewWorkflow.Result.Ok).value
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
+        (result1 as Result.Ok).value shouldBe 
+            (result2 as Result.Ok).value
     }
 
     "실패: missing slice → Err (fail-closed)" {
@@ -157,7 +158,7 @@ class QueryViewWorkflowTest : StringSpec({
             requiredSliceTypes = listOf(SliceType.CORE)
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
 
     // ==================== RFC-IMPL-010 D-1: Tombstone 연동 ====================
@@ -188,7 +189,7 @@ class QueryViewWorkflowTest : StringSpec({
             requiredSliceTypes = listOf(SliceType.CORE),
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
 
     // ==================== RFC-IMPL-010 GAP-D: v2 API (ViewDefinitionContract 기반) ====================
@@ -202,7 +203,7 @@ class QueryViewWorkflowTest : StringSpec({
             missingPolicy = MissingPolicy.FAIL_CLOSED,
         )
         val mockRegistry = mockk<ContractRegistryPort>()
-        coEvery { mockRegistry.loadViewDefinitionContract(any()) } returns ContractRegistryPort.Result.Ok(viewDef)
+        coEvery { mockRegistry.loadViewDefinitionContract(any()) } returns Result.Ok(viewDef)
 
         val v2Workflow = QueryViewWorkflow(sliceRepo, mockRegistry)
 
@@ -230,8 +231,8 @@ class QueryViewWorkflowTest : StringSpec({
             version = 1L,
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (result as QueryViewWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (result as Result.Ok).value
         response.data stringContain "V2 Test Product"
     }
 
@@ -243,7 +244,7 @@ class QueryViewWorkflowTest : StringSpec({
             missingPolicy = MissingPolicy.FAIL_CLOSED,
         )
         val mockRegistry = mockk<ContractRegistryPort>()
-        coEvery { mockRegistry.loadViewDefinitionContract(any()) } returns ContractRegistryPort.Result.Ok(viewDef)
+        coEvery { mockRegistry.loadViewDefinitionContract(any()) } returns Result.Ok(viewDef)
 
         val v2Workflow = QueryViewWorkflow(sliceRepo, mockRegistry)
 
@@ -270,8 +271,8 @@ class QueryViewWorkflowTest : StringSpec({
             version = 1L,
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
-        val error = (result as QueryViewWorkflow.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.MissingSliceError>()
         (error as DomainError.MissingSliceError).missingSlices shouldContain "PRICE"
     }
@@ -287,7 +288,7 @@ class QueryViewWorkflowTest : StringSpec({
             includeMissingSlices = true,
         )
         val mockRegistry = mockk<ContractRegistryPort>()
-        coEvery { mockRegistry.loadViewDefinitionContract(any()) } returns ContractRegistryPort.Result.Ok(viewDef)
+        coEvery { mockRegistry.loadViewDefinitionContract(any()) } returns Result.Ok(viewDef)
 
         val v2Workflow = QueryViewWorkflow(sliceRepo, mockRegistry)
 
@@ -314,8 +315,8 @@ class QueryViewWorkflowTest : StringSpec({
             version = 1L,
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (result as QueryViewWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (result as Result.Ok).value
         response.data stringContain "Partial Product"
         // meta에 missingSlices 포함
         response.meta shouldNotBe null
@@ -332,14 +333,14 @@ class QueryViewWorkflowTest : StringSpec({
             version = 1L,
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
-        val error = (result as QueryViewWorkflow.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "v2: ViewDefinitionContract 로드 실패 → Err 전파" {
         val mockRegistry = mockk<ContractRegistryPort>()
-        coEvery { mockRegistry.loadViewDefinitionContract(any()) } returns ContractRegistryPort.Result.Err(
+        coEvery { mockRegistry.loadViewDefinitionContract(any()) } returns Result.Err(
             DomainError.NotFoundError("ViewDefinition", "view.not.exists")
         )
 
@@ -352,8 +353,8 @@ class QueryViewWorkflowTest : StringSpec({
             version = 1L,
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
-        val error = (result as QueryViewWorkflow.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 })

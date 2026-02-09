@@ -1,0 +1,133 @@
+/**
+ * Design System Header Styles
+ */
+
+.ds-header {
+  margin-bottom: 2rem;
+}
+
+.ds-header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1rem;
+}
+
+/* Breadcrumbs */
+.ds-breadcrumbs {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.ds-breadcrumb-item {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+.ds-breadcrumb-separator {
+  color: var(--text-muted);
+}
+
+.ds-breadcrumb-link {
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  text-decoration: none;
+  transition: color 0.2s ease;
+}
+
+.ds-breadcrumb-link:hover {
+  color: var(--text-primary);
+}
+
+.ds-breadcrumb-current {
+  color: var(--text-primary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+}
+
+/* Header Actions */
+.ds-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Header Main */
+.ds-header-main {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ds-header-content {
+  flex: 1;
+}
+
+.ds-header-title {
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+  line-height: 1.2;
+}
+
+.ds-header-description {
+  font-size: 1rem;
+  color: var(--text-secondary);
+  margin: 0;
+  max-width: 600px;
+  line-height: 1.6;
+}
+
+/* Stability Badge */
+.ds-stability-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: var(--radius-full);
+  font-size: 0.6875rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ds-stability-stable {
+  background: rgba(34, 197, 94, 0.15);
+  color: #22c55e;
+}
+
+.ds-stability-beta {
+  background: rgba(59, 130, 246, 0.15);
+  color: #3b82f6;
+}
+
+.ds-stability-experimental {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+}
+
+.ds-stability-deprecated {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .ds-header-top {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .ds-header-title {
+    font-size: 1.5rem;
+  }
+
+  .ds-header-description {
+    font-size: 0.875rem;
+  }
+}

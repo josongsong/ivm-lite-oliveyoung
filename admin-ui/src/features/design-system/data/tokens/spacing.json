@@ -1,0 +1,150 @@
+{
+  "base": {
+    "0": {
+      "value": "0px",
+      "description": "간격 없음"
+    },
+    "px": {
+      "value": "1px",
+      "description": "1픽셀 (보더 등)"
+    },
+    "0.5": {
+      "value": "2px",
+      "description": "매우 작은 간격"
+    },
+    "1": {
+      "value": "4px",
+      "description": "아이콘 내부 패딩"
+    },
+    "1.5": {
+      "value": "6px",
+      "description": "작은 요소 간격"
+    },
+    "2": {
+      "value": "8px",
+      "description": "기본 작은 간격"
+    },
+    "2.5": {
+      "value": "10px",
+      "description": "버튼 패딩 (sm)"
+    },
+    "3": {
+      "value": "12px",
+      "description": "카드 패딩 (sm)"
+    },
+    "3.5": {
+      "value": "14px",
+      "description": "중간 간격"
+    },
+    "4": {
+      "value": "16px",
+      "description": "기본 간격"
+    },
+    "5": {
+      "value": "20px",
+      "description": "섹션 내부 간격"
+    },
+    "6": {
+      "value": "24px",
+      "description": "카드 패딩"
+    },
+    "7": {
+      "value": "28px",
+      "description": "중간 큰 간격"
+    },
+    "8": {
+      "value": "32px",
+      "description": "섹션 간격"
+    },
+    "9": {
+      "value": "36px",
+      "description": "큰 간격"
+    },
+    "10": {
+      "value": "40px",
+      "description": "모달 패딩"
+    },
+    "12": {
+      "value": "48px",
+      "description": "페이지 섹션 간격"
+    },
+    "14": {
+      "value": "56px",
+      "description": "대형 간격"
+    },
+    "16": {
+      "value": "64px",
+      "description": "페이지 마진"
+    },
+    "20": {
+      "value": "80px",
+      "description": "히어로 섹션"
+    },
+    "24": {
+      "value": "96px",
+      "description": "대형 섹션"
+    },
+    "32": {
+      "value": "128px",
+      "description": "최대 간격"
+    }
+  },
+  "semantic": {
+    "page-x": {
+      "value": "24px",
+      "description": "페이지 좌우 패딩"
+    },
+    "page-y": {
+      "value": "32px",
+      "description": "페이지 상하 패딩"
+    },
+    "section": {
+      "value": "48px",
+      "description": "섹션 사이 간격"
+    },
+    "card": {
+      "value": "16px",
+      "description": "카드 내부 패딩"
+    },
+    "card-gap": {
+      "value": "12px",
+      "description": "카드 요소 간 간격"
+    },
+    "input": {
+      "value": "12px",
+      "description": "입력 필드 패딩"
+    },
+    "button-x": {
+      "value": "16px",
+      "description": "버튼 좌우 패딩"
+    },
+    "button-y": {
+      "value": "8px",
+      "description": "버튼 상하 패딩"
+    },
+    "stack-sm": {
+      "value": "8px",
+      "description": "작은 수직 스택"
+    },
+    "stack-md": {
+      "value": "16px",
+      "description": "중간 수직 스택"
+    },
+    "stack-lg": {
+      "value": "24px",
+      "description": "큰 수직 스택"
+    },
+    "inline-sm": {
+      "value": "4px",
+      "description": "작은 인라인 간격"
+    },
+    "inline-md": {
+      "value": "8px",
+      "description": "중간 인라인 간격"
+    },
+    "inline-lg": {
+      "value": "16px",
+      "description": "큰 인라인 간격"
+    }
+  }
+}

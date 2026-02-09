@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
@@ -100,7 +101,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -119,8 +120,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         )
 
         // ===== Step 4: 검증 - Product가 재슬라이싱되었는지 =====
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<FanoutResult>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok<FanoutResult>).value
+        result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
+        val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.status shouldBe FanoutResultStatus.SUCCESS
 
         // SlicingWorkflow가 P001에 대해 정확히 1번 호출되었는지 검증 (atLeast 대신 exactly)
@@ -199,7 +200,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -216,8 +217,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         )
 
         // ===== Step 4: 검증 - 3개 Product 모두 재슬라이싱 =====
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<FanoutResult>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok<FanoutResult>).value
+        result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
+        val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 3
 
         // 각 Product에 대해 정확히 1번씩 호출되었는지 검증
@@ -286,8 +287,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         )
 
         // ===== Step 4: 검증 - Fanout 없음 =====
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<FanoutResult>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok<FanoutResult>).value
+        result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
+        val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 0
 
         // SlicingWorkflow 호출 없음 (4개 파라미터: tenantId, entityKey, version, ruleSetRef)
@@ -336,7 +337,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -353,8 +354,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         )
 
         // ===== Step 4: 검증 =====
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<FanoutResult>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok<FanoutResult>).value
+        result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
+        val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 1
 
         // 정확히 1번 호출되었는지 검증
@@ -391,8 +392,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // 의존성 추론
         val result = fanoutWorkflow.inferDependencies("BRAND")
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<List<FanoutDependency>>>()
-        val dependencies = (result as FanoutWorkflow.Result.Ok<List<FanoutDependency>>).value
+        result.shouldBeInstanceOf<Result.Ok<List<FanoutDependency>>>()
+        val dependencies = (result as Result.Ok<List<FanoutDependency>>).value
 
         // indexes에서 references="BRAND" 발견
         dependencies.size shouldBe 1
@@ -457,8 +458,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         )
 
         // ===== Step 3: 검증 - Circuit Breaker 발동으로 SKIP됨 =====
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<FanoutResult>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok<FanoutResult>).value
+        result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
+        val fanoutResult = (result as Result.Ok<FanoutResult>).value
         
         // SKIP 상태 확인
         fanoutResult.totalAffected shouldBe productCount
@@ -537,8 +538,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         )
 
         // ===== Step 3: 검증 - Circuit Breaker 발동으로 FAILED됨 =====
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<FanoutResult>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok<FanoutResult>).value
+        result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
+        val fanoutResult = (result as Result.Ok<FanoutResult>).value
         
         // FAILED 상태 확인
         fanoutResult.totalAffected shouldBe productCount
@@ -607,8 +608,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         )
 
         // ===== Step 3: 검증 - 빈 결과 =====
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<FanoutResult>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok<FanoutResult>).value
+        result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
+        val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 0
         fanoutResult.processedCount shouldBe 0
         
@@ -665,8 +666,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         )
 
         // ===== Step 3: 검증 - tenant 격리로 영향 없음 =====
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<FanoutResult>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok<FanoutResult>).value
+        result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
+        val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 0  // 다른 tenant이므로 영향 없음
         
         // SlicingWorkflow 호출 없음
@@ -720,7 +721,7 @@ private fun createMockContractRegistryWithReferences(): ContractRegistryPort {
     )
 
     coEvery { registry.loadRuleSetContract(any()) } returns
-        ContractRegistryPort.Result.Ok(ruleSet)
+        Result.Ok(ruleSet)
 
     return registry
 }
@@ -752,7 +753,7 @@ private fun createMockContractRegistryWithTagOnly(): ContractRegistryPort {
     )
 
     coEvery { registry.loadRuleSetContract(any()) } returns
-        ContractRegistryPort.Result.Ok(ruleSet)
+        Result.Ok(ruleSet)
 
     return registry
 }
@@ -789,7 +790,7 @@ private fun createMockContractRegistryWithIndexesOnly(): ContractRegistryPort {
     )
 
     coEvery { registry.loadRuleSetContract(any()) } returns
-        ContractRegistryPort.Result.Ok(ruleSet)
+        Result.Ok(ruleSet)
 
     return registry
 }
@@ -825,7 +826,7 @@ private fun createMockContractRegistryWithMaxFanout(maxFanout: Int): ContractReg
     )
 
     coEvery { registry.loadRuleSetContract(any()) } returns
-        ContractRegistryPort.Result.Ok(ruleSet)
+        Result.Ok(ruleSet)
 
     return registry
 }
@@ -861,7 +862,7 @@ private fun createMockContractRegistryWithCategory(): ContractRegistryPort {
     )
 
     coEvery { registry.loadRuleSetContract(any()) } returns
-        ContractRegistryPort.Result.Ok(ruleSet)
+        Result.Ok(ruleSet)
 
     return registry
 }

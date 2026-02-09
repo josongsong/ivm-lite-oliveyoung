@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.orchestration.adapters
 
 import com.oliveyoung.ivmlite.pkg.orchestration.application.DeployJobRecord
 import com.oliveyoung.ivmlite.pkg.orchestration.application.DeployJobRepositoryPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
@@ -15,20 +16,20 @@ class InMemoryDeployJobRepository : DeployJobRepositoryPort, HealthCheckable {
     
     private val storage = ConcurrentHashMap<String, DeployJobRecord>()
     
-    override suspend fun save(job: DeployJobRecord): DeployJobRepositoryPort.Result<DeployJobRecord> {
+    override suspend fun save(job: DeployJobRecord): Result<DeployJobRecord> {
         storage[job.jobId] = job
-        return DeployJobRepositoryPort.Result.Ok(job)
+        return Result.Ok(job)
     }
     
-    override suspend fun get(jobId: String): DeployJobRepositoryPort.Result<DeployJobRecord?> {
-        return DeployJobRepositoryPort.Result.Ok(storage[jobId])
+    override suspend fun get(jobId: String): Result<DeployJobRecord?> {
+        return Result.Ok(storage[jobId])
     }
     
     override suspend fun updateState(
         jobId: String, 
         state: String, 
         error: String?
-    ): DeployJobRepositoryPort.Result<Unit> {
+    ): Result<Unit> {
         val existing = storage[jobId]
         if (existing != null) {
             storage[jobId] = existing.copy(
@@ -37,7 +38,7 @@ class InMemoryDeployJobRepository : DeployJobRepositoryPort, HealthCheckable {
                 updatedAt = Instant.now()
             )
         }
-        return DeployJobRepositoryPort.Result.Ok(Unit)
+        return Result.Ok(Unit)
     }
     
     override suspend fun healthCheck(): Boolean = true

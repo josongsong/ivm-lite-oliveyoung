@@ -5,6 +5,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.IngestUnitOfWorkPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 
 /**
@@ -25,19 +26,19 @@ class InMemoryIngestUnitOfWork(
     override suspend fun executeIngest(
         rawData: RawDataRecord,
         outboxEntry: OutboxEntry,
-    ): IngestUnitOfWorkPort.Result<Unit> {
+    ): Result<Unit> {
         // Step 1: RawData 저장
         when (val r = rawRepo.putIdempotent(rawData)) {
-            is RawDataRepositoryPort.Result.Ok -> { /* continue */ }
-            is RawDataRepositoryPort.Result.Err -> return IngestUnitOfWorkPort.Result.Err(r.error)
+            is Result.Ok -> { /* continue */ }
+            is Result.Err -> return Result.Err(r.error)
         }
 
         // Step 2: Outbox 저장
         when (val r = outboxRepo.insert(outboxEntry)) {
-            is OutboxRepositoryPort.Result.Ok -> { /* continue */ }
-            is OutboxRepositoryPort.Result.Err -> return IngestUnitOfWorkPort.Result.Err(r.error)
+            is Result.Ok -> { /* continue */ }
+            is Result.Err -> return Result.Err(r.error)
         }
 
-        return IngestUnitOfWorkPort.Result.Ok(Unit)
+        return Result.Ok(Unit)
     }
 }

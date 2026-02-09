@@ -1,0 +1,206 @@
+rules:
+  # ============================================
+  # FSD Architecture Rules
+  # ============================================
+
+  - id: fsd-no-cross-feature-import
+    message: |
+      ❌ FSD 아키텍처 위반: features 간 직접 import 금지
+      다른 feature의 내부 모듈을 직접 import하지 마세요.
+      공유가 필요한 경우 shared 레이어로 이동하세요.
+    severity: ERROR
+    languages: [typescript]
+    patterns:
+      - pattern-regex: "from ['\"]@/features/[^'\"]+/(?:components|hooks|ui|api|model)/[^'\"]+['\"]"
+    paths:
+      include:
+        - "**/src/features/**"
+
+  - id: fsd-no-upward-import-from-features
+    message: |
+      ❌ FSD 아키텍처 위반: features에서 상위 레이어(app, widgets) import 금지
+      features → shared 방향으로만 import 가능합니다.
+    severity: ERROR
+    languages: [typescript]
+    patterns:
+      - pattern-regex: "from ['\"]@/(app|widgets)/[^'\"]+['\"]"
+    paths:
+      include:
+        - "**/src/features/**"
+
+  - id: fsd-no-upward-import-from-widgets
+    message: |
+      ❌ FSD 아키텍처 위반: widgets에서 app 레이어 import 금지
+      widgets → features → shared 방향으로만 import 가능합니다.
+    severity: ERROR
+    languages: [typescript]
+    patterns:
+      - pattern-regex: "from ['\"]@/app/[^'\"]+['\"]"
+    paths:
+      include:
+        - "**/src/widgets/**"
+
+  # ============================================
+  # React Security Rules
+  # ============================================
+
+  - id: react-no-dangerously-set-innerhtml
+    message: |
+      ⚠️ 보안 경고: dangerouslySetInnerHTML 사용 감지
+      XSS 공격에 취약할 수 있습니다. 반드시 DOMPurify 등으로 sanitize 후 사용하세요.
+    severity: WARNING
+    languages: [typescript]
+    pattern: dangerouslySetInnerHTML={$X}
+
+  - id: react-no-innerhtml-assignment
+    message: |
+      ❌ 보안 위반: innerHTML 직접 할당 금지
+      XSS 공격에 취약합니다. React의 상태 관리를 사용하세요.
+    severity: ERROR
+    languages: [typescript]
+    pattern: $EL.innerHTML = $VALUE
+
+  - id: react-no-document-write
+    message: |
+      ❌ 보안 위반: document.write 사용 금지
+      XSS 공격에 취약하고 성능 문제를 일으킵니다.
+    severity: ERROR
+    languages: [typescript]
+    pattern: document.write($X)
+
+  - id: react-no-location-href-javascript
+    message: |
+      ❌ 보안 위반: javascript: URL 금지
+      XSS 공격에 취약합니다.
+    severity: ERROR
+    languages: [typescript]
+    pattern-regex: "location\\.href\\s*=\\s*['\"]javascript:"
+
+  # ============================================
+  # API Security Rules
+  # ============================================
+
+  - id: api-no-hardcoded-secrets
+    message: |
+      ❌ 보안 위반: 하드코딩된 시크릿 감지
+      API 키, 토큰, 비밀번호를 코드에 직접 포함하지 마세요.
+      환경변수를 사용하세요.
+    severity: ERROR
+    languages: [typescript]
+    patterns:
+      - pattern-regex: "(api[_-]?key|api[_-]?secret|auth[_-]?token|password|secret[_-]?key)\\s*[=:]\\s*['\"][^'\"]{8,}['\"]"
+    paths:
+      exclude:
+        - "**/*.test.*"
+        - "**/*.spec.*"
+
+  - id: api-no-http-urls
+    message: |
+      ⚠️ 보안 경고: HTTP URL 감지 (HTTPS 권장)
+      프로덕션에서는 HTTPS를 사용하세요.
+    severity: WARNING
+    languages: [typescript]
+    pattern-regex: "['\"]http://(?!localhost|127\\.0\\.0\\.1)[^'\"]+['\"]"
+    paths:
+      exclude:
+        - "**/*.test.*"
+        - "**/*.spec.*"
+
+  # ============================================
+  # Shared UI Enforcement
+  # ============================================
+
+  - id: shared-ui-no-native-button
+    message: |
+      ❌ UI 규칙 위반: Native <button> 사용 금지
+      @/shared/ui의 Button 또는 IconButton을 사용하세요.
+    severity: ERROR
+    languages: [typescript]
+    pattern: <button $...ATTRS>$...CHILDREN</button>
+    paths:
+      exclude:
+        - "**/src/shared/ui/**"
+
+  - id: shared-ui-no-native-select
+    message: |
+      ❌ UI 규칙 위반: Native <select> 사용 금지
+      @/shared/ui의 Select를 사용하세요.
+    severity: ERROR
+    languages: [typescript]
+    pattern: <select $...ATTRS>$...CHILDREN</select>
+    paths:
+      exclude:
+        - "**/src/shared/ui/**"
+
+  # ============================================
+  # Code Quality Rules
+  # ============================================
+
+  - id: quality-no-console-log
+    message: |
+      ⚠️ 품질 경고: console.log 사용 감지
+      프로덕션 코드에서는 console.log를 제거하세요.
+      디버깅이 필요하면 console.warn 또는 console.error를 사용하세요.
+    severity: WARNING
+    languages: [typescript]
+    pattern: console.log($...ARGS)
+    paths:
+      exclude:
+        - "**/*.test.*"
+        - "**/*.spec.*"
+        - "**/api/**"
+
+  - id: quality-no-todo-without-issue
+    message: |
+      ⚠️ 품질 경고: TODO 주석에 이슈 번호 없음
+      TODO 주석에는 관련 이슈 번호를 포함하세요.
+      예: // TODO(#123): 구현 필요
+    severity: INFO
+    languages: [typescript]
+    pattern-regex: "//\\s*TODO(?!\\s*\\(#\\d+\\))"
+
+  - id: quality-no-any-explicit
+    message: |
+      ⚠️ 타입 경고: 명시적 any 타입 사용 감지
+      구체적인 타입을 정의하거나 unknown을 사용하세요.
+    severity: WARNING
+    languages: [typescript]
+    pattern-regex: "\\bas\\s+any\\b"
+    paths:
+      exclude:
+        - "**/*.test.*"
+        - "**/*.spec.*"
+        - "**/*.d.ts"
+
+  # ============================================
+  # Performance Rules
+  # ============================================
+
+  - id: perf-no-large-inline-object
+    message: |
+      ⚠️ 성능 경고: 큰 인라인 스타일 객체 사용
+      매 렌더링마다 새 객체가 생성됩니다. useMemo 또는 CSS 클래스를 사용하세요.
+    severity: WARNING
+    languages: [typescript]
+    pattern-regex: "style=\\{\\{[^}]{100,}\\}\\}"
+    paths:
+      exclude:
+        - "**/*.test.*"
+        - "**/*.spec.*"
+
+  # ============================================
+  # React Hook Rules
+  # ============================================
+
+  - id: react-hooks-missing-deps-fetch
+    message: |
+      ⚠️ 잠재적 버그: useEffect에서 fetch 후 상태 업데이트
+      cleanup 함수에서 isMounted 체크를 권장합니다.
+    severity: INFO
+    languages: [typescript]
+    pattern: |
+      useEffect(() => {
+        ...
+        fetch($URL)
+        ...
+      }, [...])

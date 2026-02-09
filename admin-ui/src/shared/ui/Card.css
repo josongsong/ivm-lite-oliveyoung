@@ -1,0 +1,323 @@
+/**
+ * Card Component Styles
+ *
+ * Design system tokens used:
+ * - Colors: --bg-card, --bg-hover, --border-color, --border-accent
+ * - Status: --status-success, --status-warning, --status-error, --status-info
+ * - Shadows: --shadow-sm, --shadow-md, --shadow-glow-cyan
+ * - Radius: --radius-md, --radius-lg
+ */
+
+/* =============================================================================
+   Base Card
+   ============================================================================= */
+
+.ui-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.ui-card__content {
+  padding: 1rem;
+}
+
+.ui-card--no-padding .ui-card__content {
+  padding: 0;
+}
+
+/* Variants */
+.ui-card--elevated {
+  box-shadow: var(--shadow-md);
+  border-color: var(--border-accent);
+}
+
+.ui-card--outlined {
+  background: transparent;
+  border: 1px solid var(--border-accent);
+}
+
+.ui-card--ghost {
+  background: transparent;
+  border: none;
+}
+
+.ui-card--glass {
+  background: rgba(21, 21, 31, 0.7);
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+/* States */
+.ui-card--hoverable:hover {
+  border-color: var(--accent-cyan);
+  box-shadow: var(--shadow-glow-cyan);
+  transform: translateY(-2px);
+}
+
+.ui-card--clickable {
+  cursor: pointer;
+}
+
+.ui-card--clickable:hover {
+  border-color: var(--accent-cyan);
+}
+
+.ui-card--clickable:active {
+  transform: scale(0.99);
+}
+
+.ui-card--clickable:focus-visible {
+  outline: 2px solid var(--accent-cyan);
+  outline-offset: 2px;
+}
+
+/* Status indicators */
+.ui-card--status-success {
+  border-left: 3px solid var(--status-success);
+}
+
+.ui-card--status-warning {
+  border-left: 3px solid var(--status-warning);
+}
+
+.ui-card--status-error {
+  border-left: 3px solid var(--status-error);
+}
+
+.ui-card--status-info {
+  border-left: 3px solid var(--status-info);
+}
+
+.ui-card--status-pending {
+  border-left: 3px solid var(--status-pending);
+}
+
+.ui-card--status-processing {
+  border-left: 3px solid var(--status-processing);
+}
+
+/* Header */
+.ui-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.75rem 1rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.ui-card--no-padding .ui-card__header {
+  padding: 0.75rem 1rem;
+}
+
+.ui-card__header-title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ui-card__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+}
+
+/* =============================================================================
+   Stats Card
+   ============================================================================= */
+
+.ui-stats-card {
+  min-width: 180px;
+}
+
+.ui-stats-card .ui-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.ui-stats-card__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ui-stats-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--accent-cyan);
+}
+
+.ui-stats-card__title {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ui-stats-card__body {
+  display: flex;
+  align-items: baseline;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.ui-stats-card__value {
+  font-family: var(--font-mono);
+  font-weight: 600;
+  color: var(--text-primary);
+  line-height: 1.2;
+}
+
+.ui-stats-card__value--sm {
+  font-size: 1.25rem;
+}
+
+.ui-stats-card__value--md {
+  font-size: 1.5rem;
+}
+
+.ui-stats-card__value--lg {
+  font-size: 2rem;
+}
+
+.ui-stats-card__value--xl {
+  font-size: 2.5rem;
+}
+
+.ui-stats-card__trend {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0.125rem 0.375rem;
+  border-radius: var(--radius-sm);
+}
+
+.ui-stats-card__trend--up {
+  color: var(--status-success);
+  background: rgba(0, 255, 136, 0.1);
+}
+
+.ui-stats-card__trend--down {
+  color: var(--status-error);
+  background: rgba(255, 68, 102, 0.1);
+}
+
+.ui-stats-card__trend--neutral {
+  color: var(--text-muted);
+  background: rgba(106, 106, 128, 0.1);
+}
+
+.ui-stats-card__trend-label {
+  color: var(--text-muted);
+  margin-left: 0.25rem;
+}
+
+.ui-stats-card__subtitle {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+/* =============================================================================
+   Breakdown Item
+   ============================================================================= */
+
+.ui-breakdown-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.375rem 0.5rem;
+  border-radius: var(--radius-sm);
+  transition: all 0.15s ease;
+}
+
+.ui-breakdown-item--clickable {
+  cursor: pointer;
+}
+
+.ui-breakdown-item--clickable:hover {
+  background: var(--bg-hover);
+}
+
+.ui-breakdown-item--highlighted {
+  background: rgba(0, 212, 255, 0.1);
+  border: 1px solid var(--accent-cyan);
+}
+
+.ui-breakdown-item__label {
+  font-size: 0.8125rem;
+  color: var(--text-secondary);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ui-breakdown-item__value {
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+/* =============================================================================
+   Stats Grid
+   ============================================================================= */
+
+.ui-stats-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.ui-stats-grid--cols-2 {
+  grid-template-columns: repeat(2, 1fr);
+}
+
+.ui-stats-grid--cols-3 {
+  grid-template-columns: repeat(3, 1fr);
+}
+
+.ui-stats-grid--cols-4 {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.ui-stats-grid--cols-5 {
+  grid-template-columns: repeat(5, 1fr);
+}
+
+/* Responsive */
+@media (max-width: 1200px) {
+  .ui-stats-grid--cols-5 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  .ui-stats-grid--cols-4 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 768px) {
+  .ui-stats-grid--cols-5,
+  .ui-stats-grid--cols-4,
+  .ui-stats-grid--cols-3 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .ui-stats-grid--cols-5,
+  .ui-stats-grid--cols-4,
+  .ui-stats-grid--cols-3,
+  .ui-stats-grid--cols-2 {
+    grid-template-columns: 1fr;
+  }
+}

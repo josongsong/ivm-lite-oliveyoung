@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.GatedContractRegistryAdapter
@@ -85,41 +86,41 @@ class GatedContractRegistryAdapterTest : StringSpec({
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createChangeSetContract(ContractStatus.ACTIVE)
-        coEvery { delegate.loadChangeSetContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadChangeSetContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadChangeSetContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        (result as ContractRegistryPort.Result.Ok).value.meta.status shouldBe ContractStatus.ACTIVE
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        (result as Result.Ok).value.meta.status shouldBe ContractStatus.ACTIVE
         coVerify(exactly = 1) { delegate.loadChangeSetContract(ref) }
     }
     "loadChangeSetContract - DEPRECATED → 경고 로그 + delegate 호출" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createChangeSetContract(ContractStatus.DEPRECATED)
-        coEvery { delegate.loadChangeSetContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadChangeSetContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadChangeSetContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        (result as ContractRegistryPort.Result.Ok).value.meta.status shouldBe ContractStatus.DEPRECATED
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        (result as Result.Ok).value.meta.status shouldBe ContractStatus.DEPRECATED
     }
     "loadChangeSetContract - DRAFT → gate 실패, delegate 호출 안함" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createChangeSetContract(ContractStatus.DRAFT)
-        coEvery { delegate.loadChangeSetContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadChangeSetContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadChangeSetContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
         result.error.shouldBeInstanceOf<DomainError.ContractStatusError>()
     }
     "loadChangeSetContract - ARCHIVED → gate 실패, Err 반환" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createChangeSetContract(ContractStatus.ARCHIVED)
-        coEvery { delegate.loadChangeSetContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadChangeSetContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadChangeSetContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
         result.error.shouldBeInstanceOf<DomainError.ContractStatusError>()
     }
     // ==================== loadJoinSpecContract 테스트 ====================
@@ -127,80 +128,80 @@ class GatedContractRegistryAdapterTest : StringSpec({
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createJoinSpecContract(ContractStatus.ACTIVE)
-        coEvery { delegate.loadJoinSpecContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadJoinSpecContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadJoinSpecContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
         coVerify(exactly = 1) { delegate.loadJoinSpecContract(ref) }
     }
     "loadJoinSpecContract - DRAFT → Err" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createJoinSpecContract(ContractStatus.DRAFT)
-        coEvery { delegate.loadJoinSpecContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadJoinSpecContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadJoinSpecContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
     // ==================== loadInvertedIndexContract 테스트 ====================
     "loadInvertedIndexContract - ACTIVE → Ok" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createInvertedIndexContract(ContractStatus.ACTIVE)
-        coEvery { delegate.loadInvertedIndexContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadInvertedIndexContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadInvertedIndexContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
         coVerify(exactly = 1) { delegate.loadInvertedIndexContract(ref) }
     }
     "loadInvertedIndexContract - ARCHIVED → Err" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createInvertedIndexContract(ContractStatus.ARCHIVED)
-        coEvery { delegate.loadInvertedIndexContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadInvertedIndexContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadInvertedIndexContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
     // ==================== loadRuleSetContract 테스트 ====================
     "loadRuleSetContract - ACTIVE → Ok" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createRuleSetContract(ContractStatus.ACTIVE)
-        coEvery { delegate.loadRuleSetContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadRuleSetContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadRuleSetContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
         coVerify(exactly = 1) { delegate.loadRuleSetContract(ref) }
     }
     "loadRuleSetContract - DRAFT → Err" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createRuleSetContract(ContractStatus.DRAFT)
-        coEvery { delegate.loadRuleSetContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadRuleSetContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadRuleSetContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
     // ==================== loadViewDefinitionContract 테스트 ====================
     "loadViewDefinitionContract - ACTIVE → Ok" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createViewDefinitionContract(ContractStatus.ACTIVE)
-        coEvery { delegate.loadViewDefinitionContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadViewDefinitionContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadViewDefinitionContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
         coVerify(exactly = 1) { delegate.loadViewDefinitionContract(ref) }
     }
     "loadViewDefinitionContract - ARCHIVED → Err" {
         val delegate = mockk<ContractRegistryPort>()
         val gate = DefaultContractStatusGate
         val contract = createViewDefinitionContract(ContractStatus.ARCHIVED)
-        coEvery { delegate.loadViewDefinitionContract(ref) } returns ContractRegistryPort.Result.Ok(contract)
+        coEvery { delegate.loadViewDefinitionContract(ref) } returns Result.Ok(contract)
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadViewDefinitionContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
     // ==================== delegate 에러 전파 테스트 ====================
     "delegate가 Err 반환 시 gate 검사 안함, Err 그대로 전파" {
@@ -208,9 +209,9 @@ class GatedContractRegistryAdapterTest : StringSpec({
         val gate = DefaultContractStatusGate
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val error = DomainError.NotFoundError("Contract", "test.v1")
-        coEvery { delegate.loadChangeSetContract(ref) } returns ContractRegistryPort.Result.Err(error)
+        coEvery { delegate.loadChangeSetContract(ref) } returns Result.Err(error)
         val result = adapter.loadChangeSetContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
         result.error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
     // ==================== HealthCheckable 위임 테스트 ====================
@@ -248,65 +249,65 @@ class GatedContractRegistryAdapterTest : StringSpec({
         ContractStatus.entries.forEach { status ->
             val delegate = mockk<ContractRegistryPort>()
             val gate = DefaultContractStatusGate
-            coEvery { delegate.loadChangeSetContract(ref) } returns ContractRegistryPort.Result.Ok(createChangeSetContract(status))
+            coEvery { delegate.loadChangeSetContract(ref) } returns Result.Ok(createChangeSetContract(status))
             val adapter = GatedContractRegistryAdapter(delegate, gate)
             val result = adapter.loadChangeSetContract(ref)
             if (status in allowedStatuses) {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+                result.shouldBeInstanceOf<Result.Ok<*>>()
             } else {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+                result.shouldBeInstanceOf<Result.Err>()
             }
         }
         // JoinSpec × 4 Status
         ContractStatus.entries.forEach { status ->
             val delegate = mockk<ContractRegistryPort>()
             val gate = DefaultContractStatusGate
-            coEvery { delegate.loadJoinSpecContract(ref) } returns ContractRegistryPort.Result.Ok(createJoinSpecContract(status))
+            coEvery { delegate.loadJoinSpecContract(ref) } returns Result.Ok(createJoinSpecContract(status))
             val adapter = GatedContractRegistryAdapter(delegate, gate)
             val result = adapter.loadJoinSpecContract(ref)
             if (status in allowedStatuses) {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+                result.shouldBeInstanceOf<Result.Ok<*>>()
             } else {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+                result.shouldBeInstanceOf<Result.Err>()
             }
         }
         // InvertedIndex × 4 Status
         ContractStatus.entries.forEach { status ->
             val delegate = mockk<ContractRegistryPort>()
             val gate = DefaultContractStatusGate
-            coEvery { delegate.loadInvertedIndexContract(ref) } returns ContractRegistryPort.Result.Ok(createInvertedIndexContract(status))
+            coEvery { delegate.loadInvertedIndexContract(ref) } returns Result.Ok(createInvertedIndexContract(status))
             val adapter = GatedContractRegistryAdapter(delegate, gate)
             val result = adapter.loadInvertedIndexContract(ref)
             if (status in allowedStatuses) {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+                result.shouldBeInstanceOf<Result.Ok<*>>()
             } else {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+                result.shouldBeInstanceOf<Result.Err>()
             }
         }
         // RuleSet × 4 Status
         ContractStatus.entries.forEach { status ->
             val delegate = mockk<ContractRegistryPort>()
             val gate = DefaultContractStatusGate
-            coEvery { delegate.loadRuleSetContract(ref) } returns ContractRegistryPort.Result.Ok(createRuleSetContract(status))
+            coEvery { delegate.loadRuleSetContract(ref) } returns Result.Ok(createRuleSetContract(status))
             val adapter = GatedContractRegistryAdapter(delegate, gate)
             val result = adapter.loadRuleSetContract(ref)
             if (status in allowedStatuses) {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+                result.shouldBeInstanceOf<Result.Ok<*>>()
             } else {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+                result.shouldBeInstanceOf<Result.Err>()
             }
         }
         // ViewDefinition × 4 Status
         ContractStatus.entries.forEach { status ->
             val delegate = mockk<ContractRegistryPort>()
             val gate = DefaultContractStatusGate
-            coEvery { delegate.loadViewDefinitionContract(ref) } returns ContractRegistryPort.Result.Ok(createViewDefinitionContract(status))
+            coEvery { delegate.loadViewDefinitionContract(ref) } returns Result.Ok(createViewDefinitionContract(status))
             val adapter = GatedContractRegistryAdapter(delegate, gate)
             val result = adapter.loadViewDefinitionContract(ref)
             if (status in allowedStatuses) {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+                result.shouldBeInstanceOf<Result.Ok<*>>()
             } else {
-                result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+                result.shouldBeInstanceOf<Result.Err>()
             }
         }
     }
@@ -316,9 +317,9 @@ class GatedContractRegistryAdapterTest : StringSpec({
         val gate = AllowAllStatusGate
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         ContractStatus.entries.forEach { status ->
-            coEvery { delegate.loadChangeSetContract(ref) } returns ContractRegistryPort.Result.Ok(createChangeSetContract(status))
+            coEvery { delegate.loadChangeSetContract(ref) } returns Result.Ok(createChangeSetContract(status))
             val result = adapter.loadChangeSetContract(ref)
-            result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+            result.shouldBeInstanceOf<Result.Ok<*>>()
         }
     }
     // ==================== 모든 Contract 타입에 대한 delegate Err 전파 ====================
@@ -327,15 +328,15 @@ class GatedContractRegistryAdapterTest : StringSpec({
         val gate = DefaultContractStatusGate
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val error = DomainError.ContractError("parse error")
-        coEvery { delegate.loadChangeSetContract(ref) } returns ContractRegistryPort.Result.Err(error)
-        coEvery { delegate.loadJoinSpecContract(ref) } returns ContractRegistryPort.Result.Err(error)
-        coEvery { delegate.loadInvertedIndexContract(ref) } returns ContractRegistryPort.Result.Err(error)
-        coEvery { delegate.loadRuleSetContract(ref) } returns ContractRegistryPort.Result.Err(error)
-        coEvery { delegate.loadViewDefinitionContract(ref) } returns ContractRegistryPort.Result.Err(error)
-        adapter.loadChangeSetContract(ref).shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        adapter.loadJoinSpecContract(ref).shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        adapter.loadInvertedIndexContract(ref).shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        adapter.loadRuleSetContract(ref).shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        adapter.loadViewDefinitionContract(ref).shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        coEvery { delegate.loadChangeSetContract(ref) } returns Result.Err(error)
+        coEvery { delegate.loadJoinSpecContract(ref) } returns Result.Err(error)
+        coEvery { delegate.loadInvertedIndexContract(ref) } returns Result.Err(error)
+        coEvery { delegate.loadRuleSetContract(ref) } returns Result.Err(error)
+        coEvery { delegate.loadViewDefinitionContract(ref) } returns Result.Err(error)
+        adapter.loadChangeSetContract(ref).shouldBeInstanceOf<Result.Err>()
+        adapter.loadJoinSpecContract(ref).shouldBeInstanceOf<Result.Err>()
+        adapter.loadInvertedIndexContract(ref).shouldBeInstanceOf<Result.Err>()
+        adapter.loadRuleSetContract(ref).shouldBeInstanceOf<Result.Err>()
+        adapter.loadViewDefinitionContract(ref).shouldBeInstanceOf<Result.Err>()
     }
 })

@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.pkg.slices.adapters
 import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
 import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
@@ -40,37 +41,53 @@ class DynamoDbInvertedIndexRepository(
         }
     }
 
-    override suspend fun putAllIdempotent(entries: List<InvertedIndexEntry>): InvertedIndexRepositoryPort.Result<Unit> {
+    override suspend fun putAllIdempotent(entries: List<InvertedIndexEntry>): Result<Unit> {
+        if (entries.isEmpty()) {
+            return Result.Ok(Unit)
+        }
+
         return try {
-            entries.forEach { entry ->
+            // BatchWriteItem API 사용 (최대 25개씩 배치 처리)
+            val now = java.time.Instant.now().toString()
+            val writeRequests: List<WriteRequest> = entries.map { entry ->
                 val pk = buildPK(entry.tenantId, entry.indexType, entry.indexValue)
                 val sk = buildSK(entry.refEntityKey, entry.sliceType)
 
-                dynamoClient.putItem {
-                    it.tableName(tableName)
-                    it.item(
-                        mapOf(
-                            "PK" to AttributeValue.builder().s(pk).build(),
-                            "SK" to AttributeValue.builder().s(sk).build(),
-                            "tenant_id" to AttributeValue.builder().s(entry.tenantId.value).build(),
-                            "ref_entity_key" to AttributeValue.builder().s(entry.refEntityKey.value).build(),
-                            "ref_version" to AttributeValue.builder().n(entry.refVersion.value.toString()).build(),
-                            "target_entity_key" to AttributeValue.builder().s(entry.targetEntityKey.value).build(),
-                            "target_version" to AttributeValue.builder().n(entry.targetVersion.value.toString()).build(),
-                            "index_type" to AttributeValue.builder().s(entry.indexType).build(),
-                            "index_value" to AttributeValue.builder().s(entry.indexValue).build(),
-                            "slice_type" to AttributeValue.builder().s(entry.sliceType.name).build(),
-                            "slice_hash" to AttributeValue.builder().s(entry.sliceHash).build(),
-                            "tombstone" to AttributeValue.builder().bool(entry.tombstone).build(),
-                            "created_at" to AttributeValue.builder().s(java.time.Instant.now().toString()).build()
-                        )
+                WriteRequest.builder()
+                    .putRequest(
+                        PutRequest.builder()
+                            .item(
+                                mapOf(
+                                    "PK" to AttributeValue.builder().s(pk).build(),
+                                    "SK" to AttributeValue.builder().s(sk).build(),
+                                    "tenant_id" to AttributeValue.builder().s(entry.tenantId.value).build(),
+                                    "ref_entity_key" to AttributeValue.builder().s(entry.refEntityKey.value).build(),
+                                    "ref_version" to AttributeValue.builder().n(entry.refVersion.value.toString()).build(),
+                                    "target_entity_key" to AttributeValue.builder().s(entry.targetEntityKey.value).build(),
+                                    "target_version" to AttributeValue.builder().n(entry.targetVersion.value.toString()).build(),
+                                    "index_type" to AttributeValue.builder().s(entry.indexType).build(),
+                                    "index_value" to AttributeValue.builder().s(entry.indexValue).build(),
+                                    "slice_type" to AttributeValue.builder().s(entry.sliceType.name).build(),
+                                    "slice_hash" to AttributeValue.builder().s(entry.sliceHash).build(),
+                                    "tombstone" to AttributeValue.builder().bool(entry.tombstone).build(),
+                                    "created_at" to AttributeValue.builder().s(now).build()
+                                )
+                            )
+                            .build()
                     )
+                    .build()
+            }
+
+            // DynamoDB BatchWriteItem은 최대 25개 제한
+            for (chunk in writeRequests.chunked(25)) {
+                dynamoClient.batchWriteItem { builder ->
+                    builder.requestItems(mapOf(tableName to chunk))
                 }.await()
             }
 
-            InvertedIndexRepositoryPort.Result.Ok(Unit)
+            Result.Ok(Unit)
         } catch (e: Exception) {
-            InvertedIndexRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB putAllIdempotent failed: ${e.message}")
             )
         }
@@ -80,7 +97,7 @@ class DynamoDbInvertedIndexRepository(
         tenantId: TenantId,
         refPk: String,
         limit: Int
-    ): InvertedIndexRepositoryPort.Result<List<InvertedIndexEntry>> {
+    ): Result<List<InvertedIndexEntry>> {
         return try {
             val response = dynamoClient.query {
                 it.tableName(tableName)
@@ -101,11 +118,11 @@ class DynamoDbInvertedIndexRepository(
                     throw e
                 }
             }
-            InvertedIndexRepositoryPort.Result.Ok(entries)
+            Result.Ok(entries)
         } catch (e: DomainError) {
-            InvertedIndexRepositoryPort.Result.Err(e)
+            Result.Err(e)
         } catch (e: Exception) {
-            InvertedIndexRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB listTargets failed: ${e.message}")
             )
         }
@@ -120,7 +137,7 @@ class DynamoDbInvertedIndexRepository(
         indexValue: String,
         limit: Int,
         cursor: String?,
-    ): InvertedIndexRepositoryPort.Result<com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult> {
+    ): Result<com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult> {
         return try {
             val pk = buildPK(tenantId, indexType, indexValue)
             
@@ -165,11 +182,11 @@ class DynamoDbInvertedIndexRepository(
             
             val nextCursor = response.lastEvaluatedKey()?.get("SK")?.s()
             
-            InvertedIndexRepositoryPort.Result.Ok(
+            Result.Ok(
                 com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult(entries, nextCursor)
             )
         } catch (e: Exception) {
-            InvertedIndexRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB queryByIndexType failed: ${e.message}")
             )
         }
@@ -182,7 +199,7 @@ class DynamoDbInvertedIndexRepository(
         tenantId: TenantId,
         indexType: String,
         indexValue: String,
-    ): InvertedIndexRepositoryPort.Result<Long> {
+    ): Result<Long> {
         return try {
             val pk = buildPK(tenantId, indexType, indexValue)
             
@@ -199,9 +216,9 @@ class DynamoDbInvertedIndexRepository(
                 it.select(Select.COUNT)
             }.await()
             
-            InvertedIndexRepositoryPort.Result.Ok(response.count().toLong())
+            Result.Ok(response.count().toLong())
         } catch (e: Exception) {
-            InvertedIndexRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB countByIndexType failed: ${e.message}")
             )
         }
@@ -215,8 +232,8 @@ class DynamoDbInvertedIndexRepository(
     ): List<InvertedIndexEntry> {
         val pk = buildPK(tenantId, indexType, indexValue)
         return when (val result = listTargets(tenantId, pk, 100)) {
-            is InvertedIndexRepositoryPort.Result.Ok -> result.value
-            is InvertedIndexRepositoryPort.Result.Err -> throw result.error
+            is Result.Ok -> result.value
+            is Result.Err -> throw result.error
         }
     }
 

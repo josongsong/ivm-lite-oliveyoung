@@ -13,6 +13,8 @@ import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.shared.domain.determinism.CanonicalJson
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.json.JsonPathExtractor
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 /**
  * RFC-IMPL-010 Phase D-3: SlicingEngine - RuleSet 기반 슬라이싱 엔진
@@ -22,6 +24,8 @@ import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
  * Contract is Law: RuleSet이 슬라이싱 규칙의 유일한 정의 소스.
  * - 결정성: 동일 RawData + RuleSet → 동일 Slices
  * - 멱등성: 재실행해도 동일 결과
+ *
+ * RFC-003: JsonPathExtractor 사용으로 중복 로직 제거
  */
 class SlicingEngine(
     private val contractRegistry: ContractRegistryPort,
@@ -42,8 +46,8 @@ class SlicingEngine(
         ruleSetRef: ContractRef,
     ): Result<SlicingResult> {
         val ruleSet = when (val r = contractRegistry.loadRuleSetContract(ruleSetRef)) {
-            is ContractRegistryPort.Result.Ok -> r.value
-            is ContractRegistryPort.Result.Err -> return Result.Err(r.error)
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Err(r.error)
         }
 
         return try {
@@ -86,8 +90,8 @@ class SlicingEngine(
         impactedTypes: Set<com.oliveyoung.ivmlite.shared.domain.types.SliceType>,
     ): Result<SlicingResult> {
         val ruleSet = when (val r = contractRegistry.loadRuleSetContract(ruleSetRef)) {
-            is ContractRegistryPort.Result.Ok -> r.value
-            is ContractRegistryPort.Result.Err -> return Result.Err(r.error)
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Err(r.error)
         }
 
         return try {
@@ -126,7 +130,7 @@ class SlicingEngine(
         ruleSet: RuleSetContract,
     ): Result<SliceRecord> {
         // 1. Light JOIN 실행 (joins가 있으면)
-        val mergedPayload = if (def.joins.isNotEmpty()) {
+        val mergedPayload: String = if (def.joins.isNotEmpty()) {
             if (joinExecutor == null) {
                 // JOIN이 정의되어 있는데 executor가 없으면 에러 (fail-closed)
                 return Result.Err(
@@ -137,11 +141,14 @@ class SlicingEngine(
             }
             val joinResult = joinExecutor.executeJoins(rawData, def.joins)
             when (joinResult) {
-                is JoinExecutor.Result.Ok -> {
+                is Result.Ok -> {
                     // JOIN 결과를 원본 payload에 병합
-                    mergePayload(rawData.payload, joinResult.value)
+                    when (val mergeResult = mergePayload(rawData.payload, joinResult.value)) {
+                        is Result.Ok -> mergeResult.value
+                        is Result.Err -> return Result.Err(mergeResult.error)
+                    }
                 }
-                is JoinExecutor.Result.Err -> {
+                is Result.Err -> {
                     return Result.Err(joinResult.error)
                 }
             }
@@ -150,9 +157,19 @@ class SlicingEngine(
         }
 
         // 2. 슬라이싱 규칙 적용
-        val data = when (val rules = def.buildRules) {
-            is SliceBuildRules.PassThrough -> applyPassThrough(mergedPayload, rules.fields)
-            is SliceBuildRules.MapFields -> applyFieldMappings(mergedPayload, rules.mappings)
+        val data: String = when (val rules = def.buildRules) {
+            is SliceBuildRules.PassThrough -> {
+                when (val r = applyPassThrough(mergedPayload, rules.fields)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
+            }
+            is SliceBuildRules.MapFields -> {
+                when (val r = applyFieldMappings(mergedPayload, rules.mappings)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
+            }
         }
 
         // 3. 정규화 및 해싱
@@ -178,41 +195,58 @@ class SlicingEngine(
      *
      * @param originalPayload 원본 payload JSON string
      * @param joinResults JOIN 결과 맵 (key: joinSpec.name, value: 타겟 payload)
-     * @return 병합된 payload JSON string
+     * @return 병합된 payload JSON string (Result 타입)
      */
-    private fun mergePayload(originalPayload: String, joinResults: Map<String, String>): String {
-        val original = mapper.readTree(originalPayload) as ObjectNode
-        joinResults.forEach { (name, payloadJson) ->
-            val joinedData = mapper.readTree(payloadJson)
-            original.set<JsonNode>(name, joinedData)
+    private fun mergePayload(originalPayload: String, joinResults: Map<String, String>): Result<String> {
+        return try {
+            val original = mapper.readTree(originalPayload)
+            if (original !is ObjectNode) {
+                return Result.Err(
+                    DomainError.ValidationError("payload", "Original payload is not a JSON object")
+                )
+            }
+            joinResults.forEach { (name, payloadJson) ->
+                val joinedData = mapper.readTree(payloadJson)
+                original.set<JsonNode>(name, joinedData)
+            }
+            Result.Ok(mapper.writeValueAsString(original))
+        } catch (e: Exception) {
+            Result.Err(
+                DomainError.ValidationError("payload", "Failed to parse/merge JSON: ${e.message}")
+            )
         }
-        return mapper.writeValueAsString(original)
     }
 
     /**
      * PassThrough 규칙 적용: 지정된 필드만 통과
      * fields = ["*"] → 전체 payload 통과
      */
-    private fun applyPassThrough(payload: String, fields: List<String>): String {
+    private fun applyPassThrough(payload: String, fields: List<String>): Result<String> {
         if (payload.isBlank()) {
-            return "{}"
+            return Result.Ok("{}")
         }
 
         if (fields.contains("*")) {
-            return payload
+            return Result.Ok(payload)
         }
 
-        val source = mapper.readTree(payload)
-        val target = mapper.createObjectNode()
+        return try {
+            val source = mapper.readTree(payload)
+            val target = mapper.createObjectNode()
 
-        fields.forEach { field ->
-            val value = source.get(field)
-            if (value != null) {
-                target.set<JsonNode>(field, value)
+            fields.forEach { field ->
+                val value = source.get(field)
+                if (value != null) {
+                    target.set<JsonNode>(field, value)
+                }
             }
-        }
 
-        return mapper.writeValueAsString(target)
+            Result.Ok(mapper.writeValueAsString(target))
+        } catch (e: Exception) {
+            Result.Err(
+                DomainError.ValidationError("payload", "Failed to parse JSON in PassThrough: ${e.message}")
+            )
+        }
     }
 
     /**
@@ -222,87 +256,31 @@ class SlicingEngine(
      * - 단순 필드: "name" → "name"
      * - 중첩 필드: "product.name" → "name"
      * - 배열 내부: "items[*].name" → "names"
-     */
-    private fun applyFieldMappings(payload: String, mappings: Map<String, String>): String {
-        if (payload.isBlank()) {
-            return "{}"
-        }
-
-        val source = mapper.readTree(payload)
-        val target = mapper.createObjectNode()
-
-        mappings.forEach { (sourcePath, targetField) ->
-            val value = extractValue(source, sourcePath)
-            if (value != null && !value.isNull) {
-                target.set<JsonNode>(targetField, value)
-            }
-        }
-
-        return mapper.writeValueAsString(target)
-    }
-
-    /**
-     * JSON path에서 값 추출
      *
-     * 지원 패턴:
-     * - "name" → root.name
-     * - "product.name" → root.product.name
-     * - "items" → root.items (배열 전체)
-     * - "items[*].name" → [root.items[0].name, root.items[1].name, ...]
+     * JsonPathExtractor 사용으로 중복 로직 제거
      */
-    private fun extractValue(root: JsonNode, path: String): JsonNode? {
-        // 배열 내부 필드 추출 패턴: items[*].name
-        if (path.contains("[*]")) {
-            return extractArrayField(root, path)
+    private fun applyFieldMappings(payload: String, mappings: Map<String, String>): Result<String> {
+        if (payload.isBlank()) {
+            return Result.Ok("{}")
         }
 
-        // 중첩 필드: product.name
-        val parts = path.split(".")
-        var current: JsonNode? = root
+        return try {
+            val source = mapper.readTree(payload)
+            val target = mapper.createObjectNode()
 
-        for (part in parts) {
-            current = current?.get(part)
-            if (current == null) {
-                return null
+            mappings.forEach { (sourcePath, targetField) ->
+                val value = JsonPathExtractor.extractNode(source, sourcePath)
+                if (value != null && !value.isNull) {
+                    target.set<JsonNode>(targetField, value)
+                }
             }
+
+            Result.Ok(mapper.writeValueAsString(target))
+        } catch (e: Exception) {
+            Result.Err(
+                DomainError.ValidationError("payload", "Failed to parse JSON in MapFields: ${e.message}")
+            )
         }
-
-        return current
-    }
-
-    /**
-     * 배열 내부 필드 추출: items[*].name → ["a", "b"]
-     * 중첩 필드 지원: items[*].nested.field
-     */
-    private fun extractArrayField(root: JsonNode, path: String): JsonNode? {
-        val parts = path.split("[*]", limit = 2)
-        if (parts.size != 2) {
-            return null
-        }
-
-        val arrayPath = parts[0]
-        val afterArray = parts[1].removePrefix(".")
-
-        val array = if (arrayPath.isEmpty()) root else extractValue(root, arrayPath)
-
-        if (array == null || !array.isArray) {
-            return null
-        }
-
-        // items[*] 로만 끝나는 경우 → 배열 전체 반환
-        if (afterArray.isEmpty()) {
-            return array
-        }
-
-        val result = mapper.createArrayNode()
-        array.forEach { item ->
-            val value = extractValue(item, afterArray)
-            if (value != null && !value.isNull) {
-                result.add(value)
-            }
-        }
-
-        return result
     }
 
     /**
@@ -312,14 +290,4 @@ class SlicingEngine(
         val slices: List<SliceRecord>,
         val indexes: List<InvertedIndexEntry>,
     )
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-
-        inline fun <R> map(transform: (T) -> R): Result<R> = when (this) {
-            is Ok -> Ok(transform(value))
-            is Err -> this
-        }
-    }
 }

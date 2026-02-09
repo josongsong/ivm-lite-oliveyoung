@@ -8,6 +8,7 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.request.receive
@@ -44,7 +45,7 @@ fun Route.ingestRoutes() {
             )
 
             when (result) {
-                is IngestWorkflow.Result.Ok -> {
+                is Result.Ok<*> -> {
                     call.respond(
                         HttpStatusCode.OK,
                         IngestResponse(
@@ -55,7 +56,7 @@ fun Route.ingestRoutes() {
                         ),
                     )
                 }
-                is IngestWorkflow.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         result.error.toKtorStatus(),
                         ApiError.from(result.error),

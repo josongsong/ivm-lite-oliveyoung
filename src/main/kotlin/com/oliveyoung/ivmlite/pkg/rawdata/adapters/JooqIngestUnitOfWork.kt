@@ -5,6 +5,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.IngestUnitOfWorkPort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Tracer
@@ -74,7 +75,7 @@ class JooqIngestUnitOfWork(
     override suspend fun executeIngest(
         rawData: RawDataRecord,
         outboxEntry: OutboxEntry,
-    ): IngestUnitOfWorkPort.Result<Unit> = tracer.withSpanSuspend(
+    ): Result<Unit> = tracer.withSpanSuspend(
         "PostgreSQL.executeIngest",
         mapOf(
             "db.system" to "postgresql",
@@ -164,12 +165,12 @@ class JooqIngestUnitOfWork(
                     }
                 }
 
-                IngestUnitOfWorkPort.Result.Ok(Unit)
+                Result.Ok(Unit)
             } catch (e: DomainError) {
-                IngestUnitOfWorkPort.Result.Err(e)
+                Result.Err(e)
             } catch (e: Exception) {
                 logger.error("Failed to execute ingest transaction", e)
-                IngestUnitOfWorkPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Ingest transaction failed: ${e.message}")
                 )
             }

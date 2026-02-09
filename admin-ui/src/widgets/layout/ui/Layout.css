@@ -75,10 +75,9 @@
 .nav-indicator {
   position: absolute;
   left: 0;
-  top: 50%;
-  transform: translateY(-50%);
+  top: 0;
+  bottom: 0;
   width: 3px;
-  height: 24px;
   background: var(--accent-cyan);
   border-radius: 0 2px 2px 0;
   box-shadow: var(--shadow-glow-cyan);
@@ -101,34 +100,16 @@
 
 /* Footer */
 .sidebar-footer {
-  padding: 1rem 1.5rem;
+  padding: 1rem;
   border-top: 1px solid var(--border-color);
-}
-
-.refresh-btn {
   display: flex;
-  align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.sidebar-footer > button {
   width: 100%;
-  padding: 0.75rem;
-  background: var(--bg-tertiary);
-  border: 1px solid var(--border-color);
-  border-radius: var(--radius-md);
-  color: var(--text-secondary);
-  font-size: 0.875rem;
-  font-weight: 500;
-  margin-bottom: 1rem;
-  transition: all 0.2s ease;
-}
-
-.refresh-btn:hover {
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
-}
-
-.refresh-btn:active svg {
-  animation: spin 0.5s linear;
+  justify-content: center;
 }
 
 .version-info {
@@ -183,9 +164,6 @@
     padding: 1rem;
   }
 
-  .refresh-btn span {
-    display: none;
-  }
 
   .version-info {
     flex-direction: column;

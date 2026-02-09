@@ -1,0 +1,130 @@
+{
+  "duration": {
+    "instant": {
+      "value": "0ms",
+      "description": "즉시 전환"
+    },
+    "fast": {
+      "value": "100ms",
+      "description": "빠른 마이크로인터랙션"
+    },
+    "normal": {
+      "value": "200ms",
+      "description": "기본 전환"
+    },
+    "slow": {
+      "value": "300ms",
+      "description": "느린 전환"
+    },
+    "slower": {
+      "value": "500ms",
+      "description": "더 느린 전환"
+    },
+    "slowest": {
+      "value": "700ms",
+      "description": "가장 느린 전환"
+    }
+  },
+  "easing": {
+    "linear": {
+      "value": "linear",
+      "description": "일정한 속도"
+    },
+    "ease": {
+      "value": "ease",
+      "description": "기본 이징"
+    },
+    "ease-in": {
+      "value": "cubic-bezier(0.4, 0, 1, 1)",
+      "description": "천천히 시작"
+    },
+    "ease-out": {
+      "value": "cubic-bezier(0, 0, 0.2, 1)",
+      "description": "천천히 끝"
+    },
+    "ease-in-out": {
+      "value": "cubic-bezier(0.4, 0, 0.2, 1)",
+      "description": "천천히 시작하고 끝"
+    },
+    "bounce": {
+      "value": "cubic-bezier(0.68, -0.55, 0.265, 1.55)",
+      "description": "바운스 효과"
+    },
+    "spring": {
+      "value": "cubic-bezier(0.175, 0.885, 0.32, 1.275)",
+      "description": "스프링 효과"
+    }
+  },
+  "presets": {
+    "fade-in": {
+      "keyframes": "@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }",
+      "properties": {
+        "animation": "fadeIn 200ms ease-out"
+      },
+      "description": "페이드 인"
+    },
+    "fade-out": {
+      "keyframes": "@keyframes fadeOut { from { opacity: 1; } to { opacity: 0; } }",
+      "properties": {
+        "animation": "fadeOut 200ms ease-in"
+      },
+      "description": "페이드 아웃"
+    },
+    "slide-up": {
+      "keyframes": "@keyframes slideUp { from { transform: translateY(10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }",
+      "properties": {
+        "animation": "slideUp 200ms ease-out"
+      },
+      "description": "아래에서 위로 슬라이드"
+    },
+    "slide-down": {
+      "keyframes": "@keyframes slideDown { from { transform: translateY(-10px); opacity: 0; } to { transform: translateY(0); opacity: 1; } }",
+      "properties": {
+        "animation": "slideDown 200ms ease-out"
+      },
+      "description": "위에서 아래로 슬라이드"
+    },
+    "scale-in": {
+      "keyframes": "@keyframes scaleIn { from { transform: scale(0.95); opacity: 0; } to { transform: scale(1); opacity: 1; } }",
+      "properties": {
+        "animation": "scaleIn 200ms ease-out"
+      },
+      "description": "확대 효과로 나타남"
+    },
+    "scale-out": {
+      "keyframes": "@keyframes scaleOut { from { transform: scale(1); opacity: 1; } to { transform: scale(0.95); opacity: 0; } }",
+      "properties": {
+        "animation": "scaleOut 150ms ease-in"
+      },
+      "description": "축소 효과로 사라짐"
+    },
+    "spin": {
+      "keyframes": "@keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }",
+      "properties": {
+        "animation": "spin 1s linear infinite"
+      },
+      "description": "회전 (로딩)"
+    },
+    "pulse": {
+      "keyframes": "@keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }",
+      "properties": {
+        "animation": "pulse 2s ease-in-out infinite"
+      },
+      "description": "펄스 효과"
+    },
+    "bounce": {
+      "keyframes": "@keyframes bounce { 0%, 100% { transform: translateY(-25%); animation-timing-function: cubic-bezier(0.8, 0, 1, 1); } 50% { transform: translateY(0); animation-timing-function: cubic-bezier(0, 0, 0.2, 1); } }",
+      "properties": {
+        "animation": "bounce 1s infinite"
+      },
+      "description": "바운스 효과"
+    },
+    "shake": {
+      "keyframes": "@keyframes shake { 0%, 100% { transform: translateX(0); } 10%, 30%, 50%, 70%, 90% { transform: translateX(-4px); } 20%, 40%, 60%, 80% { transform: translateX(4px); } }",
+      "properties": {
+        "animation": "shake 0.5s ease-in-out"
+      },
+      "description": "흔들림 (오류)"
+    }
+  }
+}

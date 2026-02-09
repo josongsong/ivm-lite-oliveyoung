@@ -9,6 +9,7 @@ import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.config.WorkerConfig
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.opentelemetry.api.trace.Tracer
@@ -69,7 +70,8 @@ class OutboxPollingWorker(
         const val STALE_TIMEOUT_SECONDS = 300L
     }
 
-    private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
+    private val supervisorJob: Job = SupervisorJob()
+    private val scope = CoroutineScope(Dispatchers.IO + supervisorJob)
     private var pollingJob: Job? = null
 
     private val running = AtomicBoolean(false)
@@ -146,6 +148,9 @@ class OutboxPollingWorker(
             pollingJob?.cancel()
         }
 
+        // CoroutineScope 정리 (리소스 누수 방지)
+        supervisorJob.cancel()
+
         running.set(false)
         shutdownRequested.set(false)
 
@@ -218,8 +223,8 @@ class OutboxPollingWorker(
         
         // claim: 원자적으로 PENDING → PROCESSING 전환 후 반환
         val claimed = when (val r = outboxRepo.claim(config.batchSize, aggregateType, workerId)) {
-            is OutboxRepositoryPort.Result.Ok -> r.value
-            is OutboxRepositoryPort.Result.Err -> {
+            is Result.Ok -> r.value
+            is Result.Err -> {
                 logger.error("Failed to claim entries: {}", r.error)
                 throw ProcessingException("Failed to claim entries: ${r.error}")
             }
@@ -252,11 +257,11 @@ class OutboxPollingWorker(
         // 일괄 상태 업데이트 (PROCESSING → PROCESSED)
         if (processed.isNotEmpty()) {
             when (val r = outboxRepo.markProcessed(processed)) {
-                is OutboxRepositoryPort.Result.Ok -> {
+                is Result.Ok -> {
                     processedCount.addAndGet(r.value.toLong())
                     logger.debug("Marked {} entries as processed", r.value)
                 }
-                is OutboxRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     logger.error("Failed to mark processed: {}", r.error)
                     throw ProcessingException("Failed to mark processed entries: ${r.error}")
                 }
@@ -266,10 +271,10 @@ class OutboxPollingWorker(
         // PROCESSING → FAILED
         for ((id, reason) in failed) {
             when (val r = outboxRepo.markFailed(id, reason)) {
-                is OutboxRepositoryPort.Result.Ok -> {
+                is Result.Ok -> {
                     failedCount.incrementAndGet()
                 }
-                is OutboxRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     logger.error("Failed to mark failed: {}", id)
                     throw ProcessingException("Failed to mark entry as failed: id=$id, error=${r.error}")
                 }
@@ -287,12 +292,12 @@ class OutboxPollingWorker(
     private suspend fun recoverStaleEntries() {
         try {
             when (val r = outboxRepo.recoverStaleProcessing(STALE_TIMEOUT_SECONDS)) {
-                is OutboxRepositoryPort.Result.Ok -> {
+                is Result.Ok -> {
                     if (r.value > 0) {
                         logger.info("Recovered {} stale entries", r.value)
                     }
                 }
-                is OutboxRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     logger.warn("Failed to recover stale entries: {}", r.error)
                 }
             }
@@ -337,7 +342,7 @@ class OutboxPollingWorker(
                 )
 
                 when (result) {
-                    is SlicingWorkflow.Result.Ok -> {
+                    is Result.Ok -> {
                         logger.debug(
                             "Slicing completed for {}:{} v{}, slices={}",
                             payload.tenantId,
@@ -345,7 +350,7 @@ class OutboxPollingWorker(
                             payload.version,
                             result.value.size,
                         )
-                        
+
                         // RFC-IMPL-013: Slicing 완료 후 자동으로 ShipRequested outbox 생성
                         autoTriggerShip(
                             tenantId = payload.tenantId,
@@ -354,7 +359,7 @@ class OutboxPollingWorker(
                             sliceKeys = result.value
                         )
                     }
-                    is SlicingWorkflow.Result.Err -> {
+                    is Result.Err -> {
                         throw ProcessingException("Slicing failed: ${result.error}")
                     }
                 }
@@ -398,7 +403,7 @@ class OutboxPollingWorker(
             val rulesResult = registry.findByEntityAndSliceType(entityType, sliceKey.sliceType)
             
             when (rulesResult) {
-                is SinkRuleRegistryPort.Result.Ok -> {
+                is Result.Ok -> {
                     for (rule in rulesResult.value) {
                         // 중복 방지: 같은 sink로 이미 생성했으면 스킵
                         val sinkId = "${rule.target.type}:${rule.id}"
@@ -415,7 +420,7 @@ class OutboxPollingWorker(
                         )
                     }
                 }
-                is SinkRuleRegistryPort.Result.Err -> {
+                is Result.Err -> {
                     logger.warn("Failed to find SinkRules for {}:{}: {}", 
                         entityType, sliceKey.sliceType, rulesResult.error)
                 }
@@ -468,10 +473,10 @@ class OutboxPollingWorker(
         )
         
         when (val result = outboxRepo.insert(shipEntry)) {
-            is OutboxRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 logger.debug("Created ShipRequested outbox: entity={}, sink={}", entityKey, sinkType)
             }
-            is OutboxRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Failed to create ShipRequested outbox: {}", result.error)
                 // 실패해도 슬라이싱은 완료되었으므로 에러를 던지지 않음
                 // Reconciliation Worker가 나중에 복구할 수 있음

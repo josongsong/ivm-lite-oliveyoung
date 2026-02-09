@@ -10,59 +10,39 @@ import com.oliveyoung.ivmlite.sdk.schema.ViewRef
 
 /**
  * Legacy Ivm object (client() 패턴용)
- * 
- * 신규 코드는 com.oliveyoung.ivmlite.sdk.Ivm 사용 권장
- * 
- * 스레드 안전성: @Volatile + lazy 캐싱으로 고빈도 호출 최적화
+ *
+ * @deprecated 신규 코드는 com.oliveyoung.ivmlite.sdk.Ivm 사용 권장
+ *
+ * 이 객체는 하위 호환성을 위해 유지되며, 내부적으로
+ * com.oliveyoung.ivmlite.sdk.Ivm에 위임합니다.
  */
+@Deprecated(
+    message = "Use com.oliveyoung.ivmlite.sdk.Ivm instead",
+    replaceWith = ReplaceWith("com.oliveyoung.ivmlite.sdk.Ivm")
+)
 object Ivm {
-    @Volatile
-    private var config: IvmClientConfig = IvmClientConfig()
-    
-    @Volatile
-    private var executor: DeployExecutor? = null
-    
-    // 캐싱된 클라이언트 (config 변경 시 무효화)
-    @Volatile
-    private var cachedClient: IvmClient? = null
-    
-    private val lock = Any()
-
+    /**
+     * @deprecated Use com.oliveyoung.ivmlite.sdk.Ivm.configure() instead
+     */
+    @Deprecated("Use com.oliveyoung.ivmlite.sdk.Ivm.configure()")
     fun configure(block: IvmClientConfig.Builder.() -> Unit) {
-        synchronized(lock) {
-            config = IvmClientConfig.Builder().apply(block).build()
-            cachedClient = null  // 설정 변경 시 캐시 무효화
-        }
+        @Suppress("DEPRECATION")
+        com.oliveyoung.ivmlite.sdk.Ivm.configure(block)
     }
 
     /**
-     * DI 컨테이너에서 사용하기 위한 executor 주입
-     * Wave 5-L: DeployExecutor 연동
+     * @deprecated Use Ivm.initialize(IvmContext.builder().executor(...).build()) instead
      */
+    @Deprecated("Use Ivm.initialize(IvmContext.builder().executor(...).build())")
     fun setExecutor(executor: DeployExecutor) {
-        synchronized(lock) {
-            this.executor = executor
-            cachedClient = null  // executor 변경 시 캐시 무효화
-        }
+        @Suppress("DEPRECATION")
+        com.oliveyoung.ivmlite.sdk.Ivm.setExecutor(executor)
     }
 
     /**
-     * 캐싱된 IvmClient 반환 (고빈도 호출 최적화)
-     * 
-     * Double-checked locking으로 스레드 안전 + 성능 보장
+     * IvmClient 반환 (sdk.Ivm에 위임)
      */
-    fun client(): IvmClient {
-        // Fast path: 캐시 히트
-        cachedClient?.let { return it }
-        
-        // Slow path: 캐시 미스
-        synchronized(lock) {
-            cachedClient?.let { return it }
-            val newClient = IvmClient(config, executor)
-            cachedClient = newClient
-            return newClient
-        }
-    }
+    fun client(): IvmClient = com.oliveyoung.ivmlite.sdk.Ivm.client()
 }
 
 /**

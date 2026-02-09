@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.rawdata
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
@@ -43,7 +44,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
             async(Dispatchers.Default) {
                 repeat(20) { // 각 worker가 20번씩 claim 시도
                     val result = repo.claimOne(type = null, workerId = "worker-$workerId")
-                    if (result is OutboxRepositoryPort.Result.Ok) {
+                    if (result is Result.Ok) {
                         val entry = result.value ?: return@repeat
                         val wasNew = claimedIds.add(entry.id)
                         if (!wasNew) {
@@ -79,7 +80,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
                 val claimed = mutableListOf<UUID>()
                 repeat(10) { // 10번 × 100개 = 최대 1000개 시도
                     val result = repo.claim(limit = 100, type = null, workerId = "worker-$workerId")
-                    if (result is OutboxRepositoryPort.Result.Ok) {
+                    if (result is Result.Ok) {
                         claimed.addAll(result.value.map { it.id })
                     }
                 }
@@ -95,7 +96,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
         
         // PENDING 남은 것 없음
         val remaining = repo.findPending(limit = 10)
-        remaining shouldBe OutboxRepositoryPort.Result.Ok(emptyList())
+        remaining shouldBe Result.Ok(emptyList())
     }
 
     "claim 후 markProcessed가 원자적으로 동작" {
@@ -111,7 +112,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
             async(Dispatchers.Default) {
                 repeat(20) {
                     val claimed = repo.claimOne(type = null, workerId = "worker-$workerId")
-                    if (claimed is OutboxRepositoryPort.Result.Ok) {
+                    if (claimed is Result.Ok) {
                         val entry = claimed.value ?: return@repeat
                         
                         // 가상 처리 시간
@@ -133,7 +134,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
         // 모든 엔트리가 PROCESSED 상태
         entries.forEach { original ->
             val current = repo.findById(original.id)
-            if (current is OutboxRepositoryPort.Result.Ok) {
+            if (current is Result.Ok) {
                 current.value.status shouldBe OutboxStatus.PROCESSED
             }
         }
@@ -170,7 +171,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
             async(Dispatchers.Default) {
                 repeat(20) {
                     val claimed = repo.claimOne(type = null, workerId = "worker-$workerId")
-                    if (claimed is OutboxRepositoryPort.Result.Ok) {
+                    if (claimed is Result.Ok) {
                         val entry = claimed.value ?: return@repeat
                         repo.markProcessed(listOf(entry.id))
                         allProcessed.add(entry.id)
@@ -203,7 +204,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
             async(Dispatchers.Default) {
                 repeat(30) {
                     val claimed = repo.claimOne(type = AggregateType.RAW_DATA, workerId = "raw-worker-$workerId")
-                    if (claimed is OutboxRepositoryPort.Result.Ok) {
+                    if (claimed is Result.Ok) {
                         val entry = claimed.value ?: return@repeat
                         rawDataClaimed.add(entry.id)
                     }
@@ -217,7 +218,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
             async(Dispatchers.Default) {
                 repeat(30) {
                     val claimed = repo.claimOne(type = AggregateType.SLICE, workerId = "slice-worker-$workerId")
-                    if (claimed is OutboxRepositoryPort.Result.Ok) {
+                    if (claimed is Result.Ok) {
                         val entry = claimed.value ?: return@repeat
                         sliceClaimed.add(entry.id)
                     }
@@ -244,7 +245,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
             async(Dispatchers.Default) {
                 repeat(50) {
                     val result = repo.claimOne(type = null, workerId = "worker-$workerId")
-                    result shouldBe OutboxRepositoryPort.Result.Ok(null)
+                    result shouldBe Result.Ok(null)
                 }
             }
         }
@@ -271,7 +272,7 @@ class OutboxClaimConcurrencyTest : StringSpec({
         
         // retryCount가 5번 증가했는지 확인
         val result = repo.findById(entry.id)
-        if (result is OutboxRepositoryPort.Result.Ok) {
+        if (result is Result.Ok) {
             result.value.retryCount shouldBe 5
         }
     }

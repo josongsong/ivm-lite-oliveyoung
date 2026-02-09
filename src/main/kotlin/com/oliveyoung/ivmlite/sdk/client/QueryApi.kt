@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.sdk.dsl.markers.IvmDslMarker
 import com.oliveyoung.ivmlite.sdk.model.QueryOptions
 import com.oliveyoung.ivmlite.sdk.model.ReadConsistency
 import com.oliveyoung.ivmlite.sdk.model.ViewResult
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonObject
@@ -405,7 +406,7 @@ class QueryBuilder internal constructor(
         val queryTimeMs = System.currentTimeMillis() - startTime
         
         return when (result) {
-            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Ok -> {
+            is Result.Ok -> {
                 val response = result.value
                 // ViewResponse.data는 JSON 문자열, 파싱 필요
                 val dataJson = try {
@@ -430,7 +431,7 @@ class QueryBuilder internal constructor(
                     )
                 )
             }
-            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Err -> {
+            is Result.Err -> {
                 ViewResult(
                     success = false,
                     viewId = viewId,
@@ -519,7 +520,7 @@ class QueryBuilder internal constructor(
         )
         
         return when (result) {
-            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Ok -> {
+            is Result.Ok -> {
                 val rangeResult = result.value
                 QueryResultPage(
                     items = rangeResult.items.map { item ->
@@ -542,7 +543,7 @@ class QueryBuilder internal constructor(
                     queryTimeMs = System.currentTimeMillis() - startTime
                 )
             }
-            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Err -> {
+            is Result.Err -> {
                 QueryResultPage(
                     items = emptyList(),
                     totalCount = 0,
@@ -588,8 +589,8 @@ class QueryBuilder internal constructor(
         )
         
         return when (result) {
-            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Ok -> result.value
-            is com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow.Result.Err -> 0L
+            is Result.Ok -> result.value
+            is Result.Err -> 0L
         }
     }
 }

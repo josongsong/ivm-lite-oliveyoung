@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.sdk.execution
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import arrow.core.getOrElse
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
@@ -48,12 +49,12 @@ class DeployExecutorIntegrationTest : StringSpec({
     // MockContractRegistry for testing
     val mockContractRegistry = object : ContractRegistryPort {
         override suspend fun loadChangeSetContract(ref: ContractRef) =
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("ChangeSet", ref.id))
+            Result.Err(DomainError.NotFoundError("ChangeSet", ref.id))
         override suspend fun loadJoinSpecContract(ref: ContractRef) =
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("JoinSpec", ref.id))
+            Result.Err(DomainError.NotFoundError("JoinSpec", ref.id))
         override suspend fun loadInvertedIndexContract(ref: ContractRef) =
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("InvertedIndex", ref.id))
-        override suspend fun loadRuleSetContract(ref: ContractRef): ContractRegistryPort.Result<RuleSetContract> {
+            Result.Err(DomainError.NotFoundError("InvertedIndex", ref.id))
+        override suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract> {
             val ruleSet = RuleSetContract(
                 meta = ContractMeta("RULE_SET", ref.id, ref.version, ContractStatus.ACTIVE),
                 entityType = "PRODUCT",
@@ -63,10 +64,10 @@ class DeployExecutorIntegrationTest : StringSpec({
                     SliceDefinition(SliceType.CORE, SliceBuildRules.PassThrough(listOf("*")))
                 ),
             )
-            return ContractRegistryPort.Result.Ok(ruleSet)
+            return Result.Ok(ruleSet)
         }
         override suspend fun loadViewDefinitionContract(ref: ContractRef) =
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("ViewDefinition", ref.id))
+            Result.Err(DomainError.NotFoundError("ViewDefinition", ref.id))
     }
 
     val joinExecutor = JoinExecutor(rawDataRepo)
@@ -130,8 +131,8 @@ class DeployExecutorIntegrationTest : StringSpec({
             result.version.toLong()
         )
         when (rawResult) {
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok -> { /* success */ }
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Err -> {
+            is Result.Ok -> { /* success */ }
+            is Result.Err -> {
                 throw AssertionError("Expected RawData to be saved")
             }
         }
@@ -143,11 +144,11 @@ class DeployExecutorIntegrationTest : StringSpec({
             result.version.toLong()
         )
         when (slices) {
-            is com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 slices.value.size shouldBe 1
                 slices.value[0].sliceType shouldBe SliceType.CORE
             }
-            is com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 throw AssertionError("Expected slices to be created")
             }
         }
@@ -155,12 +156,12 @@ class DeployExecutorIntegrationTest : StringSpec({
         // Verify Ship Outbox entry (Async Ship)
         val pendingOutbox = outboxRepo.findPending(limit = 100)
         when (pendingOutbox) {
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 val shipEntries = pendingOutbox.value.filter { it.eventType == "ShipRequested" }
                 shipEntries.size shouldBe 1
                 shipEntries[0].status shouldBe OutboxStatus.PENDING
             }
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 throw AssertionError("Expected outbox entries")
             }
         }
@@ -197,8 +198,8 @@ class DeployExecutorIntegrationTest : StringSpec({
             result.version.toLong()
         )
         when (rawResult) {
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok -> { /* success */ }
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Err -> {
+            is Result.Ok -> { /* success */ }
+            is Result.Err -> {
                 throw AssertionError("Expected RawData to be saved")
             }
         }
@@ -206,12 +207,12 @@ class DeployExecutorIntegrationTest : StringSpec({
         // Verify Compile Outbox entry (Async Compile)
         val pendingOutbox = outboxRepo.findPending(limit = 100)
         when (pendingOutbox) {
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 val compileEntries = pendingOutbox.value.filter { it.eventType == "CompileRequested" }
                 compileEntries.size shouldBe io.kotest.matchers.comparables.gt(0)
                 compileEntries.last().status shouldBe OutboxStatus.PENDING
             }
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 throw AssertionError("Expected outbox entries")
             }
         }
@@ -254,8 +255,8 @@ class DeployExecutorIntegrationTest : StringSpec({
             job.version.toLong()
         )
         when (rawResult) {
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok -> { /* success */ }
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Err -> {
+            is Result.Ok -> { /* success */ }
+            is Result.Err -> {
                 throw AssertionError("Expected RawData to be saved")
             }
         }
@@ -263,13 +264,13 @@ class DeployExecutorIntegrationTest : StringSpec({
         // Verify Compile Outbox entry
         val pendingOutbox = outboxRepo.findPending(limit = 100)
         when (pendingOutbox) {
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 val compileEntries = pendingOutbox.value.filter { it.eventType == "CompileRequested" }
                 compileEntries.size shouldBe io.kotest.matchers.comparables.gt(0)
                 compileEntries.last().status shouldBe OutboxStatus.PENDING
                 compileEntries.last().aggregateId shouldContain "tenant3:product:PROD-003"
             }
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 throw AssertionError("Expected outbox entries")
             }
         }
@@ -306,8 +307,8 @@ class DeployExecutorIntegrationTest : StringSpec({
             result.version.toLong()
         )
         when (rawResult) {
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok -> { /* success */ }
-            is com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Err -> {
+            is Result.Ok -> { /* success */ }
+            is Result.Err -> {
                 throw AssertionError("Expected RawData to be saved")
             }
         }
@@ -319,10 +320,10 @@ class DeployExecutorIntegrationTest : StringSpec({
             result.version.toLong()
         )
         when (slices) {
-            is com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 slices.value.size shouldBe 1
             }
-            is com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 throw AssertionError("Expected slices to be created")
             }
         }

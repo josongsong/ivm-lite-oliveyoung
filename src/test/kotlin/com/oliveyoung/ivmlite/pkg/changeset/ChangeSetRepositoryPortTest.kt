@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.changeset
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.InMemoryChangeSetRepository
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSet
@@ -37,7 +38,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.save(cs)
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<ChangeSet>>(result)
+        assertIs<Result.Ok<ChangeSet>>(result)
         assertEquals(cs.changeSetId, result.value.changeSetId)
     }
 
@@ -48,7 +49,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.save(cs)
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<ChangeSet>>(result)
+        assertIs<Result.Ok<ChangeSet>>(result)
     }
 
     @Test
@@ -59,7 +60,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.save(cs2)
 
-        assertIs<ChangeSetRepositoryPort.Result.Err>(result)
+        assertIs<Result.Err>(result)
         assertIs<DomainError.IdempotencyViolation>(result.error)
     }
 
@@ -72,7 +73,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.findById(cs.changeSetId)
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<ChangeSet>>(result)
+        assertIs<Result.Ok<ChangeSet>>(result)
         assertEquals(cs.changeSetId, result.value.changeSetId)
     }
 
@@ -80,7 +81,7 @@ class ChangeSetRepositoryPortTest {
     fun `findById - 없으면 NotFoundError`() = runBlocking {
         val result = repo.findById("non-existent-id")
 
-        assertIs<ChangeSetRepositoryPort.Result.Err>(result)
+        assertIs<Result.Err>(result)
         assertIs<DomainError.NotFoundError>(result.error)
     }
 
@@ -101,7 +102,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.findByEntity(tenantId, entityKey)
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<List<ChangeSet>>>(result)
+        assertIs<Result.Ok<List<ChangeSet>>>(result)
         assertEquals(2, result.value.size)
         assertTrue(result.value.all { it.entityKey == entityKey })
     }
@@ -121,7 +122,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.findByEntity(tenantId, entityKey)
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<List<ChangeSet>>>(result)
+        assertIs<Result.Ok<List<ChangeSet>>>(result)
         assertEquals(3, result.value[0].toVersion) // 최신 먼저
         assertEquals(2, result.value[1].toVersion)
         assertEquals(1, result.value[2].toVersion)
@@ -131,7 +132,7 @@ class ChangeSetRepositoryPortTest {
     fun `findByEntity - 없으면 빈 리스트`() = runBlocking {
         val result = repo.findByEntity(TenantId("t"), EntityKey("e"))
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<List<ChangeSet>>>(result)
+        assertIs<Result.Ok<List<ChangeSet>>>(result)
         assertTrue(result.value.isEmpty())
     }
 
@@ -152,7 +153,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.findByVersionRange(tenantId, entityKey, fromVersion = 1, toVersion = 3)
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<List<ChangeSet>>>(result)
+        assertIs<Result.Ok<List<ChangeSet>>>(result)
         assertEquals(2, result.value.size) // cs2, cs3
     }
 
@@ -173,7 +174,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.findLatest(tenantId, entityKey)
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<ChangeSet>>(result)
+        assertIs<Result.Ok<ChangeSet>>(result)
         assertEquals(5, result.value.toVersion)
     }
 
@@ -181,7 +182,7 @@ class ChangeSetRepositoryPortTest {
     fun `findLatest - 없으면 NotFoundError`() = runBlocking {
         val result = repo.findLatest(TenantId("t"), EntityKey("e"))
 
-        assertIs<ChangeSetRepositoryPort.Result.Err>(result)
+        assertIs<Result.Err>(result)
         assertIs<DomainError.NotFoundError>(result.error)
     }
 
@@ -201,7 +202,7 @@ class ChangeSetRepositoryPortTest {
 
         val result = repo.findByChangeType(tenantId, ChangeType.CREATE, limit = 10)
 
-        assertIs<ChangeSetRepositoryPort.Result.Ok<List<ChangeSet>>>(result)
+        assertIs<Result.Ok<List<ChangeSet>>>(result)
         assertEquals(1, result.value.size)
         assertEquals(ChangeType.CREATE, result.value[0].changeType)
     }

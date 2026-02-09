@@ -1,7 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.slices.ports
 
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
 
@@ -51,11 +51,6 @@ interface InvertedIndexRepositoryPort {
             is Result.Ok -> Result.Ok(result.value.entries.size.toLong())
             is Result.Err -> Result.Err(result.error)
         }
-    }
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
     }
 }
 

@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.slices.adapters.JooqSliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.DeleteReason
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
@@ -44,7 +45,7 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
 
         val result = runBlocking { repository.putAllIdempotent(listOf(slice)) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<Unit>>()
+        result.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         // DB 직접 확인
         val count = dsl.selectCount()
@@ -60,7 +61,7 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
         runBlocking { repository.putAllIdempotent(listOf(slice)) }
         val result = runBlocking { repository.putAllIdempotent(listOf(slice)) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<Unit>>()
+        result.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         // 레코드 1개만 존재
         val count = dsl.selectCount()
@@ -77,8 +78,8 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
         runBlocking { repository.putAllIdempotent(listOf(slice1)) }
         val result = runBlocking { repository.putAllIdempotent(listOf(slice2)) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Err>()
-        (result as SliceRepositoryPort.Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
     }
 
     "putAllIdempotent - 여러 슬라이스 배치 저장" {
@@ -90,7 +91,7 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
 
         val result = runBlocking { repository.putAllIdempotent(slices) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<Unit>>()
+        result.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         val count = dsl.selectCount()
             .from(DSL.table("slices"))
@@ -111,8 +112,8 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key)) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<List<SliceRecord>>>()
+        val fetched = (result as Result.Ok).value
         fetched shouldHaveSize 1
         fetched[0].tenantId shouldBe slice.tenantId
         fetched[0].entityKey shouldBe slice.entityKey
@@ -129,8 +130,8 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-x"), listOf(key)) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Err>()
-        (result as SliceRepositoryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     "batchGet - 여러 키 조회" {
@@ -146,8 +147,8 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), keys) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
-        (result as SliceRepositoryPort.Result.Ok).value shouldHaveSize 2
+        result.shouldBeInstanceOf<Result.Ok<List<SliceRecord>>>()
+        (result as Result.Ok).value shouldHaveSize 2
     }
 
     "putAllIdempotent - 다른 버전은 별도 레코드" {
@@ -168,14 +169,14 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
     "putAllIdempotent - 빈 리스트 → OK" {
         val result = runBlocking { repository.putAllIdempotent(emptyList()) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<Unit>>()
+        result.shouldBeInstanceOf<Result.Ok<Unit>>()
     }
 
     "batchGet - 빈 키 리스트 → 빈 결과" {
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), emptyList()) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
-        (result as SliceRepositoryPort.Result.Ok).value shouldHaveSize 0
+        result.shouldBeInstanceOf<Result.Ok<List<SliceRecord>>>()
+        (result as Result.Ok).value shouldHaveSize 0
     }
 
     // ==================== RFC-IMPL-010 D-1: Tombstone 테스트 ====================
@@ -207,8 +208,8 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key), includeTombstones = false) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Err>()
-        (result as SliceRepositoryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     "tombstone slice - includeTombstones=true → 조회 성공" {
@@ -224,8 +225,8 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key), includeTombstones = true) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<List<SliceRecord>>>()
+        val fetched = (result as Result.Ok).value
         fetched shouldHaveSize 1
         fetched[0].isDeleted shouldBe true
         fetched[0].tombstone!!.deletedAtVersion shouldBe 3L
@@ -245,7 +246,7 @@ class JooqSliceRepositoryIntegrationTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key), includeTombstones = true) }
 
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value[0]
+        val fetched = (result as Result.Ok).value[0]
         fetched.tombstone shouldBe tombstone
     }
 })

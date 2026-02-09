@@ -63,46 +63,7 @@
 }
 
 /* 타입 탭 */
-.type-tabs {
-  display: flex;
-  gap: 0.25rem;
-  padding: 0.25rem;
-  background: var(--bg-tertiary);
-  border-radius: var(--radius-md);
-  border: 1px solid var(--border-color);
-}
-
-.type-tab {
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  padding: 0.5rem 1rem;
-  background: transparent;
-  border: none;
-  border-radius: var(--radius-sm);
-  font-size: 0.8rem;
-  font-weight: 500;
-  color: var(--text-muted);
-  cursor: pointer;
-  transition: all 0.15s ease;
-}
-
-.type-tab:hover {
-  color: var(--text-secondary);
-}
-
-.type-tab.active {
-  background: var(--accent-cyan);
-  color: white;
-}
-
-.type-tab svg {
-  opacity: 0.7;
-}
-
-.type-tab.active svg {
-  opacity: 1;
-}
+/* NOTE: 타입 탭(세그먼트 스타일)은 shared/ui `TabsList variant="segmented"`로 승격됨 */
 
 /* 인라인 검색 바 */
 .search-bar-inline {
@@ -748,13 +709,7 @@ td.col-action {
     max-width: none;
   }
 
-  .type-tab span {
-    display: none;
-  }
-
-  .type-tab {
-    padding: 0.5rem 0.75rem;
-  }
+  /* NOTE: 라벨 숨김은 shared/ui `TabsList responsive="iconsOnlyMd"`로 승격됨 */
 }
 
 @media (max-width: 768px) {

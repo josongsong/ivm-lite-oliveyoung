@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
@@ -31,8 +32,8 @@ class RuleSetProjectionParsingTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         // CORE 슬라이스에 projection이 있는지 확인
         val coreSlice = contract.slices.first { it.type == SliceType.CORE }
@@ -64,16 +65,13 @@ class RuleSetProjectionParsingTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
-        // ENRICHED 슬라이스에 projection이 있는지 확인
-        val enrichedSlice = contract.slices.firstOrNull { it.type == SliceType.ENRICHED }
-        enrichedSlice shouldBe null  // SliceType.ENRICHED가 없을 수도 있음
-
-        // 실제로 ENRICHMENT sliceKind를 가진 슬라이스 찾기
-        val enrichmentSlice = contract.slices.firstOrNull { 
-            it.sliceKind == SliceKind.ENRICHMENT 
+        // ENRICHMENT sliceKind를 가진 슬라이스 찾기
+        @Suppress("UNUSED_VARIABLE")
+        val enrichmentSlice = contract.slices.firstOrNull {
+            it.sliceKind == SliceKind.ENRICHMENT
         }
 
         // 모든 슬라이스에서 projection 확인
@@ -97,8 +95,8 @@ class RuleSetProjectionParsingTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         // projection이 없는 join 찾기
         val joinsWithoutProjection = contract.slices.flatMap { it.joins }
@@ -117,8 +115,8 @@ class RuleSetProjectionParsingTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         // projection이 있는 join의 fields가 비어있지 않은지 확인
         val projections = contract.slices.flatMap { it.joins }
@@ -135,8 +133,8 @@ class RuleSetProjectionParsingTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         val projections = contract.slices.flatMap { it.joins }
             .mapNotNull { it.projection }

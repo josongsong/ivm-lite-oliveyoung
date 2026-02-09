@@ -23,6 +23,7 @@ val allModules = listOf(
     tracingModule,
     metricsModule,
     adapterModule,
+    domainServiceModule,  // Domain Service Port 바인딩 (공통)
     workflowModule,
     workerModule,
     sdkModule,
@@ -40,6 +41,26 @@ val productionModules = listOf(
     metricsModule,
     infraModule,
     jooqAdapterModule,
+    domainServiceModule,  // Domain Service Port 바인딩 (공통)
+    workflowModule,
+    workerModule,
+    sdkModule,
+)
+
+/**
+ * Full Production 모듈 조합 (v3: DynamoDB 중심)
+ *
+ * DynamoDB 기반 운영 환경:
+ * - DynamoDB: RawData, Slice, InvertedIndex, Contract Registry
+ * - PostgreSQL: Outbox (트랜잭션 보장용)
+ */
+val fullProductionModules = listOf(
+    appModule,
+    tracingModule,
+    metricsModule,
+    infraModule,
+    productionAdapterModule,
+    domainServiceModule,  // Domain Service Port 바인딩 (공통)
     workflowModule,
     workerModule,
     sdkModule,

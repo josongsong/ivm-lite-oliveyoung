@@ -3,7 +3,7 @@ import { motion } from 'framer-motion'
 import { ChevronDown, Clock, Eye, FileCode2, Layers } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { explorerApi } from '@/shared/api'
-import { JsonViewer } from './JsonViewer'
+import { JsonViewer } from '@/shared/ui'
 import { Loading } from '@/shared/ui'
 import './ViewPreview.css'
 

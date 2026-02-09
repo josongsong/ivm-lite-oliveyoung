@@ -1,0 +1,213 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'admin-ui/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'admin-ui/**'
+      - '.github/workflows/e2e.yml'
+
+jobs:
+  e2e-chromium:
+    name: E2E (Chromium)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        working-directory: admin-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: admin-ui
+        run: npx playwright install chromium --with-deps
+
+      - name: Run E2E tests (Chromium)
+        working-directory: admin-ui
+        run: pnpm test:e2e --project=chromium
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-chromium
+          path: admin-ui/playwright-report/
+          retention-days: 7
+
+  e2e-cross-browser:
+    name: E2E (Cross-Browser)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: e2e-chromium
+
+    strategy:
+      fail-fast: false
+      matrix:
+        browser: [firefox, webkit]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        working-directory: admin-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: admin-ui
+        run: npx playwright install ${{ matrix.browser }} --with-deps
+
+      - name: Run E2E tests (${{ matrix.browser }})
+        working-directory: admin-ui
+        run: pnpm test:e2e --project=${{ matrix.browser }}
+
+      - name: Upload test results
+        uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report-${{ matrix.browser }}
+          path: admin-ui/playwright-report/
+          retention-days: 7
+
+  e2e-a11y:
+    name: Accessibility Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: e2e-chromium
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        working-directory: admin-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: admin-ui
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Accessibility tests
+        working-directory: admin-ui
+        run: pnpm test:e2e --project=a11y
+
+      - name: Upload a11y results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: a11y-report
+          path: admin-ui/playwright-report/
+          retention-days: 7
+
+  e2e-performance:
+    name: Performance Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: e2e-chromium
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        working-directory: admin-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: admin-ui
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Performance tests
+        working-directory: admin-ui
+        run: pnpm test:e2e --project=performance
+
+      - name: Upload performance results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: performance-report
+          path: admin-ui/test-results/results.json
+          retention-days: 7
+
+  e2e-visual:
+    name: Visual Regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    needs: e2e-chromium
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v2
+        with:
+          version: 10
+
+      - name: Install dependencies
+        working-directory: admin-ui
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        working-directory: admin-ui
+        run: npx playwright install chromium --with-deps
+
+      - name: Run Visual Regression tests
+        working-directory: admin-ui
+        run: pnpm test:e2e --project=visual --update-snapshots
+
+      - name: Upload visual snapshots
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: visual-snapshots
+          path: admin-ui/e2e/regression/visual.spec.ts-snapshots/
+          retention-days: 30

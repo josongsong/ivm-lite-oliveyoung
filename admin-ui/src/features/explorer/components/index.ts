@@ -1,4 +1,7 @@
-export { SearchBar } from './SearchBar'
+// Re-export from shared/ui/recipes for backward compatibility
+export { SearchBar } from '@/shared/ui/recipes'
+export type { SearchBarProps } from '@/shared/ui/recipes'
+
 export { JsonViewer } from './JsonViewer'
 export { DiffViewer, computeDiff } from './DiffViewer'
 export { RawDataPanel } from './RawDataPanel'

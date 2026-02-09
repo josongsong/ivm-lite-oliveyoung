@@ -1,0 +1,98 @@
+/* CauseItem styles - extracted from WhyPanel.css */
+.cause-item {
+  display: flex;
+  gap: 12px;
+}
+
+.cause-item--last .cause-item__connector {
+  /* No line for last item */
+}
+
+.cause-item__connector {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.cause-item__number {
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background: var(--color-primary);
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.cause-item__line {
+  width: 2px;
+  flex: 1;
+  background: var(--color-border);
+  margin: 4px 0;
+}
+
+.cause-item__content {
+  flex: 1;
+  padding-bottom: 16px;
+}
+
+.cause-item__description {
+  margin: 0 0 8px;
+  color: var(--color-text);
+}
+
+.cause-item__comparison {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-bottom: 8px;
+  padding: 8px;
+  background: var(--color-bg-secondary);
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.cause-item__expected,
+.cause-item__actual {
+  display: flex;
+  gap: 8px;
+}
+
+.cause-item__label {
+  color: var(--color-text-secondary);
+  min-width: 40px;
+}
+
+.cause-item__expected code {
+  color: var(--color-success);
+}
+
+.cause-item__actual code {
+  color: var(--color-error);
+}
+
+.cause-item__contract-link {
+  margin-bottom: 8px;
+}
+
+.cause-item__fix {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px 12px;
+  background: var(--color-warning-bg, rgba(255, 193, 7, 0.1));
+  border-radius: 4px;
+  font-size: 13px;
+}
+
+.cause-item__fix-icon {
+  flex-shrink: 0;
+}
+
+.cause-item__fix-text {
+  color: var(--color-text);
+}

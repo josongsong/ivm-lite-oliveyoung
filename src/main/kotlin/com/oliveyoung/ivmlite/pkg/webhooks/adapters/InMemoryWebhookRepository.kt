@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.pkg.webhooks.adapters
 import com.oliveyoung.ivmlite.pkg.webhooks.domain.Webhook
 import com.oliveyoung.ivmlite.pkg.webhooks.domain.WebhookEvent
 import com.oliveyoung.ivmlite.pkg.webhooks.ports.WebhookRepositoryPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import java.util.UUID
 import java.util.concurrent.ConcurrentHashMap
 
@@ -14,9 +15,9 @@ import java.util.concurrent.ConcurrentHashMap
 class InMemoryWebhookRepository : WebhookRepositoryPort {
     private val store = ConcurrentHashMap<UUID, Webhook>()
 
-    override suspend fun save(webhook: Webhook): WebhookRepositoryPort.Result {
+    override suspend fun save(webhook: Webhook): Result<Webhook> {
         store[webhook.id] = webhook
-        return WebhookRepositoryPort.Result.Ok(webhook)
+        return Result.Ok(webhook)
     }
 
     override suspend fun findById(id: UUID): Webhook? = store[id]

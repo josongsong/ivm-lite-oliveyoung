@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.integration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.InMemoryChangeSetRepository
@@ -106,8 +107,8 @@ class BrandFanoutIntegrationTest : StringSpec({
             components.contractRegistry.loadRuleSetContract(brandRulesetRef)
         }
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val ruleset = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val ruleset = (result as Result.Ok).value
         ruleset.entityType shouldBe "BRAND"
         ruleset.slices.size shouldBe 2  // CORE + JOINED
         ruleset.slices.map { it.type }.toSet() shouldBe setOf(SliceType.CORE, SliceType.JOINED)
@@ -142,7 +143,7 @@ class BrandFanoutIntegrationTest : StringSpec({
             )
         }
 
-        ingestResult.shouldBeInstanceOf<IngestWorkflow.Result.Ok<Unit>>()
+        ingestResult.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         // When: 슬라이싱 실행
         val sliceResult = runBlocking {
@@ -155,13 +156,13 @@ class BrandFanoutIntegrationTest : StringSpec({
         }
 
         // Then: CORE + JOINED 슬라이스 생성 확인
-        sliceResult.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
         val slicesResult = runBlocking {
             components.sliceRepo.getByVersion(tenantId, brandKey, 1L)
         }
 
-        slicesResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok<*>>()
-        val slices = (slicesResult as com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok).value
+        slicesResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (slicesResult as Result.Ok).value
 
         slices.size shouldBeGreaterThan 0
         val sliceTypes = slices.map { it.sliceType }.toSet()
@@ -231,8 +232,8 @@ class BrandFanoutIntegrationTest : StringSpec({
         }
 
         // Then: 3개 Product가 조회되어야 함
-        queryResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok<*>>()
-        val queryData = (queryResult as com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val queryData = (queryResult as Result.Ok).value
         queryData.entries.size shouldBeExactly 3
         queryData.entries.map { it.entityKey }.toSet() shouldBe productKeys.toSet()
     }
@@ -309,8 +310,8 @@ class BrandFanoutIntegrationTest : StringSpec({
         }
 
         // Then: Fanout 성공 + 3개 Product 재슬라이싱
-        fanoutResult.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val result = (fanoutResult as FanoutWorkflow.Result.Ok).value
+        fanoutResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val result = (fanoutResult as Result.Ok).value
         result.totalAffected shouldBeExactly 3
         result.processedCount shouldBeExactly 3
         result.failedCount shouldBeExactly 0
@@ -323,8 +324,8 @@ class BrandFanoutIntegrationTest : StringSpec({
                 version = 2L,
             )
         }
-        updatedSlicesResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok<*>>()
-        val updatedSlices = (updatedSlicesResult as com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok).value
+        updatedSlicesResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val updatedSlices = (updatedSlicesResult as Result.Ok).value
         updatedSlices.size shouldBeGreaterThan 0
     }
 
@@ -385,8 +386,8 @@ class BrandFanoutIntegrationTest : StringSpec({
         }
 
         // Then: Circuit breaker 발동 → SKIPPED
-        fanoutResult.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val result = (fanoutResult as FanoutWorkflow.Result.Ok).value
+        fanoutResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val result = (fanoutResult as Result.Ok).value
         result.totalAffected shouldBeExactly 150
         result.skippedCount shouldBeExactly 150  // Circuit breaker로 스킵됨
         result.processedCount shouldBeExactly 0

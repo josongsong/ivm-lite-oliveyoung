@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import kotlinx.coroutines.future.await
@@ -40,7 +41,7 @@ class DynamoDbRawDataRepository(
         }
     }
 
-    override suspend fun putIdempotent(record: RawDataRecord): RawDataRepositoryPort.Result<Unit> {
+    override suspend fun putIdempotent(record: RawDataRecord): Result<Unit> {
         return try {
             val pk = buildPK(record.tenantId, record.entityKey)
             val sk = buildSK(record.version)
@@ -60,9 +61,9 @@ class DynamoDbRawDataRepository(
                     existingSchemaId == record.schemaId &&
                     existingSchemaVersion == record.schemaVersion.toString()
                 ) {
-                    RawDataRepositoryPort.Result.Ok(Unit)
+                    Result.Ok(Unit)
                 } else {
-                    RawDataRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.InvariantViolation("RawData invariant mismatch for $pk/$sk")
                     )
                 }
@@ -87,9 +88,9 @@ class DynamoDbRawDataRepository(
                 )
             }.await()
 
-            RawDataRepositoryPort.Result.Ok(Unit)
+            Result.Ok(Unit)
         } catch (e: Exception) {
-            RawDataRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB putIdempotent failed: ${e.message}")
             )
         }
@@ -99,13 +100,13 @@ class DynamoDbRawDataRepository(
         tenantId: TenantId,
         entityKey: EntityKey,
         version: Long
-    ): RawDataRepositoryPort.Result<RawDataRecord> {
+    ): Result<RawDataRecord> {
         return try {
             val pk = buildPK(tenantId, entityKey)
             val sk = buildSK(version)
 
             val item = getItem(pk, sk)
-                ?: return RawDataRepositoryPort.Result.Err(
+                ?: return Result.Err(
                     DomainError.NotFoundError("RawData", "$pk/$sk")
                 )
 
@@ -132,11 +133,11 @@ class DynamoDbRawDataRepository(
                 }
             )
 
-            RawDataRepositoryPort.Result.Ok(record)
+            Result.Ok(record)
         } catch (e: DomainError) {
-            RawDataRepositoryPort.Result.Err(e)
+            Result.Err(e)
         } catch (e: Exception) {
-            RawDataRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB get failed: ${e.message}")
             )
         }
@@ -145,7 +146,7 @@ class DynamoDbRawDataRepository(
     override suspend fun getLatest(
         tenantId: TenantId,
         entityKey: EntityKey
-    ): RawDataRepositoryPort.Result<RawDataRecord> {
+    ): Result<RawDataRecord> {
         return try {
             val pk = buildPK(tenantId, entityKey)
             val skPrefix = "RAWDATA#v"
@@ -165,12 +166,12 @@ class DynamoDbRawDataRepository(
             }.await()
 
             val item = response.items().firstOrNull()
-                ?: return RawDataRepositoryPort.Result.Err(
+                ?: return Result.Err(
                     DomainError.NotFoundError("RawData", "$pk (latest)")
                 )
 
             val version = item["version"]?.n()?.toLongOrNull()
-                ?: return RawDataRepositoryPort.Result.Err(
+                ?: return Result.Err(
                     DomainError.StorageError("Invalid version in DynamoDB item")
                 )
 
@@ -197,12 +198,83 @@ class DynamoDbRawDataRepository(
                 }
             )
 
-            RawDataRepositoryPort.Result.Ok(record)
+            Result.Ok(record)
         } catch (e: DomainError) {
-            RawDataRepositoryPort.Result.Err(e)
+            Result.Err(e)
         } catch (e: Exception) {
-            RawDataRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB getLatest failed: ${e.message}")
+            )
+        }
+    }
+
+    /**
+     * 여러 엔티티의 최신 RawData 일괄 조회 (N+1 쿼리 최적화)
+     *
+     * DynamoDB에서는 BatchGetItem이 exact key match만 지원하므로,
+     * 각 엔티티에 대해 Query를 병렬 실행합니다.
+     *
+     * 추후 개선: PartiQL BatchExecuteStatement 사용 검토
+     */
+    override suspend fun batchGetLatest(
+        tenantId: TenantId,
+        entityKeys: List<EntityKey>,
+    ): Result<Map<EntityKey, RawDataRecord>> {
+        if (entityKeys.isEmpty()) {
+            return Result.Ok(emptyMap())
+        }
+
+        return try {
+            val resultMap = mutableMapOf<EntityKey, RawDataRecord>()
+
+            // DynamoDB에서는 각 엔티티별로 Query 필요 (최신 버전 조회)
+            // 순차 처리하되, 나중에 coroutines로 병렬화 가능
+            for (entityKey in entityKeys) {
+                val pk = buildPK(tenantId, entityKey)
+                val skPrefix = "RAWDATA#v"
+
+                val response = dynamoClient.query {
+                    it.tableName(tableName)
+                    it.keyConditionExpression("PK = :pk AND begins_with(SK, :sk)")
+                    it.expressionAttributeValues(
+                        mapOf(
+                            ":pk" to AttributeValue.builder().s(pk).build(),
+                            ":sk" to AttributeValue.builder().s(skPrefix).build()
+                        )
+                    )
+                    it.scanIndexForward(false)
+                    it.limit(1)
+                }.await()
+
+                val item = response.items().firstOrNull() ?: continue
+
+                val version = item["version"]?.n()?.toLongOrNull() ?: continue
+                val payloadJson = item["payload_json"]?.s() ?: continue
+                val payloadHash = item["payload_hash"]?.s() ?: continue
+                val schemaId = item["schema_id"]?.s() ?: continue
+                val schemaVersionStr = item["schema_version"]?.s() ?: continue
+
+                val schemaVersion = try {
+                    com.oliveyoung.ivmlite.shared.domain.types.SemVer.parse(schemaVersionStr)
+                } catch (e: Exception) {
+                    continue
+                }
+
+                resultMap[entityKey] = RawDataRecord(
+                    tenantId = tenantId,
+                    entityKey = entityKey,
+                    version = version,
+                    payload = payloadJson,
+                    payloadHash = payloadHash,
+                    schemaId = schemaId,
+                    schemaVersion = schemaVersion
+                )
+            }
+
+            Result.Ok(resultMap)
+        } catch (e: Exception) {
+            Result.Err(
+                DomainError.StorageError("DynamoDB batchGetLatest failed: ${e.message}")
             )
         }
     }

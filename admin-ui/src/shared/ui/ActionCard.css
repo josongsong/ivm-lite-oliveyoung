@@ -1,0 +1,58 @@
+/**
+ * ActionCard Component Styles
+ */
+
+.ui-action-card {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-tertiary, #1a1a25);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 10px);
+  transition: all 0.2s ease;
+  text-decoration: none;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ui-action-card:hover {
+  border-color: var(--accent-cyan, #00d4ff);
+  background: rgba(0, 212, 255, 0.05);
+}
+
+.ui-action-card__icon {
+  display: flex;
+  align-items: center;
+  color: var(--accent-cyan, #00d4ff);
+  flex-shrink: 0;
+}
+
+.ui-action-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  flex: 1;
+}
+
+.ui-action-card__title {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0f0f5);
+}
+
+.ui-action-card__desc {
+  font-size: 0.75rem;
+  color: var(--text-muted, #6a6a80);
+}
+
+.ui-action-card__arrow {
+  color: var(--text-muted, #6a6a80);
+  flex-shrink: 0;
+  transition: transform 0.2s ease;
+}
+
+.ui-action-card:hover .ui-action-card__arrow {
+  transform: translateX(4px);
+  color: var(--accent-cyan, #00d4ff);
+}

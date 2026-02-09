@@ -1,0 +1,64 @@
+{
+  "elevation": {
+    "none": {
+      "value": "none",
+      "description": "그림자 없음"
+    },
+    "sm": {
+      "value": "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      "description": "미묘한 그림자, 호버 효과에 적합"
+    },
+    "base": {
+      "value": "0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1)",
+      "description": "기본 그림자, 카드에 적합"
+    },
+    "md": {
+      "value": "0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1)",
+      "description": "중간 그림자, 드롭다운에 적합"
+    },
+    "lg": {
+      "value": "0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)",
+      "description": "큰 그림자, 모달에 적합"
+    },
+    "xl": {
+      "value": "0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1)",
+      "description": "아주 큰 그림자, 팝오버에 적합"
+    },
+    "2xl": {
+      "value": "0 25px 50px -12px rgb(0 0 0 / 0.25)",
+      "description": "가장 큰 그림자, 대형 모달에 적합"
+    }
+  },
+  "inner": {
+    "none": {
+      "value": "none",
+      "description": "내부 그림자 없음"
+    },
+    "sm": {
+      "value": "inset 0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      "description": "작은 내부 그림자"
+    },
+    "base": {
+      "value": "inset 0 2px 4px 0 rgb(0 0 0 / 0.05)",
+      "description": "기본 내부 그림자, 입력 필드에 적합"
+    }
+  },
+  "colored": {
+    "primary": {
+      "value": "0 4px 14px 0 rgb(59 130 246 / 0.3)",
+      "description": "Primary 색상 그림자"
+    },
+    "success": {
+      "value": "0 4px 14px 0 rgb(34 197 94 / 0.3)",
+      "description": "Success 색상 그림자"
+    },
+    "warning": {
+      "value": "0 4px 14px 0 rgb(245 158 11 / 0.3)",
+      "description": "Warning 색상 그림자"
+    },
+    "error": {
+      "value": "0 4px 14px 0 rgb(239 68 68 / 0.3)",
+      "description": "Error 색상 그림자"
+    }
+  }
+}

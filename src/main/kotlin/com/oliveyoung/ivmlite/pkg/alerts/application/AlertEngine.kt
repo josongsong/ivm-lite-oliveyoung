@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.alerts.domain.*
 import com.oliveyoung.ivmlite.pkg.alerts.ports.AlertRepositoryPort
 import com.oliveyoung.ivmlite.pkg.alerts.ports.AlertRuleLoaderPort
 import com.oliveyoung.ivmlite.pkg.alerts.ports.NotifierPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.time.Duration
@@ -117,8 +118,8 @@ class AlertEngine(
      */
     suspend fun acknowledge(alertId: java.util.UUID, by: String): Alert? {
         val alert = when (val r = alertRepository.findById(alertId)) {
-            is AlertRepositoryPort.Result.Ok -> r.value
-            is AlertRepositoryPort.Result.Err -> return null
+            is Result.Ok -> r.value
+            is Result.Err -> return null
         } ?: return null
         
         if (!alert.isActive()) return null
@@ -136,8 +137,8 @@ class AlertEngine(
      */
     suspend fun silence(alertId: java.util.UUID, duration: Duration): Alert? {
         val alert = when (val r = alertRepository.findById(alertId)) {
-            is AlertRepositoryPort.Result.Ok -> r.value
-            is AlertRepositoryPort.Result.Err -> return null
+            is Result.Ok -> r.value
+            is Result.Err -> return null
         } ?: return null
         
         val silenced = alert.silence(duration)
@@ -157,13 +158,13 @@ class AlertEngine(
     
     private suspend fun loadActiveAlerts() {
         when (val result = alertRepository.findAllActive()) {
-            is AlertRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 result.value.forEach { alert ->
                     activeAlerts[alert.ruleId] = alert
                 }
                 logger.info("Loaded {} active alerts", result.value.size)
             }
-            is AlertRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Failed to load active alerts: {}", result.error)
             }
         }
@@ -300,7 +301,7 @@ class AlertEngine(
     
     private suspend fun handleExpiredSilences() {
         when (val result = alertRepository.findExpiredSilenced()) {
-            is AlertRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 result.value.forEach { alert ->
                     // Silence 만료 → 다시 평가 대상으로
                     val metrics = metricCollector.collect()
@@ -321,7 +322,7 @@ class AlertEngine(
                     }
                 }
             }
-            is AlertRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 logger.warn("Failed to find expired silences: {}", result.error)
             }
         }

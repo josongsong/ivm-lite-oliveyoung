@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.e2e
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
@@ -92,7 +93,7 @@ class OutboxTier1E2ETest : StringSpec({
                         ruleSetVersion = SemVer.parse("1.0.0"),
                     ),
                 )
-                SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
+                Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
             }
         }
         val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
@@ -141,7 +142,7 @@ class OutboxTier1E2ETest : StringSpec({
 
         // claim만 하고 처리 안 함 (장애 시뮬레이션)
         val claimed = outboxRepo.claim(1, null, "dead-worker")
-        (claimed as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (claimed as Result.Ok).value shouldHaveSize 1
 
         // 시간 경과 시뮬레이션: claim된 엔트리의 claimedAt을 과거로 수정
         val entry = claimed.value[0]
@@ -155,7 +156,7 @@ class OutboxTier1E2ETest : StringSpec({
 
         // Then: Visibility timeout으로 release
         val released = outboxRepo.releaseExpiredClaims(30)
-        (released as OutboxRepositoryPort.Result.Ok).value shouldBe 1
+        (released as Result.Ok).value shouldBe 1
 
         // And: Worker 2가 처리 가능
         val worker2 = OutboxPollingWorker(
@@ -191,23 +192,23 @@ class OutboxTier1E2ETest : StringSpec({
 
         // When: DLQ 이동
         val moved = outboxRepo.moveToDlq(maxRetryCount = 5)
-        (moved as OutboxRepositoryPort.Result.Ok).value shouldBe 1
+        (moved as Result.Ok).value shouldBe 1
 
         // Then: 원본에서 제거됨
         val pending = outboxRepo.findPending(10)
-        (pending as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (pending as Result.Ok).value.shouldBeEmpty()
 
         // And: DLQ에서 조회 가능
         val dlqEntries = outboxRepo.findDlq(10)
-        (dlqEntries as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (dlqEntries as Result.Ok).value shouldHaveSize 1
 
         // When: 운영자가 문제 해결 후 replay
         val replayed = outboxRepo.replayFromDlq(failedEntry.id)
-        (replayed as OutboxRepositoryPort.Result.Ok).value shouldBe true
+        (replayed as Result.Ok).value shouldBe true
 
         // Then: 원본 테이블에 PENDING으로 복귀
         val pendingAfterReplay = outboxRepo.findPending(10)
-        (pendingAfterReplay as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (pendingAfterReplay as Result.Ok).value shouldHaveSize 1
         pendingAfterReplay.value[0].retryCount shouldBe 0  // 리셋됨
         pendingAfterReplay.value[0].failureReason shouldBe null
     }
@@ -248,7 +249,7 @@ class OutboxTier1E2ETest : StringSpec({
 
         // When: 우선순위 기반 claim
         val claimed = outboxRepo.claimByPriority(2, "worker-1")
-        val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimed as Result.Ok).value
 
         // Then: 높은 우선순위가 먼저
         entries shouldHaveSize 2
@@ -317,7 +318,7 @@ class OutboxTier1E2ETest : StringSpec({
 
         // When: 우선순위 기반 claim (1개만)
         val firstClaim = outboxRepo.claimByPriority(1, "worker-1")
-        val firstEntry = (firstClaim as OutboxRepositoryPort.Result.Ok).value
+        val firstEntry = (firstClaim as Result.Ok).value
 
         // Then: 긴급 상품이 먼저 claim됨
         firstEntry shouldHaveSize 1
@@ -363,7 +364,7 @@ class OutboxTier1E2ETest : StringSpec({
         // When: 순서 보장 claim으로 하나씩 처리
         repeat(3) { i ->
             val claimed = outboxRepo.claimWithOrdering(1, "worker-1")
-            val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+            val entries = (claimed as Result.Ok).value
 
             if (entries.isNotEmpty()) {
                 val version = entries[0].entityVersion!!
@@ -399,7 +400,7 @@ class OutboxTier1E2ETest : StringSpec({
 
         // When: 순서 보장 claim으로 3개 요청
         val claimed = outboxRepo.claimWithOrdering(3, "worker-1")
-        val entries = (claimed as OutboxRepositoryPort.Result.Ok).value
+        val entries = (claimed as Result.Ok).value
 
         // Then: 3개 모두 claim됨 (서로 다른 entity이므로)
         entries shouldHaveSize 3
@@ -471,7 +472,7 @@ class OutboxTier1E2ETest : StringSpec({
         // 모든 메시지가 처리되어야 함 (100 + 5 + 3 = 108)
         // 단, 일부는 PROCESSING 상태일 수 있음
         val pendingAfter = outboxRepo.findPending(200)
-        val remainingCount = (pendingAfter as OutboxRepositoryPort.Result.Ok).value.size
+        val remainingCount = (pendingAfter as Result.Ok).value.size
 
         // 대부분 처리됨
         metrics.processed shouldBeGreaterThan 50
@@ -518,7 +519,7 @@ class OutboxTier1E2ETest : StringSpec({
 
         // And: PENDING 없음
         val pending = outboxRepo.findPending(100)
-        (pending as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (pending as Result.Ok).value.shouldBeEmpty()
 
         println("=== Multi-Worker Results ===")
         workers.forEachIndexed { index, worker ->

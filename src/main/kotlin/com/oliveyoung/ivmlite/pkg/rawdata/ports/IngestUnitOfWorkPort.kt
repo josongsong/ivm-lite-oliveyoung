@@ -2,7 +2,7 @@ package com.oliveyoung.ivmlite.pkg.rawdata.ports
 
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 /**
  * Ingest Unit of Work Port
@@ -33,9 +33,4 @@ interface IngestUnitOfWorkPort {
         rawData: RawDataRecord,
         outboxEntry: OutboxEntry,
     ): Result<Unit>
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-    }
 }

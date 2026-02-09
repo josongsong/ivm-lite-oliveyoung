@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.changeset.adapters
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSet
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeType
@@ -21,12 +22,12 @@ class InMemoryChangeSetRepository : ChangeSetRepositoryPort, HealthCheckable {
 
     private val store = ConcurrentHashMap<String, ChangeSet>()
 
-    override suspend fun save(changeSet: ChangeSet): ChangeSetRepositoryPort.Result<ChangeSet> {
+    override suspend fun save(changeSet: ChangeSet): Result<ChangeSet> {
         val prev = store.putIfAbsent(changeSet.changeSetId, changeSet)
         return when {
-            prev == null -> ChangeSetRepositoryPort.Result.Ok(changeSet)
-            prev.payloadHash == changeSet.payloadHash -> ChangeSetRepositoryPort.Result.Ok(changeSet)
-            else -> ChangeSetRepositoryPort.Result.Err(
+            prev == null -> Result.Ok(changeSet)
+            prev.payloadHash == changeSet.payloadHash -> Result.Ok(changeSet)
+            else -> Result.Err(
                 DomainError.IdempotencyViolation(
                     "ChangeSet hash mismatch for ${changeSet.changeSetId}",
                 ),
@@ -34,22 +35,22 @@ class InMemoryChangeSetRepository : ChangeSetRepositoryPort, HealthCheckable {
         }
     }
 
-    override suspend fun findById(changeSetId: String): ChangeSetRepositoryPort.Result<ChangeSet> {
+    override suspend fun findById(changeSetId: String): Result<ChangeSet> {
         val cs = store[changeSetId]
-            ?: return ChangeSetRepositoryPort.Result.Err(
+            ?: return Result.Err(
                 DomainError.NotFoundError("ChangeSet", changeSetId),
             )
-        return ChangeSetRepositoryPort.Result.Ok(cs)
+        return Result.Ok(cs)
     }
 
     override suspend fun findByEntity(
         tenantId: TenantId,
         entityKey: EntityKey,
-    ): ChangeSetRepositoryPort.Result<List<ChangeSet>> {
+    ): Result<List<ChangeSet>> {
         val list = store.values
             .filter { it.tenantId == tenantId && it.entityKey == entityKey }
             .sortedByDescending { it.toVersion }
-        return ChangeSetRepositoryPort.Result.Ok(list)
+        return Result.Ok(list)
     }
 
     override suspend fun findByVersionRange(
@@ -57,7 +58,7 @@ class InMemoryChangeSetRepository : ChangeSetRepositoryPort, HealthCheckable {
         entityKey: EntityKey,
         fromVersion: Long,
         toVersion: Long,
-    ): ChangeSetRepositoryPort.Result<List<ChangeSet>> {
+    ): Result<List<ChangeSet>> {
         val list = store.values
             .filter {
                 it.tenantId == tenantId &&
@@ -66,32 +67,32 @@ class InMemoryChangeSetRepository : ChangeSetRepositoryPort, HealthCheckable {
                     it.toVersion <= toVersion
             }
             .sortedBy { it.toVersion }
-        return ChangeSetRepositoryPort.Result.Ok(list)
+        return Result.Ok(list)
     }
 
     override suspend fun findLatest(
         tenantId: TenantId,
         entityKey: EntityKey,
-    ): ChangeSetRepositoryPort.Result<ChangeSet> {
+    ): Result<ChangeSet> {
         val latest = store.values
             .filter { it.tenantId == tenantId && it.entityKey == entityKey }
             .maxByOrNull { it.toVersion }
-            ?: return ChangeSetRepositoryPort.Result.Err(
+            ?: return Result.Err(
                 DomainError.NotFoundError("ChangeSet", "${tenantId.value}:${entityKey.value}"),
             )
-        return ChangeSetRepositoryPort.Result.Ok(latest)
+        return Result.Ok(latest)
     }
 
     override suspend fun findByChangeType(
         tenantId: TenantId,
         changeType: ChangeType,
         limit: Int,
-    ): ChangeSetRepositoryPort.Result<List<ChangeSet>> {
+    ): Result<List<ChangeSet>> {
         val list = store.values
             .filter { it.tenantId == tenantId && it.changeType == changeType }
             .sortedByDescending { it.toVersion }
             .take(limit)
-        return ChangeSetRepositoryPort.Result.Ok(list)
+        return Result.Ok(list)
     }
 
     // ==================== 테스트 헬퍼 ====================

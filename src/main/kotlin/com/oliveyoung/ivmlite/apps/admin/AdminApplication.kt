@@ -22,6 +22,7 @@ import io.ktor.server.application.*
 import io.ktor.server.engine.*
 import io.ktor.server.netty.*
 import io.ktor.server.plugins.contentnegotiation.*
+import io.ktor.server.plugins.cors.routing.*
 import io.ktor.server.plugins.statuspages.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
@@ -65,6 +66,20 @@ fun Application.module() {
         modules(adminAllModules)
     }
     
+    // CORS (개발 환경에서 프론트엔드 직접 호출 허용)
+    install(CORS) {
+        allowHost("localhost:3000")  // Vite 개발 서버
+        allowHost("localhost:8081")  // 같은 origin
+        allowHost("127.0.0.1:3000")
+        allowHeader(HttpHeaders.ContentType)
+        allowHeader(HttpHeaders.Authorization)
+        allowMethod(HttpMethod.Get)
+        allowMethod(HttpMethod.Post)
+        allowMethod(HttpMethod.Put)
+        allowMethod(HttpMethod.Delete)
+        allowMethod(HttpMethod.Options)
+    }
+
     // Content Negotiation (JSON)
     install(ContentNegotiation) {
         json(Json {

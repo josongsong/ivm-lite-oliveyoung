@@ -12,6 +12,10 @@ export type {
   ContractListResponse,
   Contract,
   ContractStatsResponse,
+  GraphNode,
+  GraphEdge,
+  GraphResponse,
+  ImpactAnalysisResponse,
 } from './contract'
 
 // Pipeline types
@@ -52,6 +56,12 @@ export type {
 // Observability types
 export type {
   ObservabilityResponse,
+  PipelineMetrics,
+  LatencyMetrics,
+  ThroughputMetrics,
+  QueueDepthMetrics,
+  LagMetrics,
+  PipelineStatus,
   KeyMetrics,
   ThroughputPoint,
   QueueStatus,

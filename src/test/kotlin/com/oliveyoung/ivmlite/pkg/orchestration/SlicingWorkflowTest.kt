@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
@@ -79,8 +80,8 @@ class SlicingWorkflowTest : StringSpec({
         // Slicing 실행
         val result = slicingWorkflow.execute(tenantId, entityKey, 1L)
         
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
-        val keys = (result as SlicingWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val keys = (result as Result.Ok).value
         keys.map { it.sliceType }.shouldContain(SliceType.CORE)
     }
 
@@ -97,11 +98,11 @@ class SlicingWorkflowTest : StringSpec({
 
         // 첫 번째 슬라이싱
         val result1 = slicingWorkflow.execute(tenantId, entityKey, 2L)
-        result1.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
 
         // 두 번째 슬라이싱 (멱등)
         val result2 = slicingWorkflow.execute(tenantId, entityKey, 2L)
-        result2.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "실패: RawData 없음 → Err" {
@@ -111,7 +112,7 @@ class SlicingWorkflowTest : StringSpec({
             version = 999L
         )
 
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
 
     // ===== RFC-IMPL-010 D-8: INCREMENTAL 슬라이싱 테스트 =====
@@ -138,8 +139,8 @@ class SlicingWorkflowTest : StringSpec({
             ruleSetRef = ruleSetRef
         )
 
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
-        val keys = (result as SlicingWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val keys = (result as Result.Ok).value
         keys.map { it.sliceType }.shouldContain(SliceType.CORE)
     }
 
@@ -156,8 +157,8 @@ class SlicingWorkflowTest : StringSpec({
         // INCREMENTAL 슬라이싱
         val result = slicingWorkflow.executeIncremental(tenantId, ek, 1L, 2L, ruleSetRef)
 
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
-        val keys = (result as SlicingWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val keys = (result as Result.Ok).value
         keys.map { it.version }.forEach { it shouldBe 2L }
     }
 
@@ -168,7 +169,7 @@ class SlicingWorkflowTest : StringSpec({
         ingestWorkflow.execute(tenantId, ek, 1L, schemaId, schemaVersion, """{"title": "Product"}""")
         slicingWorkflow.execute(tenantId, ek, 1L)
         val v1Slices = sliceRepo.getByVersion(tenantId, ek, 1L)
-        v1Slices.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
+        v1Slices.shouldBeInstanceOf<Result.Ok<*>>()
 
         // v2 저장 (동일 데이터)
         ingestWorkflow.execute(tenantId, ek, 2L, schemaId, schemaVersion, """{"title": "Product"}""")
@@ -176,13 +177,13 @@ class SlicingWorkflowTest : StringSpec({
         // INCREMENTAL 슬라이싱 (변경 없음)
         val result = slicingWorkflow.executeIncremental(tenantId, ek, 1L, 2L, ruleSetRef)
 
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
         val v2Slices = sliceRepo.getByVersion(tenantId, ek, 2L)
-        v2Slices.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
+        v2Slices.shouldBeInstanceOf<Result.Ok<*>>()
 
         // hash는 동일해야 함
-        val v1Hashes = (v1Slices as SliceRepositoryPort.Result.Ok).value.map { it.hash }.toSet()
-        val v2Hashes = (v2Slices as SliceRepositoryPort.Result.Ok).value.map { it.hash }.toSet()
+        val v1Hashes = (v1Slices as Result.Ok).value.map { it.hash }.toSet()
+        val v2Hashes = (v2Slices as Result.Ok).value.map { it.hash }.toSet()
         v2Hashes shouldBe v1Hashes
     }
 
@@ -199,7 +200,7 @@ class SlicingWorkflowTest : StringSpec({
         // FULL 슬라이싱
         slicingWorkflow.execute(tenantId, ek, 2L)
         val fullSlices = sliceRepo.getByVersion(tenantId, ek, 2L)
-        fullSlices.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
+        fullSlices.shouldBeInstanceOf<Result.Ok<*>>()
 
         // v3 저장 (v2와 동일)
         ingestWorkflow.execute(tenantId, ek, 3L, schemaId, schemaVersion, """{"title": "v2"}""")
@@ -207,11 +208,11 @@ class SlicingWorkflowTest : StringSpec({
         // INCREMENTAL 슬라이싱 (2 → 3, 변경 없음)
         slicingWorkflow.executeIncremental(tenantId, ek, 2L, 3L, ruleSetRef)
         val incrSlices = sliceRepo.getByVersion(tenantId, ek, 3L)
-        incrSlices.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
+        incrSlices.shouldBeInstanceOf<Result.Ok<*>>()
 
         // hash 집합 동일
-        val fullHashes = (fullSlices as SliceRepositoryPort.Result.Ok).value.map { it.hash }.toSet()
-        val incrHashes = (incrSlices as SliceRepositoryPort.Result.Ok).value.map { it.hash }.toSet()
+        val fullHashes = (fullSlices as Result.Ok).value.map { it.hash }.toSet()
+        val incrHashes = (incrSlices as Result.Ok).value.map { it.hash }.toSet()
         incrHashes shouldBe fullHashes
     }
 
@@ -224,7 +225,7 @@ class SlicingWorkflowTest : StringSpec({
             ruleSetRef = ruleSetRef
         )
 
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
 
     // ===== RFC-IMPL-010 D-9: InvertedIndex 통합 테스트 (GAP-C 검증) =====
@@ -249,15 +250,15 @@ class SlicingWorkflowTest : StringSpec({
 
         // 먼저 RuleSet이 indexes를 제대로 로드하는지 확인
         val ruleSetResult = contractRegistry.loadRuleSetContract(ruleSetRef)
-        ruleSetResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok<*>>()
-        val ruleSet = (ruleSetResult as com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort.Result.Ok).value
+        ruleSetResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val ruleSet = (ruleSetResult as Result.Ok).value
 
         // indexes가 제대로 로드되었는지 확인
         ruleSet.indexes.shouldHaveSize(3)
 
         // Slicing 실행 (RuleSet의 indexes 자동 로드)
         val result = slicingWorkflow.execute(tenantId, ek, 1L)
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
 
         // InvertedIndex가 생성되어 저장되었는지 확인
         // ruleset.v1.yaml에 정의된 indexes:
@@ -347,7 +348,7 @@ class SlicingWorkflowTest : StringSpec({
 
         // Slicing 실행
         val result = slicingWorkflow.execute(tenantId, ek, 1L)
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
 
         // brand 필드가 없으므로 brand 인덱스도 없음
         val brandEntries = invertedIndexRepo.queryByIndexForTest(tenantId, "brand", "")

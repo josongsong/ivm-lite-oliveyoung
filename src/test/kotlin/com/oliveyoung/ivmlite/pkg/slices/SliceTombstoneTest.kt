@@ -7,6 +7,7 @@ import com.oliveyoung.ivmlite.pkg.slices.domain.Tombstone
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
@@ -64,8 +65,8 @@ class SliceTombstoneTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key)) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Err>()
-        (result as SliceRepositoryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     "tombstone slice는 includeTombstones=true면 조회 가능" {
@@ -81,8 +82,9 @@ class SliceTombstoneTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key), includeTombstones = true) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        @Suppress("UNCHECKED_CAST")
+        val fetched = (result as Result.Ok<List<SliceRecord>>).value
         fetched.size shouldBe 1
         fetched[0].isDeleted shouldBe true
         fetched[0].tombstone shouldBe tombstone
@@ -103,7 +105,7 @@ class SliceTombstoneTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key), includeTombstones = true) }
 
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value[0]
+        val fetched = (result.getOrNull() as List<SliceRecord>)[0]
         fetched.tombstone!!.deletedAtVersion shouldBe 42L
     }
 
@@ -161,7 +163,7 @@ class SliceTombstoneTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key)) }
 
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value[0]
+        val fetched = (result.getOrNull() as List<SliceRecord>)[0]
         fetched.tenantId shouldBe slice.tenantId
         fetched.entityKey shouldBe slice.entityKey
         fetched.version shouldBe slice.version
@@ -184,7 +186,7 @@ class SliceTombstoneTest : StringSpec({
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key), includeTombstones = true) }
 
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value[0]
+        val fetched = (result.getOrNull() as List<SliceRecord>)[0]
         fetched.tombstone shouldBe tombstone
         fetched.isDeleted shouldBe true
     }
@@ -207,8 +209,8 @@ class SliceTombstoneTest : StringSpec({
             sliceType = SliceType.CORE,
         )
         val normalResult = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(normalKey)) }
-        normalResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
-        (normalResult as SliceRepositoryPort.Result.Ok).value.size shouldBe 1
+        normalResult.shouldBeInstanceOf<Result.Ok<*>>()
+        (normalResult.getOrNull() as List<*>).size shouldBe 1
 
         // tombstone 포함 조회
         val deletedKey = SliceRepositoryPort.SliceKey(
@@ -218,12 +220,12 @@ class SliceTombstoneTest : StringSpec({
             sliceType = SliceType.CORE,
         )
         val excludeResult = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(deletedKey)) }
-        excludeResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Err>()
+        excludeResult.shouldBeInstanceOf<Result.Err>()
 
         val includeResult = runBlocking {
             repository.batchGet(TenantId("tenant-1"), listOf(deletedKey), includeTombstones = true)
         }
-        includeResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
+        includeResult.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     // ==================== 7. 결정성/불변성/멱등성 ====================
@@ -256,8 +258,8 @@ class SliceTombstoneTest : StringSpec({
         val result1 = runBlocking { repository.putAllIdempotent(listOf(slice)) }
         val result2 = runBlocking { repository.putAllIdempotent(listOf(slice)) }
 
-        result1.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<Unit>>()
-        result2.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<Unit>>()
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
         repository.size() shouldBe 1
     }
 
@@ -277,7 +279,7 @@ class SliceTombstoneTest : StringSpec({
             sliceType = SliceType.CORE,
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), listOf(key), includeTombstones = true) }
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value[0]
+        val fetched = (result.getOrNull() as List<SliceRecord>)[0]
         fetched.tombstone!!.deletedAtVersion shouldBe Long.MAX_VALUE
     }
 
@@ -302,7 +304,7 @@ class SliceTombstoneTest : StringSpec({
         )
         // includeTombstones=false면 entity-b가 NotFound → 전체 실패
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), keys, includeTombstones = false) }
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
 
     "혼합 배치 조회: includeTombstones=true면 전체 성공" {
@@ -318,8 +320,9 @@ class SliceTombstoneTest : StringSpec({
             SliceRepositoryPort.SliceKey(TenantId("tenant-1"), EntityKey("entity-d"), 1L, SliceType.CORE),
         )
         val result = runBlocking { repository.batchGet(TenantId("tenant-1"), keys, includeTombstones = true) }
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
-        val fetched = (result as SliceRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        @Suppress("UNCHECKED_CAST")
+        val fetched = result.getOrNull() as List<SliceRecord>
         fetched.size shouldBe 2
         fetched.count { it.isDeleted } shouldBe 1
         fetched.count { !it.isDeleted } shouldBe 1
@@ -398,8 +401,8 @@ class SliceTombstoneTest : StringSpec({
         runBlocking { repository.putAllIdempotent(listOf(slice1)) }
         val result = runBlocking { repository.putAllIdempotent(listOf(slice2)) }
 
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Err>()
-        (result as SliceRepositoryPort.Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
     }
 
     // ==================== 14. Serialization 테스트 ====================

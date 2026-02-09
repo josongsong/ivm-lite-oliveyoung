@@ -1,0 +1,37 @@
+/**
+ * SearchFilter Component Styles
+ */
+
+.ui-search-filter {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.75rem;
+  background: var(--bg-tertiary, #1a1a25);
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 10px);
+}
+
+.ui-search-filter svg {
+  color: var(--text-muted, #6a6a80);
+  flex-shrink: 0;
+}
+
+.ui-search-filter__input {
+  background: transparent;
+  border: none;
+  outline: none;
+  font-size: 0.8rem;
+  color: var(--text-primary, #f0f0f5);
+  width: 150px;
+  flex: 1;
+}
+
+.ui-search-filter__input::placeholder {
+  color: var(--text-muted, #6a6a80);
+}
+
+.ui-search-filter:focus-within {
+  border-color: var(--accent-cyan, #00d4ff);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.1);
+}

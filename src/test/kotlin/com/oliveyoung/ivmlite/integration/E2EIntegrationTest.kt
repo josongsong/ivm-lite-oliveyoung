@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
@@ -50,12 +51,12 @@ class E2EIntegrationTest : StringSpec({
     // MockContractRegistry for testing
     val mockContractRegistry = object : ContractRegistryPort {
         override suspend fun loadChangeSetContract(ref: ContractRef) =
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("ChangeSet", ref.id))
+            Result.Err(DomainError.NotFoundError("ChangeSet", ref.id))
         override suspend fun loadJoinSpecContract(ref: ContractRef) =
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("JoinSpec", ref.id))
+            Result.Err(DomainError.NotFoundError("JoinSpec", ref.id))
         override suspend fun loadInvertedIndexContract(ref: ContractRef) =
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("InvertedIndex", ref.id))
-        override suspend fun loadRuleSetContract(ref: ContractRef): ContractRegistryPort.Result<RuleSetContract> {
+            Result.Err(DomainError.NotFoundError("InvertedIndex", ref.id))
+        override suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract> {
             val ruleSet = RuleSetContract(
                 meta = ContractMeta("RULE_SET", ref.id, ref.version, ContractStatus.ACTIVE),
                 entityType = "PRODUCT",
@@ -65,10 +66,10 @@ class E2EIntegrationTest : StringSpec({
                     SliceDefinition(SliceType.CORE, SliceBuildRules.PassThrough(listOf("*")))
                 ),
             )
-            return ContractRegistryPort.Result.Ok(ruleSet)
+            return Result.Ok(ruleSet)
         }
         override suspend fun loadViewDefinitionContract(ref: ContractRef) =
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("ViewDefinition", ref.id))
+            Result.Err(DomainError.NotFoundError("ViewDefinition", ref.id))
     }
 
     val slicingEngine = DefaultSlicingEngineAdapter(SlicingEngine(mockContractRegistry))
@@ -128,12 +129,12 @@ class E2EIntegrationTest : StringSpec({
             schemaVersion = SemVer.parse("1.0.0"),
             payloadJson = payload,
         )
-        ingestResult.shouldBeInstanceOf<IngestWorkflow.Result.Ok<Unit>>()
+        ingestResult.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         // Step 2: Outbox에 PENDING 상태로 저장 확인
         val pendingBefore = outboxRepo.findPending(10)
-        pendingBefore.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        val entriesBefore = (pendingBefore as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value
+        pendingBefore.shouldBeInstanceOf<Result.Ok<*>>()
+        val entriesBefore = (pendingBefore as Result.Ok).value
         entriesBefore.size shouldBe 1
         entriesBefore[0].status shouldBe OutboxStatus.PENDING
 
@@ -143,8 +144,8 @@ class E2EIntegrationTest : StringSpec({
 
         // Step 4: Outbox 처리 완료 확인 (PENDING → PROCESSED)
         val pendingAfter = outboxRepo.findPending(10)
-        pendingAfter.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        val entriesAfter = (pendingAfter as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value
+        pendingAfter.shouldBeInstanceOf<Result.Ok<*>>()
+        val entriesAfter = (pendingAfter as Result.Ok).value
         entriesAfter.size shouldBe 0 // PENDING 없음
 
         // Step 5: Slice 생성 확인 (Query로 검증)
@@ -155,8 +156,8 @@ class E2EIntegrationTest : StringSpec({
             version = version,
             requiredSliceTypes = listOf(SliceType.CORE),
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val viewResponse = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val viewResponse = (queryResult as Result.Ok).value
         viewResponse.data.shouldContain("E2E Test Product")
         viewResponse.data.shouldContain("29900")
 
@@ -185,8 +186,8 @@ class E2EIntegrationTest : StringSpec({
 
         // Step 2: Outbox에 5개 PENDING 확인
         val pendingBefore = outboxRepo.findPending(20)
-        pendingBefore.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        val entriesBefore = (pendingBefore as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value
+        pendingBefore.shouldBeInstanceOf<Result.Ok<*>>()
+        val entriesBefore = (pendingBefore as Result.Ok).value
         entriesBefore.size shouldBe entityCount
 
         // Step 3: Worker 시작 → 배치 처리
@@ -195,8 +196,8 @@ class E2EIntegrationTest : StringSpec({
 
         // Step 4: 모든 Outbox 처리 완료 확인
         val pendingAfter = outboxRepo.findPending(20)
-        pendingAfter.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        val entriesAfter = (pendingAfter as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value
+        pendingAfter.shouldBeInstanceOf<Result.Ok<*>>()
+        val entriesAfter = (pendingAfter as Result.Ok).value
         entriesAfter.size shouldBe 0
 
         // Step 5: 모든 Slice Query 성공
@@ -209,8 +210,8 @@ class E2EIntegrationTest : StringSpec({
                 version = 1L,
                 requiredSliceTypes = listOf(SliceType.CORE),
             )
-            queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-            val viewResponse = (queryResult as QueryViewWorkflow.Result.Ok).value
+            queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+            val viewResponse = (queryResult as Result.Ok).value
             viewResponse.data.shouldContain("Item $i")
         }
 
@@ -235,7 +236,7 @@ class E2EIntegrationTest : StringSpec({
 
         // Step 2: 수동 Slicing (Worker 없이)
         val sliceResult = slicingWorkflow.execute(tenantId, entityKey, 1L)
-        sliceResult.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 3: Query 성공
         val queryResult = queryViewWorkflow.execute(
@@ -245,8 +246,8 @@ class E2EIntegrationTest : StringSpec({
             version = 1L,
             requiredSliceTypes = listOf(SliceType.CORE),
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (queryResult as Result.Ok).value
         response.data.shouldContain("Manual Slice Test")
     }
 
@@ -264,7 +265,7 @@ class E2EIntegrationTest : StringSpec({
             schemaVersion = SemVer.parse("1.0.0"),
             payloadJson = payload,
         )
-        result1.shouldBeInstanceOf<IngestWorkflow.Result.Ok<Unit>>()
+        result1.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         // 두 번째 Ingest (멱등)
         val result2 = ingestWorkflow.execute(
@@ -275,7 +276,7 @@ class E2EIntegrationTest : StringSpec({
             schemaVersion = SemVer.parse("1.0.0"),
             payloadJson = payload,
         )
-        result2.shouldBeInstanceOf<IngestWorkflow.Result.Ok<Unit>>()
+        result2.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         // Worker 실행
         worker.start()
@@ -289,7 +290,7 @@ class E2EIntegrationTest : StringSpec({
             version = 1L,
             requiredSliceTypes = listOf(SliceType.CORE),
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "E2E: Slice 없이 Query → 실패 (fail-closed)" {
@@ -304,7 +305,7 @@ class E2EIntegrationTest : StringSpec({
             version = 1L,
             requiredSliceTypes = listOf(SliceType.CORE),
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
+        queryResult.shouldBeInstanceOf<Result.Err>()
     }
 
     // ==================== 버전 업데이트 시나리오 ====================
@@ -344,8 +345,8 @@ class E2EIntegrationTest : StringSpec({
                 version = version,
                 requiredSliceTypes = listOf(SliceType.CORE),
             )
-            result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-            val viewResponse = (result as QueryViewWorkflow.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val viewResponse = (result as Result.Ok).value
             viewResponse.data.shouldContain("Product V$version")
         }
 
@@ -390,8 +391,8 @@ class E2EIntegrationTest : StringSpec({
             version = 1L,
             requiredSliceTypes = listOf(SliceType.CORE),
         )
-        resultA.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val viewResponseA = (resultA as QueryViewWorkflow.Result.Ok).value
+        resultA.shouldBeInstanceOf<Result.Ok<*>>()
+        val viewResponseA = (resultA as Result.Ok).value
         viewResponseA.data.shouldContain("Tenant A Product")
         viewResponseA.data.shouldContain("A-SECRET")
 
@@ -403,7 +404,7 @@ class E2EIntegrationTest : StringSpec({
             version = 1L,
             requiredSliceTypes = listOf(SliceType.CORE),
         )
-        crossAccess.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
+        crossAccess.shouldBeInstanceOf<Result.Err>()
     }
 
     // ==================== Hash 결정성 검증 ====================
@@ -444,13 +445,13 @@ class E2EIntegrationTest : StringSpec({
         val result1 = sliceRepo.batchGet(tenantId, listOf(key1))
         val result2 = sliceRepo.batchGet(tenantId, listOf(key2))
 
-        result1.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        result2.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
 
         @Suppress("UNCHECKED_CAST")
-        val slices1 = (result1 as SliceRepositoryPort.Result.Ok<List<com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord>>).value
+        val slices1 = (result1 as Result.Ok<List<com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord>>).value
         @Suppress("UNCHECKED_CAST")
-        val slices2 = (result2 as SliceRepositoryPort.Result.Ok<List<com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord>>).value
+        val slices2 = (result2 as Result.Ok<List<com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord>>).value
 
         // 동일 payload → 동일 Hash (결정성 보장)
         slices1[0].hash shouldBe slices2[0].hash
@@ -475,8 +476,8 @@ class E2EIntegrationTest : StringSpec({
 
         // PENDING 3개 확인 (Worker 시작 전 미처리 상태)
         val pending = outboxRepo.findPending(10)
-        pending.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        (pending as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value.size shouldBe 3
+        pending.shouldBeInstanceOf<Result.Ok<*>>()
+        (pending as Result.Ok).value.size shouldBe 3
 
         // Worker 시작 → 미처리 항목 자동 처리
         worker.start()
@@ -484,8 +485,8 @@ class E2EIntegrationTest : StringSpec({
 
         // 모든 Outbox 처리 완료
         val afterRecovery = outboxRepo.findPending(10)
-        afterRecovery.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        (afterRecovery as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value.size shouldBe 0
+        afterRecovery.shouldBeInstanceOf<Result.Ok<*>>()
+        (afterRecovery as Result.Ok).value.size shouldBe 0
 
         // 모든 Slice 생성 확인
         repeat(3) { i ->
@@ -496,7 +497,7 @@ class E2EIntegrationTest : StringSpec({
                 version = 1L,
                 requiredSliceTypes = listOf(SliceType.CORE),
             )
-            result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
+            result.shouldBeInstanceOf<Result.Ok<*>>()
         }
     }
 })

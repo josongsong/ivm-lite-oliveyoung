@@ -54,7 +54,11 @@ import com.oliveyoung.ivmlite.pkg.workflow.canvas.application.WorkflowCanvasServ
 import com.oliveyoung.ivmlite.apps.admin.application.AdminDashboardService
 import com.oliveyoung.ivmlite.apps.admin.application.AdminPipelineService
 import com.oliveyoung.ivmlite.apps.admin.application.AdminContractService
+import com.oliveyoung.ivmlite.apps.admin.application.ExplorerService
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
+import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
+import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 
 import org.jooq.DSLContext
 import org.koin.dsl.module
@@ -90,6 +94,19 @@ val adminAppModule = module {
 
     single {
         AdminContractService()
+    }
+
+    // ExplorerService - Data Explorer 기능
+    single {
+        ExplorerService(
+            rawDataRepo = get<RawDataRepositoryPort>(),
+            sliceRepo = get<SliceRepositoryPort>(),
+            queryViewWorkflow = getOrNull<QueryViewWorkflow>(),
+            contractRegistry = getOrNull<ContractRegistryPort>(),
+            ingestWorkflow = getOrNull<IngestWorkflow>(),
+            slicingWorkflow = getOrNull<SlicingWorkflow>(),
+            dsl = get<DSLContext>()
+        )
     }
 }
 

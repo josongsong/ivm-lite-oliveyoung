@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.fanout
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
@@ -70,7 +71,7 @@ class FanoutWorkflowTest : StringSpec({
         ))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -87,8 +88,8 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.status shouldBe FanoutResultStatus.SUCCESS
         fanoutResult.processedCount shouldBe 3
 
@@ -119,8 +120,8 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.totalAffected shouldBe 0
         fanoutResult.processedCount shouldBe 0
 
@@ -144,7 +145,7 @@ class FanoutWorkflowTest : StringSpec({
         setupInvertedIndex(invertedIndexRepo, tenantId, "product_by_brand", brandKey.value, products)
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         // 배치 크기 50으로 설정
         val config = FanoutConfig(
@@ -168,8 +169,8 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.processedCount shouldBe 150
 
         // SlicingWorkflow가 150번 호출되었는지 확인
@@ -222,8 +223,8 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.dependencyResults.first().status shouldBe FanoutJobStatus.SKIPPED
         fanoutResult.skippedCount shouldBe 15000
 
@@ -264,8 +265,8 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.dependencyResults.first().status shouldBe FanoutJobStatus.FAILED
         fanoutResult.failedCount shouldBe 5000
     }
@@ -304,8 +305,8 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.status shouldBe FanoutResultStatus.SKIPPED
         fanoutResult.message shouldBe "Fanout disabled"
 
@@ -324,7 +325,7 @@ class FanoutWorkflowTest : StringSpec({
         ))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val config = FanoutConfig(
             deduplicationWindow = 5.seconds,
@@ -354,12 +355,12 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result1.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        (result1 as FanoutWorkflow.Result.Ok).value.processedCount shouldBe 1
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
+        (result1 as Result.Ok).value.processedCount shouldBe 1
 
-        result2.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        (result2 as FanoutWorkflow.Result.Ok).value.status shouldBe FanoutResultStatus.SKIPPED
-        (result2 as FanoutWorkflow.Result.Ok).value.message shouldBe "Duplicate within deduplication window"
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
+        (result2 as Result.Ok).value.status shouldBe FanoutResultStatus.SKIPPED
+        (result2 as Result.Ok).value.message shouldBe "Duplicate within deduplication window"
 
         // SlicingWorkflow가 1번만 호출되어야 함
         coVerify(exactly = 1) { slicingWorkflow.execute(any(), any(), any(), any()) }
@@ -380,11 +381,11 @@ class FanoutWorkflowTest : StringSpec({
 
         // P002만 실패하도록 설정
         coEvery { slicingWorkflow.execute(tenantId, EntityKey("PRODUCT#test-tenant#P001"), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
         coEvery { slicingWorkflow.execute(tenantId, EntityKey("PRODUCT#test-tenant#P002"), any(), any()) } returns
-            SlicingWorkflow.Result.Err(DomainError.ValidationError("field", "test error"))
+            Result.Err(DomainError.ValidationError("field", "test error"))
         coEvery { slicingWorkflow.execute(tenantId, EntityKey("PRODUCT#test-tenant#P003"), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -401,8 +402,8 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.status shouldBe FanoutResultStatus.PARTIAL_FAILURE
         fanoutResult.processedCount shouldBe 2
         fanoutResult.failedCount shouldBe 1
@@ -426,8 +427,8 @@ class FanoutWorkflowTest : StringSpec({
         val result = workflow.inferDependencies("brand")
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val dependencies = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val dependencies = (result as Result.Ok).value
         dependencies.shouldHaveSize(1)
         dependencies[0].upstreamEntityType shouldBe "brand"
         dependencies[0].downstreamEntityType shouldBe "product"
@@ -450,8 +451,8 @@ class FanoutWorkflowTest : StringSpec({
         val result = workflow.inferDependencies("unknown_type")
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val dependencies = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val dependencies = (result as Result.Ok).value
         dependencies.shouldBeEmpty()
     }
 
@@ -478,7 +479,7 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then - 빈 tenantId도 처리 가능해야 함
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "version 0 처리" {
@@ -502,7 +503,7 @@ class FanoutWorkflowTest : StringSpec({
         )
 
         // Then
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     // ==================== 7. Metrics 테스트 ====================
@@ -520,7 +521,7 @@ class FanoutWorkflowTest : StringSpec({
         ))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -661,7 +662,7 @@ private fun createMockContractRegistry(): ContractRegistryPort {
     )
 
     coEvery { registry.loadRuleSetContract(any()) } returns
-        ContractRegistryPort.Result.Ok(ruleSet)
+        Result.Ok(ruleSet)
 
     return registry
 }

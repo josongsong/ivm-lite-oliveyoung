@@ -74,24 +74,25 @@
   align-items: center;
   gap: 0.375rem;
   padding: 0.5rem 0.75rem;
-  background: var(--bg-tertiary);
+  background: transparent;
   border: 1px solid var(--border-color);
   border-radius: var(--radius-md);
   font-size: 0.75rem;
   font-weight: 500;
   color: var(--text-secondary);
   cursor: pointer;
-  transition: all 0.15s ease;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.action-btn:hover {
-  background: var(--bg-primary);
-  border-color: var(--accent-cyan);
-  color: var(--accent-cyan);
+.action-btn:hover:not(:disabled) {
+  background: var(--bg-hover);
+  border-color: var(--border-accent);
+  color: var(--text-primary);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.1);
 }
 
 .action-btn.active {
-  background: rgba(99, 179, 237, 0.15);
+  background: rgba(0, 212, 255, 0.15);
   border-color: var(--accent-cyan);
   color: var(--accent-cyan);
 }

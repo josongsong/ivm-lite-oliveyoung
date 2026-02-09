@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAda
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import kotlinx.coroutines.runBlocking
 import org.slf4j.LoggerFactory
@@ -101,18 +102,20 @@ object SeedContractsToDynamoDB {
                         }
                     }
 
-                    if (dynamoResult is ContractRegistryPort.Result.Ok) {
+                    @Suppress("UNCHECKED_CAST")
+                    val typedDynamoResult = dynamoResult as Result<Any>
+                    if (typedDynamoResult.isOk) {
                         log.info("⏭️  Contract already exists: $kind#$id@$version (skipping)")
                         skipCount++
                         return@forEach
                     }
 
                     // YAML에서 Contract 객체 로드
-                    val contractResult = when (kind.uppercase()) {
-                        "RULESET" -> yamlAdapter.loadRuleSetContract(ref)
-                        "CHANGESET", "CHANGESETCONTRACT" -> yamlAdapter.loadChangeSetContract(ref)
-                        "JOIN_SPEC", "JOINSPECCONTRACT" -> yamlAdapter.loadJoinSpecContract(ref)
-                        "VIEW_DEFINITION", "VIEWDEFINITIONCONTRACT" -> yamlAdapter.loadViewDefinitionContract(ref)
+                    val contractResult: Result<Any> = when (kind.uppercase()) {
+                        "RULESET" -> yamlAdapter.loadRuleSetContract(ref) as Result<Any>
+                        "CHANGESET", "CHANGESETCONTRACT" -> yamlAdapter.loadChangeSetContract(ref) as Result<Any>
+                        "JOIN_SPEC", "JOINSPECCONTRACT" -> yamlAdapter.loadJoinSpecContract(ref) as Result<Any>
+                        "VIEW_DEFINITION", "VIEWDEFINITIONCONTRACT" -> yamlAdapter.loadViewDefinitionContract(ref) as Result<Any>
                         else -> {
                             log.warn("⚠️  Unknown contract kind: $kind in ${file.name}, skipping")
                             skipCount++
@@ -120,8 +123,9 @@ object SeedContractsToDynamoDB {
                         }
                     }
 
-                    if (contractResult !is ContractRegistryPort.Result.Ok) {
-                        log.error("❌ Failed to parse contract from YAML: ${(contractResult as ContractRegistryPort.Result.Err).error}")
+                    val contract = contractResult.getOrNull()
+                    if (contract == null) {
+                        log.error("❌ Failed to parse contract from YAML: ${contractResult.errorOrNull()}")
                         errorCount++
                         return@forEach
                     }
@@ -131,17 +135,17 @@ object SeedContractsToDynamoDB {
                         log.info("🔍 [DRY RUN] Would upload: $kind#$id@$version")
                         successCount++
                     } else {
-                        val saveResult = when (kind.uppercase()) {
-                            "RULESET" -> adapter.saveRuleSetContract(contractResult.value as com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract)
+                        val saveResult: Result<Unit> = when (kind.uppercase()) {
+                            "RULESET" -> adapter.saveRuleSetContract(contract as com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract)
                             "CHANGESET", "CHANGESETCONTRACT" -> {
-                                val csContract = contractResult.value as com.oliveyoung.ivmlite.pkg.contracts.domain.ChangeSetContract
+                                val csContract = contract as com.oliveyoung.ivmlite.pkg.contracts.domain.ChangeSetContract
                                 adapter.saveChangeSetContract(csContract)
                             }
                             "JOIN_SPEC", "JOINSPECCONTRACT" -> {
-                                val jsContract = contractResult.value as com.oliveyoung.ivmlite.pkg.contracts.domain.JoinSpecContract
+                                val jsContract = contract as com.oliveyoung.ivmlite.pkg.contracts.domain.JoinSpecContract
                                 adapter.saveJoinSpecContract(jsContract)
                             }
-                            "VIEW_DEFINITION", "VIEWDEFINITIONCONTRACT" -> adapter.saveViewDefinitionContract(contractResult.value as com.oliveyoung.ivmlite.pkg.contracts.domain.ViewDefinitionContract)
+                            "VIEW_DEFINITION", "VIEWDEFINITIONCONTRACT" -> adapter.saveViewDefinitionContract(contract as com.oliveyoung.ivmlite.pkg.contracts.domain.ViewDefinitionContract)
                             else -> {
                                 log.error("❌ Unsupported contract kind for save: $kind")
                                 errorCount++
@@ -149,11 +153,11 @@ object SeedContractsToDynamoDB {
                             }
                         }
 
-                        if (saveResult is ContractRegistryPort.Result.Ok) {
+                        if (saveResult.isOk) {
                             log.info("✅ Uploaded: $kind#$id@$version")
                             successCount++
                         } else {
-                            log.error("❌ Failed to upload $kind#$id@$version: ${(saveResult as ContractRegistryPort.Result.Err).error}")
+                            log.error("❌ Failed to upload $kind#$id@$version: ${saveResult.errorOrNull()}")
                             errorCount++
                         }
                     }

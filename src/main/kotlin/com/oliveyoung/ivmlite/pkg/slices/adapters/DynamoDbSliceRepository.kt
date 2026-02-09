@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
 import com.oliveyoung.ivmlite.pkg.slices.domain.Tombstone
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
@@ -45,7 +46,7 @@ class DynamoDbSliceRepository(
         }
     }
 
-    override suspend fun putAllIdempotent(slices: List<SliceRecord>): SliceRepositoryPort.Result<Unit> {
+    override suspend fun putAllIdempotent(slices: List<SliceRecord>): Result<Unit> {
         return try {
             for (slice in slices) {
                 val pk = buildPK(slice.tenantId, slice.entityKey)
@@ -57,7 +58,7 @@ class DynamoDbSliceRepository(
                     val existingHash = existing["hash"]?.s()
                         ?: throw DomainError.StorageError("Missing required field 'hash' in existing DynamoDB slice item for $pk/$sk")
                     if (existingHash != slice.hash) {
-                        return SliceRepositoryPort.Result.Err(
+                        return Result.Err(
                             DomainError.InvariantViolation("Slice invariant mismatch for $pk/$sk")
                         )
                     }
@@ -72,9 +73,9 @@ class DynamoDbSliceRepository(
                 }
             }
 
-            SliceRepositoryPort.Result.Ok(Unit)
+            Result.Ok(Unit)
         } catch (e: Exception) {
-            SliceRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB putAllIdempotent failed: ${e.message}")
             )
         }
@@ -84,24 +85,58 @@ class DynamoDbSliceRepository(
         tenantId: TenantId,
         keys: List<SliceRepositoryPort.SliceKey>,
         includeTombstones: Boolean
-    ): SliceRepositoryPort.Result<List<SliceRecord>> {
+    ): Result<List<SliceRecord>> {
+        if (keys.isEmpty()) {
+            return Result.Ok(emptyList())
+        }
+
         return try {
+            // N+1 방지: BatchGetItem API 사용 (최대 100개 동시 처리)
+            val batchKeys: List<Map<String, AttributeValue>> = keys.map { key ->
+                mapOf(
+                    "PK" to AttributeValue.builder().s(buildPK(key.tenantId, key.entityKey)).build(),
+                    "SK" to AttributeValue.builder().s(buildSK(key.version, key.sliceType)).build()
+                )
+            }
+
+            // DynamoDB BatchGetItem은 최대 100개 제한
+            val allFetchedItems = mutableMapOf<String, Map<String, AttributeValue>>()
+            for (chunk in batchKeys.chunked(100)) {
+                val response = dynamoClient.batchGetItem { builder ->
+                    builder.requestItems(
+                        mapOf(tableName to KeysAndAttributes.builder().keys(chunk).build())
+                    )
+                }.await()
+
+                val items = response.responses()[tableName] ?: continue
+                for (item in items) {
+                    val itemPk = item["PK"]?.s() ?: continue
+                    val itemSk = item["SK"]?.s() ?: continue
+                    allFetchedItems["$itemPk|$itemSk"] = item
+                }
+            }
+
+            // 요청 순서대로 결과 매핑, 누락 시 에러
             val results = mutableListOf<SliceRecord>()
             for (key in keys) {
                 val pk = buildPK(key.tenantId, key.entityKey)
                 val sk = buildSK(key.version, key.sliceType)
-                val item = getItem(pk, sk)
-                    ?: return SliceRepositoryPort.Result.Err(
+                val item = allFetchedItems["$pk|$sk"]
+                    ?: return Result.Err(
                         DomainError.NotFoundError(
                             "Slice",
                             "${key.tenantId.value}:${key.entityKey.value}:${key.sliceType.name}@${key.version}"
                         )
                     )
-                val record = parseSliceRecord(item)
+
+                val record = when (val r = parseSliceRecord(item)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
                 if (includeTombstones || record.tombstone == null) {
                     results.add(record)
                 } else {
-                    return SliceRepositoryPort.Result.Err(
+                    return Result.Err(
                         DomainError.NotFoundError(
                             "Slice",
                             "${key.tenantId.value}:${key.entityKey.value}:${key.sliceType.name}@${key.version} (tombstone)"
@@ -109,11 +144,10 @@ class DynamoDbSliceRepository(
                     )
                 }
             }
-            SliceRepositoryPort.Result.Ok(results)
-        } catch (e: DomainError) {
-            SliceRepositoryPort.Result.Err(e)
+
+            Result.Ok(results)
         } catch (e: Exception) {
-            SliceRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB batchGet failed: ${e.message}")
             )
         }
@@ -124,7 +158,7 @@ class DynamoDbSliceRepository(
         entityKey: EntityKey,
         version: Long,
         includeTombstones: Boolean
-    ): SliceRepositoryPort.Result<List<SliceRecord>> {
+    ): Result<List<SliceRecord>> {
         return try {
             val pk = buildPK(tenantId, entityKey)
             val skPrefix = "SLICE#v${version.toString().padStart(10, '0')}#"
@@ -140,20 +174,19 @@ class DynamoDbSliceRepository(
                 )
             }.await()
 
-            val slices = response.items().mapNotNull { item ->
-                try {
-                    val record = parseSliceRecord(item)
-                    if (includeTombstones || record.tombstone == null) record else null
-                } catch (e: DomainError) {
-                    // 파싱 실패 시 에러를 던져서 전체 조회를 실패로 처리
-                    throw e
+            val slices = mutableListOf<SliceRecord>()
+            for (item in response.items()) {
+                val record = when (val r = parseSliceRecord(item)) {
+                    is Result.Ok -> r.value
+                    is Result.Err -> return r
+                }
+                if (includeTombstones || record.tombstone == null) {
+                    slices.add(record)
                 }
             }
-            SliceRepositoryPort.Result.Ok(slices)
-        } catch (e: DomainError) {
-            SliceRepositoryPort.Result.Err(e)
+            Result.Ok(slices)
         } catch (e: Exception) {
-            SliceRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("DynamoDB getByVersion failed: ${e.message}")
             )
         }
@@ -197,33 +230,33 @@ class DynamoDbSliceRepository(
         return item
     }
 
-    private fun parseSliceRecord(item: Map<String, AttributeValue>): SliceRecord {
+    private fun parseSliceRecord(item: Map<String, AttributeValue>): Result<SliceRecord> {
         val tenantIdStr = item["tenant_id"]?.s()
-            ?: throw DomainError.StorageError("Missing required field 'tenant_id' in DynamoDB item")
+            ?: return Result.Err(DomainError.StorageError("Missing required field 'tenant_id' in DynamoDB item"))
         val entityKeyStr = item["entity_key"]?.s()
-            ?: throw DomainError.StorageError("Missing required field 'entity_key' in DynamoDB item")
+            ?: return Result.Err(DomainError.StorageError("Missing required field 'entity_key' in DynamoDB item"))
         val versionStr = item["version"]?.n()
-            ?: throw DomainError.StorageError("Missing required field 'version' in DynamoDB item")
+            ?: return Result.Err(DomainError.StorageError("Missing required field 'version' in DynamoDB item"))
         val version = versionStr.toLongOrNull()
-            ?: throw DomainError.StorageError("Invalid version format in DynamoDB item: $versionStr")
+            ?: return Result.Err(DomainError.StorageError("Invalid version format in DynamoDB item: $versionStr"))
         val sliceTypeStr = item["slice_type"]?.s()
-            ?: throw DomainError.StorageError("Missing required field 'slice_type' in DynamoDB item")
+            ?: return Result.Err(DomainError.StorageError("Missing required field 'slice_type' in DynamoDB item"))
         val data = item["data"]?.s()
-            ?: throw DomainError.StorageError("Missing required field 'data' in DynamoDB item")
+            ?: return Result.Err(DomainError.StorageError("Missing required field 'data' in DynamoDB item"))
         val hash = item["hash"]?.s()
-            ?: throw DomainError.StorageError("Missing required field 'hash' in DynamoDB item")
+            ?: return Result.Err(DomainError.StorageError("Missing required field 'hash' in DynamoDB item"))
         val ruleSetId = item["rule_set_id"]?.s()
-            ?: throw DomainError.StorageError("Missing required field 'rule_set_id' in DynamoDB item")
+            ?: return Result.Err(DomainError.StorageError("Missing required field 'rule_set_id' in DynamoDB item"))
         val ruleSetVersionStr = item["rule_set_version"]?.s()
-            ?: throw DomainError.StorageError("Missing required field 'rule_set_version' in DynamoDB item")
+            ?: return Result.Err(DomainError.StorageError("Missing required field 'rule_set_version' in DynamoDB item"))
 
         val tombstone = if (item["tombstone_deleted"]?.bool() == true) {
             val deletedAtVersionStr = item["tombstone_deleted_at_version"]?.n()
-                ?: throw DomainError.StorageError("Missing required field 'tombstone_deleted_at_version' in DynamoDB item when tombstone_deleted is true")
+                ?: return Result.Err(DomainError.StorageError("Missing required field 'tombstone_deleted_at_version' in DynamoDB item when tombstone_deleted is true"))
             val deletedAtVersion = deletedAtVersionStr.toLongOrNull()
-                ?: throw DomainError.StorageError("Invalid tombstone_deleted_at_version format in DynamoDB item: $deletedAtVersionStr")
+                ?: return Result.Err(DomainError.StorageError("Invalid tombstone_deleted_at_version format in DynamoDB item: $deletedAtVersionStr"))
             val deleteReasonStr = item["tombstone_delete_reason"]?.s()
-                ?: throw DomainError.StorageError("Missing required field 'tombstone_delete_reason' in DynamoDB item when tombstone_deleted is true")
+                ?: return Result.Err(DomainError.StorageError("Missing required field 'tombstone_delete_reason' in DynamoDB item when tombstone_deleted is true"))
             val deleteReason = com.oliveyoung.ivmlite.pkg.slices.domain.DeleteReason.fromDbValue(deleteReasonStr)
             Tombstone(
                 isDeleted = true,
@@ -233,7 +266,7 @@ class DynamoDbSliceRepository(
         } else null
 
         return try {
-            SliceRecord(
+            Result.Ok(SliceRecord(
                 tenantId = TenantId(tenantIdStr),
                 entityKey = EntityKey(entityKeyStr),
                 version = version,
@@ -243,11 +276,11 @@ class DynamoDbSliceRepository(
                 ruleSetId = ruleSetId,
                 ruleSetVersion = SemVer.parse(ruleSetVersionStr),
                 tombstone = tombstone
-            )
+            ))
         } catch (e: IllegalArgumentException) {
-            throw DomainError.StorageError("Invalid SliceType or SemVer in DynamoDB item: ${e.message}")
+            Result.Err(DomainError.StorageError("Invalid SliceType or SemVer in DynamoDB item: ${e.message}"))
         } catch (e: Exception) {
-            throw DomainError.StorageError("Failed to parse SliceRecord from DynamoDB item: ${e.message}")
+            Result.Err(DomainError.StorageError("Failed to parse SliceRecord from DynamoDB item: ${e.message}"))
         }
     }
 
@@ -257,7 +290,7 @@ class DynamoDbSliceRepository(
         sliceType: SliceType?,
         limit: Int,
         cursor: String?
-    ): SliceRepositoryPort.Result<SliceRepositoryPort.RangeQueryResult> {
+    ): Result<SliceRepositoryPort.RangeQueryResult> {
         return try {
             val pkPrefix = "TENANT#${tenantId.value}#ENTITY#$keyPrefix"
             
@@ -280,12 +313,15 @@ class DynamoDbSliceRepository(
             val response = dynamoClient.query(requestBuilder.build()).await()
             
             val items = response.items().mapNotNull { item ->
-                try {
-                    val record = parseSliceRecord(item)
-                    if (sliceType == null || record.sliceType == sliceType) {
-                        if (record.tombstone == null) record else null
-                    } else null
-                } catch (e: Exception) { null }
+                when (val r = parseSliceRecord(item)) {
+                    is Result.Ok -> {
+                        val record = r.value
+                        if (sliceType == null || record.sliceType == sliceType) {
+                            if (record.tombstone == null) record else null
+                        } else null
+                    }
+                    is Result.Err -> null  // 파싱 실패 시 스킵
+                }
             }
             
             val hasMore = items.size > limit
@@ -295,13 +331,13 @@ class DynamoDbSliceRepository(
                 "${last["PK"]?.s()}|${last["SK"]?.s()}"
             } else null
             
-            SliceRepositoryPort.Result.Ok(SliceRepositoryPort.RangeQueryResult(
+            Result.Ok(SliceRepositoryPort.RangeQueryResult(
                 items = resultItems,
                 nextCursor = nextCursor,
                 hasMore = hasMore
             ))
         } catch (e: Exception) {
-            SliceRepositoryPort.Result.Err(DomainError.StorageError("DynamoDB findByKeyPrefix failed: ${e.message}"))
+            Result.Err(DomainError.StorageError("DynamoDB findByKeyPrefix failed: ${e.message}"))
         }
     }
 
@@ -309,7 +345,7 @@ class DynamoDbSliceRepository(
         tenantId: TenantId,
         keyPrefix: String?,
         sliceType: SliceType?
-    ): SliceRepositoryPort.Result<Long> {
+    ): Result<Long> {
         return try {
             val pkPattern = if (keyPrefix != null) {
                 "TENANT#${tenantId.value}#ENTITY#$keyPrefix"
@@ -326,9 +362,9 @@ class DynamoDbSliceRepository(
                 it.select(Select.COUNT)
             }.await()
             
-            SliceRepositoryPort.Result.Ok(response.count().toLong())
+            Result.Ok(response.count().toLong())
         } catch (e: Exception) {
-            SliceRepositoryPort.Result.Err(DomainError.StorageError("DynamoDB count failed: ${e.message}"))
+            Result.Err(DomainError.StorageError("DynamoDB count failed: ${e.message}"))
         }
     }
 
@@ -336,7 +372,7 @@ class DynamoDbSliceRepository(
         tenantId: TenantId,
         entityKey: EntityKey,
         sliceType: SliceType?
-    ): SliceRepositoryPort.Result<List<SliceRecord>> {
+    ): Result<List<SliceRecord>> {
         return try {
             val pk = buildPK(tenantId, entityKey)
             
@@ -355,27 +391,30 @@ class DynamoDbSliceRepository(
             }.await()
             
             if (response.items().isEmpty()) {
-                return SliceRepositoryPort.Result.Ok(emptyList())
+                return Result.Ok(emptyList())
             }
             
             val allSlices = response.items().mapNotNull { item ->
-                try {
-                    val record = parseSliceRecord(item)
-                    if (record.tombstone == null) record else null
-                } catch (e: Exception) { null }
+                when (val r = parseSliceRecord(item)) {
+                    is Result.Ok -> {
+                        val record = r.value
+                        if (record.tombstone == null) record else null
+                    }
+                    is Result.Err -> null  // 파싱 실패 시 스킵
+                }
             }
             
             if (allSlices.isEmpty()) {
-                return SliceRepositoryPort.Result.Ok(emptyList())
+                return Result.Ok(emptyList())
             }
             
             val latestVersion = allSlices.maxOf { it.version }
             val result = allSlices.filter { it.version == latestVersion }
                 .filter { sliceType == null || it.sliceType == sliceType }
             
-            SliceRepositoryPort.Result.Ok(result)
+            Result.Ok(result)
         } catch (e: Exception) {
-            SliceRepositoryPort.Result.Err(DomainError.StorageError("DynamoDB getLatestVersion failed: ${e.message}"))
+            Result.Err(DomainError.StorageError("DynamoDB getLatestVersion failed: ${e.message}"))
         }
     }
 

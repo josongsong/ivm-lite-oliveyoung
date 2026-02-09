@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
 import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
@@ -65,7 +66,7 @@ class JooqInvertedIndexRepository(
         private val IS_TOMBSTONE = DSL.field("is_tombstone", Boolean::class.java)
     }
 
-    override suspend fun putAllIdempotent(entries: List<InvertedIndexEntry>): InvertedIndexRepositoryPort.Result<Unit> =
+    override suspend fun putAllIdempotent(entries: List<InvertedIndexEntry>): Result<Unit> =
         tracer.withSpanSuspend(
             "PostgreSQL.putAllIdempotent",
             mapOf(
@@ -76,7 +77,7 @@ class JooqInvertedIndexRepository(
         ) {
             withContext(Dispatchers.IO) {
                 if (entries.isEmpty()) {
-                    return@withContext InvertedIndexRepositoryPort.Result.Ok(Unit)
+                    return@withContext Result.Ok(Unit)
                 }
 
                 try {
@@ -144,12 +145,12 @@ class JooqInvertedIndexRepository(
                     }
                 }
 
-                    InvertedIndexRepositoryPort.Result.Ok(Unit)
+                    Result.Ok(Unit)
                 } catch (e: DomainError.InvariantViolation) {
-                    InvertedIndexRepositoryPort.Result.Err(e)
+                    Result.Err(e)
                 } catch (e: Exception) {
                     logger.error("Failed to put inverted indexes", e)
-                    InvertedIndexRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.StorageError("Failed to put inverted indexes: ${e.message}"),
                     )
                 }
@@ -160,7 +161,7 @@ class JooqInvertedIndexRepository(
         tenantId: TenantId,
         refPk: String,
         limit: Int,
-    ): InvertedIndexRepositoryPort.Result<List<InvertedIndexEntry>> = withContext(Dispatchers.IO) {
+    ): Result<List<InvertedIndexEntry>> = withContext(Dispatchers.IO) {
         try {
             val rows = dsl.selectFrom(TABLE)
                 .where(TENANT_ID.eq(tenantId.value))
@@ -212,12 +213,12 @@ class JooqInvertedIndexRepository(
                 }
             }
 
-            InvertedIndexRepositoryPort.Result.Ok(results)
+            Result.Ok(results)
         } catch (e: DomainError) {
-            InvertedIndexRepositoryPort.Result.Err(e)
+            Result.Err(e)
         } catch (e: Exception) {
             logger.error("Failed to list inverted index targets", e)
-            InvertedIndexRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to list inverted index targets: ${e.message}"),
             )
         }
@@ -232,7 +233,7 @@ class JooqInvertedIndexRepository(
         indexValue: String,
         limit: Int,
         cursor: String?,
-    ): InvertedIndexRepositoryPort.Result<com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult> = withContext(Dispatchers.IO) {
+    ): Result<com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult> = withContext(Dispatchers.IO) {
         try {
             // 조건 구성
             var condition = TENANT_ID.eq(tenantId.value)
@@ -270,12 +271,12 @@ class JooqInvertedIndexRepository(
             
             val nextCursor = if (hasMore) entries.lastOrNull()?.entityKey?.value else null
             
-            InvertedIndexRepositoryPort.Result.Ok(
+            Result.Ok(
                 com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult(entries, nextCursor)
             )
         } catch (e: Exception) {
             logger.error("Failed to queryByIndexType", e)
-            InvertedIndexRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to queryByIndexType: ${e.message}")
             )
         }
@@ -288,7 +289,7 @@ class JooqInvertedIndexRepository(
         tenantId: TenantId,
         indexType: String,
         indexValue: String,
-    ): InvertedIndexRepositoryPort.Result<Long> = withContext(Dispatchers.IO) {
+    ): Result<Long> = withContext(Dispatchers.IO) {
         try {
             val count = dsl.selectCount()
                 .from(TABLE)
@@ -298,10 +299,10 @@ class JooqInvertedIndexRepository(
                 .and(IS_TOMBSTONE.eq(false).or(IS_TOMBSTONE.isNull))
                 .fetchOne(0, Long::class.java) ?: 0L
             
-            InvertedIndexRepositoryPort.Result.Ok(count)
+            Result.Ok(count)
         } catch (e: Exception) {
             logger.error("Failed to countByIndexType", e)
-            InvertedIndexRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to countByIndexType: ${e.message}")
             )
         }
@@ -315,7 +316,7 @@ class JooqInvertedIndexRepository(
         indexType: String,
         indexValue: String,
         limit: Int = 100,
-    ): InvertedIndexRepositoryPort.Result<List<InvertedIndexEntry>> = withContext(Dispatchers.IO) {
+    ): Result<List<InvertedIndexEntry>> = withContext(Dispatchers.IO) {
         try {
             val rows = dsl.selectFrom(TABLE)
                 .where(TENANT_ID.eq(tenantId.value))
@@ -363,12 +364,12 @@ class JooqInvertedIndexRepository(
                 }
             }
 
-            InvertedIndexRepositoryPort.Result.Ok(results)
+            Result.Ok(results)
         } catch (e: DomainError) {
-            InvertedIndexRepositoryPort.Result.Err(e)
+            Result.Err(e)
         } catch (e: Exception) {
             logger.error("Failed to query inverted index", e)
-            InvertedIndexRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to query inverted index: ${e.message}"),
             )
         }

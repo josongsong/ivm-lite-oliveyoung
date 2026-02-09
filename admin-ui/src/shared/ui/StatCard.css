@@ -1,0 +1,101 @@
+/**
+ * StatCard Component Styles
+ */
+
+.ui-stat-card {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.875rem 1rem;
+  background: var(--gradient-card, linear-gradient(145deg, rgba(26, 26, 37, 0.8) 0%, rgba(21, 21, 31, 0.9) 100%));
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-md, 10px);
+  transition: all 0.2s ease;
+}
+
+.ui-stat-card:hover {
+  border-color: var(--accent-cyan, #00d4ff);
+  transform: translateY(-1px);
+}
+
+.ui-stat-card--error {
+  border-color: rgba(255, 68, 102, 0.3);
+}
+
+.ui-stat-card--error:hover {
+  border-color: var(--status-error, #ff4466);
+}
+
+.ui-stat-card--warning {
+  border-color: rgba(255, 204, 0, 0.3);
+}
+
+.ui-stat-card--warning:hover {
+  border-color: var(--status-warning, #ffcc00);
+}
+
+.ui-stat-card--accent {
+  border-color: rgba(136, 85, 255, 0.3);
+}
+
+.ui-stat-card--accent:hover {
+  border-color: var(--accent-purple, #8855ff);
+}
+
+.ui-stat-card--success {
+  border-color: rgba(0, 255, 136, 0.3);
+}
+
+.ui-stat-card--success:hover {
+  border-color: var(--status-success, #00ff88);
+}
+
+.ui-stat-card__icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: var(--bg-tertiary, #1a1a25);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--accent-cyan, #00d4ff);
+  flex-shrink: 0;
+}
+
+.ui-stat-card--error .ui-stat-card__icon {
+  color: var(--status-error, #ff4466);
+}
+
+.ui-stat-card--warning .ui-stat-card__icon {
+  color: var(--status-warning, #ffcc00);
+}
+
+.ui-stat-card--accent .ui-stat-card__icon {
+  color: var(--accent-purple, #8855ff);
+}
+
+.ui-stat-card--success .ui-stat-card__icon {
+  color: var(--status-success, #00ff88);
+}
+
+.ui-stat-card__content {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.ui-stat-card__value {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.95rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0f0f5);
+  line-height: 1.2;
+}
+
+.ui-stat-card__label {
+  font-size: 0.7rem;
+  color: var(--text-muted, #6a6a80);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}

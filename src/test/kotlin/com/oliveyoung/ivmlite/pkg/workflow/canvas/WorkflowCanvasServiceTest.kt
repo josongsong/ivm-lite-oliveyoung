@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.workflow.canvas
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.observability.domain.*
 import com.oliveyoung.ivmlite.pkg.observability.ports.MetricsCollectorPort
@@ -90,8 +91,8 @@ class WorkflowCanvasServiceTest : StringSpec({
 
         val result = service.getNodeDetail("rawdata_PRODUCT")
 
-        result.shouldBeInstanceOf<WorkflowCanvasService.Result.Ok<*>>()
-        val detail = (result as WorkflowCanvasService.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val detail = (result as Result.Ok).value
 
         detail.node.id shouldBe "rawdata_PRODUCT"
         detail.node.type shouldBe NodeType.RAWDATA
@@ -107,7 +108,7 @@ class WorkflowCanvasServiceTest : StringSpec({
 
         val result = service.getNodeDetail("nonexistent_node")
 
-        result.shouldBeInstanceOf<WorkflowCanvasService.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
 
     "워크플로우 통계 조회" {
@@ -157,7 +158,7 @@ class WorkflowCanvasServiceTest : StringSpec({
         )
 
         val result = service.getNodeDetail("rawdata_PRODUCT")
-        val detail = (result as WorkflowCanvasService.Result.Ok).value
+        val detail = (result as Result.Ok).value
 
         // RawData 노드는 Contract ID가 있음
         (detail.relatedContracts.isNotEmpty() || detail.node.contractId != null) shouldBe true

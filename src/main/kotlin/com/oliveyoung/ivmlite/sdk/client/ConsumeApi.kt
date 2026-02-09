@@ -5,6 +5,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.shared.config.WorkerConfig
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.Topic
 import com.oliveyoung.ivmlite.shared.domain.types.TopicConfig
 import kotlinx.coroutines.flow.Flow
@@ -84,8 +85,8 @@ class ConsumeApi(
         }
         
         return when (result) {
-            is OutboxRepositoryPort.Result.Ok -> result.value
-            is OutboxRepositoryPort.Result.Err -> emptyList()
+            is Result.Ok -> result.value
+            is Result.Err -> emptyList()
         }
     }
 

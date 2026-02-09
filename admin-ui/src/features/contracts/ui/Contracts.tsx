@@ -82,13 +82,24 @@ export function Contracts() {
     retry: 1,
   })
 
-  const filteredContracts = contractsData?.contracts?.filter(contract => {
+  // 중복 제거: kind + id + version 조합으로 유니크 필터링
+  const uniqueContracts = (() => {
+    const seen = new Set<string>()
+    return (contractsData?.contracts ?? []).filter(contract => {
+      const key = `${contract.kind}-${contract.id}-${contract.version}`
+      if (seen.has(key)) return false
+      seen.add(key)
+      return true
+    })
+  })()
+
+  const filteredContracts = uniqueContracts.filter(contract => {
     const matchesKind = selectedKind === 'all' || contract.kind === selectedKind
     const matchesSearch = !searchTerm ||
       contract.id.toLowerCase().includes(searchTerm.toLowerCase()) ||
       contract.kind.toLowerCase().includes(searchTerm.toLowerCase())
     return matchesKind && matchesSearch
-  }) ?? []
+  })
 
   if (isLoading) return <Loading />
 
@@ -101,9 +112,9 @@ export function Contracts() {
     )
   }
 
-  // 실제 contract 목록에서 kind별 개수 계산 (동기화)
+  // 실제 contract 목록에서 kind별 개수 계산 (중복 제거된 데이터 사용)
   const actualByKind: Record<string, number> = {}
-  contractsData?.contracts?.forEach(c => {
+  uniqueContracts.forEach(c => {
     actualByKind[c.kind] = (actualByKind[c.kind] || 0) + 1
   })
 
@@ -119,7 +130,7 @@ export function Contracts() {
       >
         <div className="stat-overview">
           <div className="stat-total">
-            <span className="stat-number">{contractsData?.contracts?.length ?? 0}</span>
+            <span className="stat-number">{uniqueContracts.length}</span>
             <span className="stat-text">Total Contracts</span>
           </div>
           <div className="stat-breakdown-grid">
@@ -208,12 +219,12 @@ export function Contracts() {
         transition={{ delay: 0.2 }}
       >
         <AnimatePresence mode="popLayout">
-          {filteredContracts.map((contract) => {
+          {filteredContracts.map((contract, index) => {
             const info = contractKindInfo[contract.kind] || { label: contract.kind, color: 'cyan', description: '' }
             
             return (
               <motion.div
-                key={`${contract.kind}-${contract.id}-${contract.version}`}
+                key={`${contract.kind}-${contract.id}-${contract.version}-${index}`}
                 layout
                 initial={{ opacity: 0, scale: 0.9 }}
                 animate={{ opacity: 1, scale: 1 }}

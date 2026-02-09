@@ -38,3 +38,65 @@ export const APP_INFO = {
   VERSION: '1.0.0',
   NAME: 'IVM Lite Admin',
 } as const
+
+/** Contract 종류별 정보 */
+export type ContractKind = 'ENTITY_SCHEMA' | 'RULESET' | 'VIEW_DEFINITION' | 'SINKRULE'
+
+export interface ContractKindInfo {
+  label: string
+  description: string
+  color: string
+  icon: string
+}
+
+const CONTRACT_KIND_INFO: Record<ContractKind, ContractKindInfo> = {
+  ENTITY_SCHEMA: {
+    label: 'Entity Schema',
+    description: '엔티티 스키마 정의',
+    color: '#00d4ff',
+    icon: 'Database',
+  },
+  RULESET: {
+    label: 'Ruleset',
+    description: '변환 규칙 정의',
+    color: '#8855ff',
+    icon: 'Cog',
+  },
+  VIEW_DEFINITION: {
+    label: 'View Definition',
+    description: '뷰 정의',
+    color: '#00ff88',
+    icon: 'Eye',
+  },
+  SINKRULE: {
+    label: 'Sink Rule',
+    description: '외부 전송 규칙',
+    color: '#ffaa00',
+    icon: 'Send',
+  },
+}
+
+export function getContractKindInfo(kind: string): ContractKindInfo {
+  return CONTRACT_KIND_INFO[kind as ContractKind] ?? {
+    label: kind,
+    description: '',
+    color: '#666',
+    icon: 'File',
+  }
+}
+
+/** Explorer 기본 설정 */
+export const EXPLORER_DEFAULTS = {
+  /** 기본 탭 */
+  DEFAULT_TAB: 'rawdata' as const,
+  /** 목록 기본 limit */
+  DEFAULT_LIMIT: 50,
+  /** 최근 검색 저장 개수 */
+  SEARCH_HISTORY_LIMIT: 10,
+  /** 페이지 사이즈 옵션 */
+  PAGE_SIZE_OPTIONS: [10, 25, 50, 100] as const,
+  /** 기본 테넌트 */
+  DEFAULT_TENANT: 'default',
+  /** 기본 페이지 사이즈 */
+  DEFAULT_PAGE_SIZE: 25,
+} as const

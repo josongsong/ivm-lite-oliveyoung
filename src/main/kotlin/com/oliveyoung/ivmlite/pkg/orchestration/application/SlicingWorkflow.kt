@@ -13,6 +13,7 @@ import com.oliveyoung.ivmlite.pkg.slices.ports.SlicingEnginePort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
@@ -72,27 +73,27 @@ class SlicingWorkflow(
             ),
         ) {
             val raw = when (val r = rawRepo.get(tenantId, entityKey, version)) {
-                is RawDataRepositoryPort.Result.Ok -> r.value
-                is RawDataRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             // RFC-IMPL-010 D-3: SlicingEngine을 사용하여 RuleSet 기반 슬라이싱
             val slicingResult: SlicingEnginePort.SlicingResult = when (val r = slicingEngine.slice(raw, ruleSetRef)) {
-                is SlicingEnginePort.Result.Ok -> r.value
-                is SlicingEnginePort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             val put = sliceRepo.putAllIdempotent(slicingResult.slices)
             when (put) {
-                is SliceRepositoryPort.Result.Ok -> Unit
-                is SliceRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(put.error)
+                is Result.Ok -> Unit
+                is Result.Err -> return@withSpanSuspend Result.Err(put.error)
             }
 
             // RFC-IMPL-010 Phase D-9: Inverted Indexes 저장
             val putIndexes = invertedIndexRepo.putAllIdempotent(slicingResult.indexes)
             when (putIndexes) {
-                is InvertedIndexRepositoryPort.Result.Ok -> Unit
-                is InvertedIndexRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(putIndexes.error)
+                is Result.Ok -> Unit
+                is Result.Err -> return@withSpanSuspend Result.Err(putIndexes.error)
             }
 
             val keys = slicingResult.slices.map { slice ->
@@ -156,8 +157,8 @@ class SlicingWorkflow(
             //    이 경우 안전하게 FULL로 폴백
             val fromVersion = version - 1
             val hasPreviousVersion = when (rawRepo.get(tenantId, entityKey, fromVersion)) {
-                is RawDataRepositoryPort.Result.Ok -> true
-                is RawDataRepositoryPort.Result.Err -> false
+                is Result.Ok -> true
+                is Result.Err -> false
             }
 
             // 3. 이전 버전이 있으면 INCREMENTAL, 없으면 FULL
@@ -205,12 +206,12 @@ class SlicingWorkflow(
         ) {
             // 1. RawData 로드
             val fromRaw = when (val r = rawRepo.get(tenantId, entityKey, fromVersion)) {
-                is RawDataRepositoryPort.Result.Ok -> r.value
-                is RawDataRepositoryPort.Result.Err -> null // 첫 버전인 경우
+                is Result.Ok -> r.value
+                is Result.Err -> null // 첫 버전인 경우
             }
             val toRaw = when (val r = rawRepo.get(tenantId, entityKey, toVersion)) {
-                is RawDataRepositoryPort.Result.Ok -> r.value
-                is RawDataRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             // 2. 첫 버전이면 FULL로 폴백
@@ -220,8 +221,8 @@ class SlicingWorkflow(
 
             // 3. RuleSet 로드
             val ruleSet = when (val r = contractRegistry.loadRuleSetContract(ruleSetRef)) {
-                is ContractRegistryPort.Result.Ok -> r.value
-                is ContractRegistryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             // 4. ChangeSet 생성
@@ -247,16 +248,16 @@ class SlicingWorkflow(
 
             // 6. 영향받는 Slice만 재생성
             val slicingResult = when (val r = slicingEngine.slicePartial(toRaw, ruleSetRef, impactedTypes)) {
-                is SlicingEnginePort.Result.Ok -> r.value
-                is SlicingEnginePort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             // 7. 기존 Slice 중 영향 없는 것 버전 올려서 유지
             // NOTE: NotFoundError는 첫 버전일 때 발생 가능 - emptyList로 처리
             // 다른 에러(StorageError 등)는 전파해야 함
             val existingSlices = when (val r = sliceRepo.getByVersion(tenantId, entityKey, fromVersion)) {
-                is SliceRepositoryPort.Result.Ok -> r.value
-                is SliceRepositoryPort.Result.Err -> when (r.error) {
+                is Result.Ok -> r.value
+                is Result.Err -> when (r.error) {
                     is DomainError.NotFoundError -> emptyList()
                     else -> return@withSpanSuspend Result.Err(r.error)
                 }
@@ -290,8 +291,8 @@ class SlicingWorkflow(
             // 9. 저장 (Slices + Tombstones)
             val allSlices = slicingResult.slices + unchangedSlices + tombstones
             when (val r = sliceRepo.putAllIdempotent(allSlices)) {
-                is SliceRepositoryPort.Result.Ok -> Unit
-                is SliceRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> Unit
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             // 10. Inverted Indexes 저장
@@ -299,8 +300,8 @@ class SlicingWorkflow(
             // (slice.tombstone?.isDeleted ?: false 참조)
             val allIndexes = slicingResult.indexes
             when (val r = invertedIndexRepo.putAllIdempotent(allIndexes)) {
-                is InvertedIndexRepositoryPort.Result.Ok -> Unit
-                is InvertedIndexRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> Unit
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             // 11. 반환: tombstone 제외한 SliceKey 목록
@@ -313,8 +314,4 @@ class SlicingWorkflow(
         }
     }
 
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-    }
 }

@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.rawdata
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
@@ -36,7 +37,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.insert(entry)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(result)
+        assertIs<Result.Ok<OutboxEntry>>(result)
         assertEquals(entry.id, result.value.id)
     }
 
@@ -47,7 +48,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.insert(entry)
 
-        assertIs<OutboxRepositoryPort.Result.Err>(result)
+        assertIs<Result.Err>(result)
         assertIs<DomainError.IdempotencyViolation>(result.error)
     }
 
@@ -59,7 +60,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.insertAll(entries)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertEquals(5, result.value.size)
     }
 
@@ -67,7 +68,7 @@ class OutboxRepositoryPortTest {
     fun `insertAll - 빈 리스트 저장 OK`() = runBlocking {
         val result = repo.insertAll(emptyList())
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertTrue(result.value.isEmpty())
     }
 
@@ -79,7 +80,7 @@ class OutboxRepositoryPortTest {
         val entries = listOf(createEntry(), existing, createEntry())
         val result = repo.insertAll(entries)
 
-        assertIs<OutboxRepositoryPort.Result.Err>(result)
+        assertIs<Result.Err>(result)
     }
 
     // ==================== findPending 테스트 ====================
@@ -95,7 +96,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.findPending(limit = 10)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertEquals(2, result.value.size)
         assertTrue(result.value.all { it.status == OutboxStatus.PENDING })
     }
@@ -107,7 +108,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.findPending(limit = 3)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertEquals(3, result.value.size)
     }
 
@@ -123,7 +124,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.findPending(limit = 10)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertEquals(old.id, result.value[0].id)
         assertEquals(mid.id, result.value[1].id)
         assertEquals(recent.id, result.value[2].id)
@@ -133,7 +134,7 @@ class OutboxRepositoryPortTest {
     fun `findPending - 없으면 빈 리스트`() = runBlocking {
         val result = repo.findPending(limit = 10)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertTrue(result.value.isEmpty())
     }
 
@@ -146,12 +147,12 @@ class OutboxRepositoryPortTest {
 
         val result = repo.markProcessed(listOf(entry.id))
 
-        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertIs<Result.Ok<Int>>(result)
         assertEquals(1, result.value)
 
         // 확인
         val pending = repo.findPending(limit = 10)
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(pending)
+        assertIs<Result.Ok<List<OutboxEntry>>>(pending)
         assertTrue(pending.value.none { it.id == entry.id })
     }
 
@@ -163,11 +164,11 @@ class OutboxRepositoryPortTest {
         val ids = entries.take(3).map { it.id }
         val result = repo.markProcessed(ids)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertIs<Result.Ok<Int>>(result)
         assertEquals(3, result.value)
 
         val pending = repo.findPending(limit = 10)
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(pending)
+        assertIs<Result.Ok<List<OutboxEntry>>>(pending)
         assertEquals(2, pending.value.size)
     }
 
@@ -178,7 +179,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.markProcessed(listOf(entry.id, UUID.randomUUID()))
 
-        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertIs<Result.Ok<Int>>(result)
         assertEquals(1, result.value) // 실제 처리된 것만 카운트
     }
 
@@ -186,7 +187,7 @@ class OutboxRepositoryPortTest {
     fun `markProcessed - 빈 리스트 OK`() = runBlocking {
         val result = repo.markProcessed(emptyList())
 
-        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertIs<Result.Ok<Int>>(result)
         assertEquals(0, result.value)
     }
 
@@ -199,7 +200,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.markFailed(entry.id, "Connection timeout")
 
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(result)
+        assertIs<Result.Ok<OutboxEntry>>(result)
         assertEquals(OutboxStatus.FAILED, result.value.status)
         assertEquals(1, result.value.retryCount)
     }
@@ -208,7 +209,7 @@ class OutboxRepositoryPortTest {
     fun `markFailed - 존재하지 않는 ID는 NotFoundError`() = runBlocking {
         val result = repo.markFailed(UUID.randomUUID(), "error")
 
-        assertIs<OutboxRepositoryPort.Result.Err>(result)
+        assertIs<Result.Err>(result)
         assertIs<DomainError.NotFoundError>(result.error)
     }
 
@@ -221,7 +222,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.resetToPending(entry.id)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(result)
+        assertIs<Result.Ok<OutboxEntry>>(result)
         assertEquals(OutboxStatus.PENDING, result.value.status)
         assertEquals(2, result.value.retryCount) // retryCount 유지
     }
@@ -236,7 +237,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.resetToPending(entry.id)
 
-        assertIs<OutboxRepositoryPort.Result.Err>(result)
+        assertIs<Result.Err>(result)
     }
 
     // ==================== findById 테스트 ====================
@@ -248,7 +249,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.findById(entry.id)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(result)
+        assertIs<Result.Ok<OutboxEntry>>(result)
         assertEquals(entry.id, result.value.id)
     }
 
@@ -256,7 +257,7 @@ class OutboxRepositoryPortTest {
     fun `findById - 없으면 NotFoundError`() = runBlocking {
         val result = repo.findById(UUID.randomUUID())
 
-        assertIs<OutboxRepositoryPort.Result.Err>(result)
+        assertIs<Result.Err>(result)
         assertIs<DomainError.NotFoundError>(result.error)
     }
 
@@ -269,7 +270,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.claim(limit = 3, type = null, workerId = "test-worker")
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertEquals(3, result.value.size)
         assertTrue(result.value.all { it.status == OutboxStatus.PROCESSING })
         assertTrue(result.value.all { it.claimedBy == "test-worker" })
@@ -277,7 +278,7 @@ class OutboxRepositoryPortTest {
 
         // PENDING 상태는 2개만 남음
         val pending = repo.findPending(limit = 10)
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(pending)
+        assertIs<Result.Ok<List<OutboxEntry>>>(pending)
         assertEquals(2, pending.value.size)
     }
 
@@ -293,7 +294,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.claim(limit = 2, type = null, workerId = null)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertEquals(old.id, result.value[0].id)
         assertEquals(mid.id, result.value[1].id)
     }
@@ -308,7 +309,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.claim(limit = 10, type = AggregateType.SLICE, workerId = null)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertEquals(1, result.value.size)
         assertEquals(slice.id, result.value[0].id)
     }
@@ -321,7 +322,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.claim(limit = 10, type = null, workerId = null)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertTrue(result.value.isEmpty())
     }
 
@@ -332,12 +333,12 @@ class OutboxRepositoryPortTest {
 
         // 첫 번째 claim
         val first = repo.claim(limit = 10, type = null, workerId = "worker-1")
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(first)
+        assertIs<Result.Ok<List<OutboxEntry>>>(first)
         assertEquals(1, first.value.size)
 
         // 두 번째 claim - 이미 PROCESSING이므로 빈 결과
         val second = repo.claim(limit = 10, type = null, workerId = "worker-2")
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(second)
+        assertIs<Result.Ok<List<OutboxEntry>>>(second)
         assertTrue(second.value.isEmpty())
     }
 
@@ -350,7 +351,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.claimOne(type = null, workerId = "single-worker")
 
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry?>>(result)
+        assertIs<Result.Ok<OutboxEntry?>>(result)
         val claimed = result.value
         assertNotNull(claimed)
         assertEquals(OutboxStatus.PROCESSING, claimed.status)
@@ -361,7 +362,7 @@ class OutboxRepositoryPortTest {
     fun `claimOne - PENDING 없으면 null 반환`() = runBlocking {
         val result = repo.claimOne(type = null, workerId = null)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry?>>(result)
+        assertIs<Result.Ok<OutboxEntry?>>(result)
         assertEquals(null, result.value)
     }
 
@@ -388,12 +389,12 @@ class OutboxRepositoryPortTest {
         // 5분(300초) 기준으로 stale 복구
         val result = repo.recoverStaleProcessing(olderThanSeconds = 300)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertIs<Result.Ok<Int>>(result)
         assertEquals(1, result.value)
 
         // stale은 PENDING으로 복구, claimedAt/claimedBy 초기화
         val staleAfter = repo.findById(stale.id)
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(staleAfter)
+        assertIs<Result.Ok<OutboxEntry>>(staleAfter)
         assertEquals(OutboxStatus.PENDING, staleAfter.value.status)
         assertEquals(null, staleAfter.value.claimedAt)
         assertEquals(null, staleAfter.value.claimedBy)
@@ -401,7 +402,7 @@ class OutboxRepositoryPortTest {
 
         // recent는 그대로 PROCESSING
         val recentAfter = repo.findById(recent.id)
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(recentAfter)
+        assertIs<Result.Ok<OutboxEntry>>(recentAfter)
         assertEquals(OutboxStatus.PROCESSING, recentAfter.value.status)
     }
 
@@ -420,12 +421,12 @@ class OutboxRepositoryPortTest {
 
         val result = repo.recoverStaleProcessing(olderThanSeconds = 300)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertIs<Result.Ok<Int>>(result)
         assertEquals(0, result.value) // 복구 안됨
 
         // 여전히 PROCESSING
         val after = repo.findById(maxRetried.id)
-        assertIs<OutboxRepositoryPort.Result.Ok<OutboxEntry>>(after)
+        assertIs<Result.Ok<OutboxEntry>>(after)
         assertEquals(OutboxStatus.PROCESSING, after.value.status)
     }
 
@@ -437,7 +438,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.recoverStaleProcessing(olderThanSeconds = 0) // 즉시 타임아웃
 
-        assertIs<OutboxRepositoryPort.Result.Ok<Int>>(result)
+        assertIs<Result.Ok<Int>>(result)
         assertEquals(0, result.value)
     }
 
@@ -453,7 +454,7 @@ class OutboxRepositoryPortTest {
 
         val result = repo.findPendingByType(AggregateType.RAW_DATA, limit = 10)
 
-        assertIs<OutboxRepositoryPort.Result.Ok<List<OutboxEntry>>>(result)
+        assertIs<Result.Ok<List<OutboxEntry>>>(result)
         assertEquals(1, result.value.size)
         assertEquals(AggregateType.RAW_DATA, result.value[0].aggregateType)
     }

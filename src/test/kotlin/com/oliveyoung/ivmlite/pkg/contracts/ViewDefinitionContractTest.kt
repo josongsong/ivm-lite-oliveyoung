@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
@@ -41,8 +42,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.id shouldBe "view.product.pdp.v1"
         contract.meta.status shouldBe ContractStatus.ACTIVE
     }
@@ -53,8 +54,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.requiredSlices shouldBe listOf(SliceType.CORE)
     }
 
@@ -64,8 +65,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.optionalSlices shouldBe emptyList()
     }
 
@@ -75,8 +76,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.missingPolicy shouldBe MissingPolicy.FAIL_CLOSED
     }
 
@@ -86,8 +87,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.partialPolicy.allowed shouldBe false
         contract.partialPolicy.optionalOnly shouldBe true
         contract.partialPolicy.responseMeta.includeMissingSlices shouldBe true
@@ -100,8 +101,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.fallbackPolicy shouldBe FallbackPolicy.NONE
     }
 
@@ -111,8 +112,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.ruleSetRef.id shouldBe "ruleset.core.v1"
         contract.ruleSetRef.version shouldBe SemVer.parse("1.0.0")
     }
@@ -167,8 +168,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.id shouldBe "view.product.pdp.v1"
         contract.meta.status shouldBe ContractStatus.ACTIVE
     }
@@ -180,8 +181,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     "DynamoDB - requiredSlices 파싱 검증" {
@@ -208,8 +209,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.requiredSlices shouldBe listOf(SliceType.CORE, SliceType.PRICE, SliceType.INVENTORY)
     }
 
@@ -237,8 +238,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.optionalSlices shouldBe listOf(SliceType.MEDIA, SliceType.REVIEW)
     }
 
@@ -266,8 +267,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.missingPolicy shouldBe MissingPolicy.PARTIAL_ALLOWED
     }
 
@@ -302,8 +303,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.partialPolicy.allowed shouldBe true
         contract.partialPolicy.optionalOnly shouldBe false
         contract.partialPolicy.responseMeta.includeMissingSlices shouldBe false
@@ -334,8 +335,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.fallbackPolicy shouldBe FallbackPolicy.DEFAULT_VALUE
     }
 
@@ -363,8 +364,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.ruleSetRef.id shouldBe "ruleset.product.v2"
         contract.ruleSetRef.version shouldBe SemVer.parse("2.1.0")
     }
@@ -392,8 +393,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - partialPolicy 누락 → ContractError" {
@@ -419,8 +420,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - ruleSetRef 누락 → ContractError" {
@@ -446,8 +447,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - data 누락 → ContractError" {
@@ -464,8 +465,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - malformed JSON → ContractError" {
@@ -483,8 +484,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - 알 수 없는 SliceType → ContractError" {
@@ -511,8 +512,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - 알 수 없는 MissingPolicy → ContractError" {
@@ -539,8 +540,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - 알 수 없는 FallbackPolicy → ContractError" {
@@ -567,8 +568,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - DRAFT status → ContractError (ACTIVE만 허용)" {
@@ -595,8 +596,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - 빈 requiredSlices → 정상 로드 (빈 리스트)" {
@@ -623,8 +624,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.requiredSlices shouldBe emptyList()
         contract.optionalSlices shouldBe listOf(SliceType.CORE, SliceType.PRICE)
     }
@@ -653,8 +654,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     // ==================== 엣지/코너케이스 테스트 (수학적 완결성) ====================
@@ -683,8 +684,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.requiredSlices shouldBe listOf(SliceType.CORE, SliceType.PRICE, SliceType.INVENTORY, SliceType.MEDIA)
         contract.optionalSlices shouldBe listOf(SliceType.CATEGORY, SliceType.PROMOTION, SliceType.REVIEW, SliceType.CUSTOM)
     }
@@ -713,8 +714,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - ARCHIVED status → ContractError" {
@@ -741,8 +742,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - optionalSlices에 잘못된 SliceType → ContractError" {
@@ -769,8 +770,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - partialPolicy.allowed 누락 → ContractError" {
@@ -797,8 +798,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - responseMeta.includeMissingSlices 누락 → ContractError" {
@@ -825,8 +826,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - Boolean 조합 전수 테스트 (allowed=true, optionalOnly=false)" {
@@ -857,8 +858,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.partialPolicy.allowed shouldBe true
         contract.partialPolicy.optionalOnly shouldBe false
         contract.partialPolicy.responseMeta.includeMissingSlices shouldBe false
@@ -890,8 +891,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         val result = adapter.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     // ==================== 도메인 모델 불변성 테스트 ====================

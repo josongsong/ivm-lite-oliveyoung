@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
@@ -86,8 +87,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.id shouldBe "ruleset.brand.v1"
         contract.entityType shouldBe "BRAND"
     }
@@ -98,8 +99,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         val summarySlice = contract.slices.find { it.type == SliceType.SUMMARY }
         summarySlice shouldNotBe null
@@ -112,8 +113,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         val summarySlice = contract.slices.find { it.type == SliceType.SUMMARY }
         summarySlice shouldNotBe null
@@ -131,8 +132,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         val coreSlice = contract.slices.find { it.type == SliceType.CORE }
         coreSlice shouldNotBe null
@@ -147,8 +148,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         val enrichedSlice = contract.slices.find { it.type == SliceType.ENRICHED }
         enrichedSlice shouldNotBe null
@@ -161,8 +162,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         val enrichedSlice = contract.slices.find { it.type == SliceType.ENRICHED }
         enrichedSlice shouldNotBe null
@@ -180,8 +181,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         contract.impactMap[SliceType.ENRICHED] shouldNotBe null
         contract.impactMap[SliceType.ENRICHED]!!.contains("/masterInfo/brand/code") shouldBe true
@@ -219,8 +220,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.slices[0].sliceKind shouldBe SliceKind.STANDARD
     }
 
@@ -255,8 +256,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.slices[0].sliceKind shouldBe SliceKind.REF_INDEX
     }
 
@@ -301,8 +302,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.slices[0].sliceKind shouldBe SliceKind.ENRICHMENT
         contract.slices[0].joins.size shouldBe 1
         contract.slices[0].joins[0].name shouldBe "brand"
@@ -340,8 +341,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     // ==================== DynamoDB - MapFields 배열 형태 매핑 테스트 ====================
@@ -381,8 +382,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         val summarySlice = contract.slices.first { it.type == SliceType.SUMMARY }
 
         summarySlice.buildRules.shouldBeInstanceOf<SliceBuildRules.MapFields>()
@@ -426,8 +427,8 @@ class RefIndexSliceContractTest : StringSpec({
 
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         val summarySlice = contract.slices.first { it.type == SliceType.SUMMARY }
 
         summarySlice.buildRules.shouldBeInstanceOf<SliceBuildRules.MapFields>()

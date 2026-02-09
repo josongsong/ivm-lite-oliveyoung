@@ -1,0 +1,379 @@
+/**
+ * TypographyScale Styles
+ * Phase 4-B: 타이포그래피 스케일 스타일
+ */
+
+/* ============================================================================
+   Container
+   ============================================================================ */
+
+.typography-scale {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.typography-scale-header {
+  margin-bottom: 0.5rem;
+}
+
+.typography-scale-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.typography-scale-description code {
+  background: var(--bg-tertiary);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--accent-purple);
+}
+
+/* ============================================================================
+   Sections
+   ============================================================================ */
+
+.typography-section {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.typography-section-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* ============================================================================
+   Font Families
+   ============================================================================ */
+
+.font-families-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1rem;
+}
+
+.font-family-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.font-family-card:hover {
+  border-color: var(--border-hover);
+}
+
+.font-family-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.font-family-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.font-family-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.375rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.font-family-copy:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.font-family-preview {
+  font-size: 1.125rem;
+  color: var(--text-primary);
+  margin: 0;
+  line-height: 1.5;
+}
+
+.font-family-description {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+}
+
+.font-family-value {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  color: var(--text-secondary);
+  background: var(--bg-tertiary);
+  padding: 0.5rem;
+  border-radius: 4px;
+  overflow-x: auto;
+  white-space: nowrap;
+}
+
+/* ============================================================================
+   Font Weights
+   ============================================================================ */
+
+.font-weights-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.font-weight-card {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  text-align: center;
+  transition: border-color 0.15s ease;
+}
+
+.font-weight-card:hover {
+  border-color: var(--border-hover);
+}
+
+.font-weight-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.font-weight-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+}
+
+.font-weight-copy {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.25rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.font-weight-copy:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.font-weight-preview {
+  font-size: 2.5rem;
+  color: var(--text-primary);
+  margin: 0.5rem 0;
+  text-align: center;
+}
+
+.font-weight-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.font-weight-value {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+}
+
+.font-weight-description {
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+}
+
+/* ============================================================================
+   Typography Categories
+   ============================================================================ */
+
+.typography-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.typography-category {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.typography-category-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.typography-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+/* ============================================================================
+   Typography Sample
+   ============================================================================ */
+
+.typography-sample {
+  display: grid;
+  grid-template-columns: 1fr 280px;
+  gap: 1.5rem;
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  transition: border-color 0.15s ease;
+}
+
+.typography-sample:hover {
+  border-color: var(--border-hover);
+}
+
+.typography-sample-preview {
+  display: flex;
+  align-items: center;
+  min-height: 48px;
+  overflow: hidden;
+}
+
+.typography-sample-text {
+  margin: 0;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.typography-sample-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.typography-sample-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.typography-sample-name {
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--accent-purple);
+  font-family: var(--font-mono);
+}
+
+.typography-sample-copy {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  padding: 0.25rem 0.5rem;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  font-size: 0.6875rem;
+  color: var(--text-muted);
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.15s ease, background 0.15s ease, color 0.15s ease;
+}
+
+.typography-sample-copy.visible {
+  opacity: 1;
+}
+
+.typography-sample-copy:hover {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.typography-sample-specs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.typography-spec {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.75rem;
+}
+
+.spec-label {
+  color: var(--text-muted);
+}
+
+.spec-value {
+  color: var(--text-secondary);
+  font-family: var(--font-mono);
+}
+
+.typography-sample-description {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+  margin: 0;
+  line-height: 1.5;
+}
+
+/* ============================================================================
+   Responsive
+   ============================================================================ */
+
+@media (max-width: 900px) {
+  .typography-sample {
+    grid-template-columns: 1fr;
+    gap: 1rem;
+  }
+
+  .font-families-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 600px) {
+  .font-weights-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .typography-sample-specs {
+    gap: 0.5rem;
+  }
+
+  .typography-spec {
+    font-size: 0.6875rem;
+  }
+}

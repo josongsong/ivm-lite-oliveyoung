@@ -1,0 +1,47 @@
+/**
+ * TableHeader Component Styles
+ */
+
+.ui-table-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1rem 1.25rem;
+  background: var(--bg-secondary, #12121a);
+  border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  flex-shrink: 0;
+}
+
+.ui-table-header__title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ui-table-header__icon {
+  color: var(--accent-cyan, #00d4ff);
+  display: flex;
+  align-items: center;
+}
+
+.ui-table-header__title h3 {
+  margin: 0;
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary, #f0f0f5);
+}
+
+.ui-table-header__count {
+  font-family: var(--font-mono, 'JetBrains Mono', monospace);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.25rem 0.5rem;
+  background: var(--bg-tertiary, #1a1a25);
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-muted, #6a6a80);
+}
+
+.ui-table-header__actions {
+  display: flex;
+  gap: 0.5rem;
+}

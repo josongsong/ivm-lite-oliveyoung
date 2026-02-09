@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.fanout
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.fanout.application.FanoutEventHandler
 import com.oliveyoung.ivmlite.pkg.fanout.application.FanoutResult
@@ -39,7 +40,7 @@ class FanoutEventHandlerTest : StringSpec({
         // Given
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), any()) } returns
-            FanoutWorkflow.Result.Ok(FanoutResult(
+            Result.Ok(FanoutResult(
                 status = FanoutResultStatus.SUCCESS,
                 totalAffected = 5,
                 processedCount = 5,
@@ -83,7 +84,7 @@ class FanoutEventHandlerTest : StringSpec({
         // Given
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), any()) } returns
-            FanoutWorkflow.Result.Ok(FanoutResult(
+            Result.Ok(FanoutResult(
                 status = FanoutResultStatus.PARTIAL_FAILURE,
                 totalAffected = 10,
                 processedCount = 8,
@@ -116,7 +117,7 @@ class FanoutEventHandlerTest : StringSpec({
         // Given
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), any()) } returns
-            FanoutWorkflow.Result.Err(DomainError.StorageError("Connection failed"))
+            Result.Err(DomainError.StorageError("Connection failed"))
 
         val handler = FanoutEventHandler(fanoutWorkflow)
 
@@ -144,7 +145,7 @@ class FanoutEventHandlerTest : StringSpec({
         // Given
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), any()) } returns
-            FanoutWorkflow.Result.Ok(FanoutResult.empty())
+            Result.Ok(FanoutResult.empty())
 
         val handler = FanoutEventHandler(fanoutWorkflow)
 
@@ -173,7 +174,7 @@ class FanoutEventHandlerTest : StringSpec({
         // Given
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), any()) } returns
-            FanoutWorkflow.Result.Ok(FanoutResult(
+            Result.Ok(FanoutResult(
                 status = FanoutResultStatus.SUCCESS,
                 totalAffected = 3,
                 processedCount = 3,
@@ -214,7 +215,7 @@ class FanoutEventHandlerTest : StringSpec({
         // Given
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), any()) } returns
-            FanoutWorkflow.Result.Err(DomainError.ValidationError("entity", "Cannot delete"))
+            Result.Err(DomainError.ValidationError("entity", "Cannot delete"))
 
         val handler = FanoutEventHandler(fanoutWorkflow)
 
@@ -242,7 +243,7 @@ class FanoutEventHandlerTest : StringSpec({
         // Given
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), any()) } returns
-            FanoutWorkflow.Result.Ok(FanoutResult(
+            Result.Ok(FanoutResult(
                 status = FanoutResultStatus.SUCCESS,
                 totalAffected = 10,
                 processedCount = 10,
@@ -277,7 +278,7 @@ class FanoutEventHandlerTest : StringSpec({
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         val configSlot = slot<FanoutConfig>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), capture(configSlot)) } returns
-            FanoutWorkflow.Result.Ok(FanoutResult.empty())
+            Result.Ok(FanoutResult.empty())
 
         val handler = FanoutEventHandler(fanoutWorkflow)
 
@@ -390,7 +391,7 @@ class FanoutEventHandlerTest : StringSpec({
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         val configSlot = slot<FanoutConfig>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), capture(configSlot)) } returns
-            FanoutWorkflow.Result.Ok(FanoutResult.empty())
+            Result.Ok(FanoutResult.empty())
 
         val defaultConfig = FanoutConfig(batchSize = 100)
         val handler = FanoutEventHandler(fanoutWorkflow, defaultConfig)
@@ -419,7 +420,7 @@ class FanoutEventHandlerTest : StringSpec({
         val fanoutWorkflow = mockk<FanoutWorkflow>()
         val configSlot = slot<FanoutConfig>()
         coEvery { fanoutWorkflow.onEntityChange(any(), any(), any(), any(), capture(configSlot)) } returns
-            FanoutWorkflow.Result.Ok(FanoutResult.empty())
+            Result.Ok(FanoutResult.empty())
 
         val handler = FanoutEventHandler(fanoutWorkflow)
 

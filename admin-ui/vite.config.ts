@@ -42,15 +42,14 @@ export default defineConfig({
       // 메모리 최적화: 큰 파일 무시
       ignored: ['**/node_modules/**', '**/.git/**', '**/dist/**'],
     },
-    // Proxy API requests to Kotlin backend during development
-    proxy: {
-      '/api': {
-        target: 'http://localhost:8081',
-        changeOrigin: true,
-        // 타임아웃 설정
-        timeout: 30000,
-      },
-    },
+    // API 프록시 비활성화 - 프론트엔드에서 직접 API 호출
+    // proxy: {
+    //   '/api': {
+    //     target: 'http://localhost:8081',
+    //     changeOrigin: true,
+    //     timeout: 30000,
+    //   },
+    // },
     // 메모리 최적화
     fs: {
       strict: false,

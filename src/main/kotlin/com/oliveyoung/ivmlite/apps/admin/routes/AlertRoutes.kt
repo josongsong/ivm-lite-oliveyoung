@@ -7,6 +7,7 @@ import com.oliveyoung.ivmlite.pkg.alerts.domain.AlertStatus
 import com.oliveyoung.ivmlite.pkg.alerts.ports.AlertFilter
 import com.oliveyoung.ivmlite.pkg.alerts.ports.AlertRepositoryPort
 import com.oliveyoung.ivmlite.pkg.alerts.ports.AlertRuleLoaderPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -52,14 +53,14 @@ fun Route.alertRoutes() {
             )
             
             when (val result = alertRepository.findByFilter(filter)) {
-                is AlertRepositoryPort.Result.Ok -> {
+                is Result.Ok -> {
                     val response = AlertListResponse(
                         alerts = result.value.map { it.toDto() },
                         total = result.value.size
                     )
                     call.respond(HttpStatusCode.OK, response)
                 }
-                is AlertRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.InternalServerError,
                         ApiError(code = "ALERT_ERROR", message = result.error.toString())
@@ -107,7 +108,7 @@ fun Route.alertRoutes() {
             }
             
             when (val result = alertRepository.findById(id)) {
-                is AlertRepositoryPort.Result.Ok -> {
+                is Result.Ok -> {
                     val alert = result.value
                     if (alert != null) {
                         call.respond(HttpStatusCode.OK, alert.toDto())
@@ -115,7 +116,7 @@ fun Route.alertRoutes() {
                         call.respond(HttpStatusCode.NotFound, ApiError(code = "NOT_FOUND", message = "Alert not found"))
                     }
                 }
-                is AlertRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.InternalServerError,
                         ApiError(code = "ALERT_ERROR", message = result.error.toString())
@@ -230,10 +231,10 @@ fun Route.alertRoutes() {
     get("/alerts/stats") {
         try {
             when (val result = alertRepository.getStats()) {
-                is AlertRepositoryPort.Result.Ok -> {
+                is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, result.value)
                 }
-                is AlertRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.InternalServerError,
                         ApiError(code = "STATS_ERROR", message = result.error.toString())

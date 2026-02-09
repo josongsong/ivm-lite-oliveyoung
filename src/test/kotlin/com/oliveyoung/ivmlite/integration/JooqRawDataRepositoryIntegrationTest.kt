@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.integration
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.JooqRawDataRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
@@ -39,7 +40,7 @@ class JooqRawDataRepositoryIntegrationTest : StringSpec({
 
         val result = runBlocking { repository.putIdempotent(record) }
 
-        result.shouldBeInstanceOf<RawDataRepositoryPort.Result.Ok<Unit>>()
+        result.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         val count = dsl.selectCount()
             .from(DSL.table("raw_data"))
@@ -54,7 +55,7 @@ class JooqRawDataRepositoryIntegrationTest : StringSpec({
         runBlocking { repository.putIdempotent(record) }
         val result = runBlocking { repository.putIdempotent(record) }
 
-        result.shouldBeInstanceOf<RawDataRepositoryPort.Result.Ok<Unit>>()
+        result.shouldBeInstanceOf<Result.Ok<Unit>>()
 
         val count = dsl.selectCount()
             .from(DSL.table("raw_data"))
@@ -70,8 +71,8 @@ class JooqRawDataRepositoryIntegrationTest : StringSpec({
         runBlocking { repository.putIdempotent(record1) }
         val result = runBlocking { repository.putIdempotent(record2) }
 
-        result.shouldBeInstanceOf<RawDataRepositoryPort.Result.Err>()
-        (result as RawDataRepositoryPort.Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
     }
 
     "get - 존재하는 레코드 조회" {
@@ -82,8 +83,8 @@ class JooqRawDataRepositoryIntegrationTest : StringSpec({
             repository.get(TenantId("tenant-1"), EntityKey("entity-4"), 1L)
         }
 
-        result.shouldBeInstanceOf<RawDataRepositoryPort.Result.Ok<RawDataRecord>>()
-        val fetched = (result as RawDataRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<RawDataRecord>>()
+        val fetched = (result as Result.Ok).value
         fetched.tenantId shouldBe record.tenantId
         fetched.entityKey shouldBe record.entityKey
         fetched.version shouldBe record.version
@@ -95,8 +96,8 @@ class JooqRawDataRepositoryIntegrationTest : StringSpec({
             repository.get(TenantId("tenant-x"), EntityKey("not-exists"), 999L)
         }
 
-        result.shouldBeInstanceOf<RawDataRepositoryPort.Result.Err>()
-        (result as RawDataRepositoryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     "putIdempotent - 다른 버전은 별도 레코드" {

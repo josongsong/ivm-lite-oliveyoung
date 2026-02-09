@@ -1,0 +1,205 @@
+/**
+ * MeaningPanel Styles (Phase 1: DX Platform)
+ */
+
+.meaning-panel {
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.meaning-panel--loading,
+.meaning-panel--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  color: var(--text-secondary);
+  gap: 0.5rem;
+}
+
+.meaning-panel__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.meaning-panel__empty-icon {
+  font-size: 2rem;
+  opacity: 0.3;
+}
+
+/* Header */
+.meaning-panel__header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.meaning-panel__type {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.25rem 0.5rem;
+  border-radius: 4px;
+  background: var(--bg-tertiary);
+  color: var(--text-secondary);
+}
+
+.meaning-panel__type--field { background: #2563eb20; color: #3b82f6; }
+.meaning-panel__type--slice { background: #16a34a20; color: #22c55e; }
+.meaning-panel__type--slice_ref { background: #0d948820; color: #14b8a6; }
+.meaning-panel__type--view { background: #9333ea20; color: #a855f7; }
+.meaning-panel__type--rule { background: #ea580c20; color: #f97316; }
+.meaning-panel__type--impact_map { background: #dc262620; color: #ef4444; }
+.meaning-panel__type--property { background: #64748b20; color: #94a3b8; }
+
+.meaning-panel__name {
+  font-weight: 600;
+  font-size: 1rem;
+  color: var(--text-primary);
+}
+
+/* Details */
+.meaning-panel__details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.meaning-panel__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.meaning-panel__row--full {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.meaning-panel__label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  min-width: 60px;
+}
+
+.meaning-panel__value {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.8rem;
+  background: var(--bg-tertiary);
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+}
+
+.meaning-panel__description {
+  margin: 0.25rem 0 0 0;
+  color: var(--text-secondary);
+  line-height: 1.4;
+}
+
+/* Badges */
+.meaning-panel__badge {
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  background: var(--bg-tertiary);
+}
+
+.meaning-panel__badge--required { background: #dc262620; color: #ef4444; }
+.meaning-panel__badge--warning { background: #ea580c20; color: #f97316; }
+.meaning-panel__badge--ok { background: #16a34a20; color: #22c55e; }
+
+/* Sections */
+.meaning-panel__section {
+  margin-top: 1rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--border-color);
+}
+
+.meaning-panel__section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin: 0 0 0.5rem 0;
+}
+
+.meaning-panel__path {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  word-break: break-all;
+}
+
+/* Tags */
+.meaning-panel__tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.meaning-panel__tag {
+  font-size: 0.7rem;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+  background: var(--primary);
+  color: white;
+}
+
+/* Usage */
+.meaning-panel__usage-list {
+  margin-bottom: 0.5rem;
+}
+
+.meaning-panel__usage-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+}
+
+.meaning-panel__usage-items {
+  list-style: none;
+  margin: 0.25rem 0 0 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.25rem;
+}
+
+.meaning-panel__usage-link {
+  background: none;
+  border: 1px solid var(--border-color);
+  padding: 0.125rem 0.5rem;
+  border-radius: 3px;
+  font-size: 0.75rem;
+  cursor: pointer;
+  color: var(--primary);
+  transition: all 0.15s;
+}
+
+.meaning-panel__usage-link:hover {
+  background: var(--primary);
+  color: white;
+  border-color: var(--primary);
+}
+
+/* Impact */
+.meaning-panel__impact {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}

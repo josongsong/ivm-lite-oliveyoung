@@ -9,6 +9,7 @@ import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Tracer
@@ -68,7 +69,7 @@ class JooqOutboxRepository(
         private val FAILURE_REASON = OUTBOX.FAILURE_REASON
     }
 
-    override suspend fun insert(entry: OutboxEntry): OutboxRepositoryPort.Result<OutboxEntry> =
+    override suspend fun insert(entry: OutboxEntry): Result<OutboxEntry> =
         tracer.withSpanSuspend(
             "PostgreSQL.insertOutbox",
             mapOf(
@@ -87,7 +88,7 @@ class JooqOutboxRepository(
                     .fetchOne(0, Int::class.java) ?: 0
 
                 if (existingById > 0) {
-                    return@withContext OutboxRepositoryPort.Result.Err(
+                    return@withContext Result.Err(
                         DomainError.IdempotencyViolation("OutboxEntry already exists: ${entry.id}"),
                     )
                 }
@@ -99,7 +100,7 @@ class JooqOutboxRepository(
                     .fetchOne(0, Int::class.java) ?: 0
 
                 if (existingByKey > 0) {
-                    return@withContext OutboxRepositoryPort.Result.Err(
+                    return@withContext Result.Err(
                         DomainError.IdempotencyViolation("OutboxEntry with same idempotencyKey already exists: ${entry.idempotencyKey}"),
                     )
                 }
@@ -119,20 +120,20 @@ class JooqOutboxRepository(
                     .execute()
 
                     logger.debug("Inserted outbox entry: {}", entry.id)
-                    OutboxRepositoryPort.Result.Ok(entry)
+                    Result.Ok(entry)
                 } catch (e: Exception) {
                     logger.error("Failed to insert outbox entry", e)
-                    OutboxRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.StorageError("Failed to insert outbox: ${e.message}"),
                     )
                 }
             }
         }
 
-    override suspend fun insertAll(entries: List<OutboxEntry>): OutboxRepositoryPort.Result<List<OutboxEntry>> =
+    override suspend fun insertAll(entries: List<OutboxEntry>): Result<List<OutboxEntry>> =
         withContext(Dispatchers.IO) {
             if (entries.isEmpty()) {
-                return@withContext OutboxRepositoryPort.Result.Ok(emptyList())
+                return@withContext Result.Ok(emptyList())
             }
 
             try {
@@ -197,18 +198,18 @@ class JooqOutboxRepository(
                 }
 
                 logger.debug("Inserted {} outbox entries", entries.size)
-                OutboxRepositoryPort.Result.Ok(entries)
+                Result.Ok(entries)
             } catch (e: DomainError.IdempotencyViolation) {
-                OutboxRepositoryPort.Result.Err(e)
+                Result.Err(e)
             } catch (e: Exception) {
                 logger.error("Failed to insert outbox entries", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to insert outbox entries: ${e.message}"),
                 )
             }
         }
 
-    override suspend fun findById(id: UUID): OutboxRepositoryPort.Result<OutboxEntry> =
+    override suspend fun findById(id: UUID): Result<OutboxEntry> =
         withContext(Dispatchers.IO) {
             try {
                 val row = dsl.selectFrom(OUTBOX)
@@ -216,15 +217,15 @@ class JooqOutboxRepository(
                     .fetchOne()
 
                 if (row == null) {
-                    return@withContext OutboxRepositoryPort.Result.Err(
+                    return@withContext Result.Err(
                         DomainError.NotFoundError("OutboxEntry", id.toString()),
                     )
                 }
 
-                OutboxRepositoryPort.Result.Ok(rowToEntry(row))
+                Result.Ok(rowToEntry(row))
             } catch (e: Exception) {
                 logger.error("Failed to find outbox entry", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to find outbox: ${e.message}"),
                 )
             }
@@ -239,7 +240,7 @@ class JooqOutboxRepository(
      * 
      * 이를 통해 여러 worker가 동시에 같은 entry를 처리하는 것을 방지
      */
-    override suspend fun findPending(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> =
+    override suspend fun findPending(limit: Int): Result<List<OutboxEntry>> =
         tracer.withSpanSuspend(
             "PostgreSQL.findPending",
             mapOf(
@@ -261,10 +262,10 @@ class JooqOutboxRepository(
                         .skipLocked()
                         .fetch()
 
-                    OutboxRepositoryPort.Result.Ok(rows.map { rowToEntry(it) })
+                    Result.Ok(rows.map { rowToEntry(it) })
                 } catch (e: Exception) {
                     logger.error("Failed to find pending outbox entries", e)
-                    OutboxRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.StorageError("Failed to find pending: ${e.message}"),
                     )
                 }
@@ -274,7 +275,7 @@ class JooqOutboxRepository(
     override suspend fun findPendingByType(
         type: AggregateType,
         limit: Int,
-    ): OutboxRepositoryPort.Result<List<OutboxEntry>> = withContext(Dispatchers.IO) {
+    ): Result<List<OutboxEntry>> = withContext(Dispatchers.IO) {
         try {
             val rows = dsl.selectFrom(OUTBOX)
                 .where(STATUS.eq(OutboxStatus.PENDING.name))
@@ -283,10 +284,10 @@ class JooqOutboxRepository(
                 .limit(limit)
                 .fetch()
 
-            OutboxRepositoryPort.Result.Ok(rows.map { rowToEntry(it) })
+            Result.Ok(rows.map { rowToEntry(it) })
         } catch (e: Exception) {
             logger.error("Failed to find pending outbox entries by type", e)
-            OutboxRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to find pending by type: ${e.message}"),
             )
         }
@@ -301,7 +302,7 @@ class JooqOutboxRepository(
         limit: Int,
         cursor: String?,
         type: AggregateType?
-    ): OutboxRepositoryPort.Result<OutboxPage> = withContext(Dispatchers.IO) {
+    ): Result<OutboxPage> = withContext(Dispatchers.IO) {
         try {
             // 커서 파싱
             val (cursorTime, cursorId) = if (cursor != null) {
@@ -351,10 +352,10 @@ class JooqOutboxRepository(
                 null
             }
 
-            OutboxRepositoryPort.Result.Ok(OutboxPage(entries, nextCursor, hasMore))
+            Result.Ok(OutboxPage(entries, nextCursor, hasMore))
         } catch (e: Exception) {
             logger.error("Failed to find pending outbox entries with cursor", e)
-            OutboxRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to find pending with cursor: ${e.message}"),
             )
         }
@@ -374,7 +375,7 @@ class JooqOutboxRepository(
         limit: Int,
         type: AggregateType?,
         workerId: String?
-    ): OutboxRepositoryPort.Result<List<OutboxEntry>> = 
+    ): Result<List<OutboxEntry>> = 
         tracer.withSpanSuspend(
             "PostgreSQL.claim",
             mapOf(
@@ -424,7 +425,7 @@ class JooqOutboxRepository(
                     }
                     
                     if (claimedIds.isEmpty()) {
-                        return@withContext OutboxRepositoryPort.Result.Ok(emptyList())
+                        return@withContext Result.Ok(emptyList<OutboxEntry>())
                     }
                     
                     // Step 3: 업데이트된 row 조회
@@ -433,10 +434,10 @@ class JooqOutboxRepository(
                         .orderBy(CREATED_AT.asc(), ID.asc())
                         .fetch()
                     
-                    OutboxRepositoryPort.Result.Ok(rows.map { rowToEntry(it) })
+                    Result.Ok(rows.map { rowToEntry(it) })
                 } catch (e: Exception) {
                     logger.error("Failed to claim outbox entries", e)
-                    OutboxRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.StorageError("Failed to claim: ${e.message}"),
                     )
                 }
@@ -446,11 +447,11 @@ class JooqOutboxRepository(
     override suspend fun claimOne(
         type: AggregateType?,
         workerId: String?
-    ): OutboxRepositoryPort.Result<OutboxEntry?> {
+    ): Result<OutboxEntry?> {
         return when (val result = claim(1, type, workerId)) {
-            is OutboxRepositoryPort.Result.Ok -> 
-                OutboxRepositoryPort.Result.Ok(result.value.firstOrNull())
-            is OutboxRepositoryPort.Result.Err -> result
+            is Result.Ok -> 
+                Result.Ok(result.value.firstOrNull())
+            is Result.Err -> result
         }
     }
 
@@ -461,7 +462,7 @@ class JooqOutboxRepository(
      */
     override suspend fun recoverStaleProcessing(
         olderThanSeconds: Long
-    ): OutboxRepositoryPort.Result<Int> = 
+    ): Result<Int> = 
         tracer.withSpanSuspend(
             "PostgreSQL.recoverStaleProcessing",
             mapOf(
@@ -489,17 +490,17 @@ class JooqOutboxRepository(
                             recovered, olderThanSeconds)
                     }
                     
-                    OutboxRepositoryPort.Result.Ok(recovered)
+                    Result.Ok(recovered)
                 } catch (e: Exception) {
                     logger.error("Failed to recover stale processing entries", e)
-                    OutboxRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.StorageError("Failed to recover stale: ${e.message}"),
                     )
                 }
             }
         }
 
-    override suspend fun markProcessed(ids: List<UUID>): OutboxRepositoryPort.Result<Int> =
+    override suspend fun markProcessed(ids: List<UUID>): Result<Int> =
         tracer.withSpanSuspend(
             "PostgreSQL.markProcessed",
             mapOf(
@@ -510,7 +511,7 @@ class JooqOutboxRepository(
         ) {
             withContext(Dispatchers.IO) {
                 if (ids.isEmpty()) {
-                    return@withContext OutboxRepositoryPort.Result.Ok(0)
+                    return@withContext Result.Ok(0)
                 }
 
             try {
@@ -521,17 +522,17 @@ class JooqOutboxRepository(
                     .execute()
 
                     logger.debug("Marked {} entries as processed", updated)
-                    OutboxRepositoryPort.Result.Ok(updated)
+                    Result.Ok(updated)
                 } catch (e: Exception) {
                     logger.error("Failed to mark processed", e)
-                    OutboxRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.StorageError("Failed to mark processed: ${e.message}"),
                     )
                 }
             }
         }
 
-    override suspend fun markFailed(id: UUID, reason: String): OutboxRepositoryPort.Result<OutboxEntry> =
+    override suspend fun markFailed(id: UUID, reason: String): Result<OutboxEntry> =
         withContext(Dispatchers.IO) {
             try {
                 val updated = dsl.update(OUTBOX)
@@ -543,22 +544,22 @@ class JooqOutboxRepository(
                     .fetchOne()
 
                 if (updated == null) {
-                    return@withContext OutboxRepositoryPort.Result.Err(
+                    return@withContext Result.Err(
                         DomainError.NotFoundError("OutboxEntry", id.toString()),
                     )
                 }
 
                 logger.debug("Marked entry {} as failed: {}", id, reason)
-                OutboxRepositoryPort.Result.Ok(rowToEntry(updated))
+                Result.Ok(rowToEntry(updated))
             } catch (e: Exception) {
                 logger.error("Failed to mark failed", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to mark failed: ${e.message}"),
                 )
             }
         }
 
-    override suspend fun resetToPending(id: UUID): OutboxRepositoryPort.Result<OutboxEntry> =
+    override suspend fun resetToPending(id: UUID): Result<OutboxEntry> =
         withContext(Dispatchers.IO) {
             try {
                 // 먼저 현재 상태 확인
@@ -567,14 +568,14 @@ class JooqOutboxRepository(
                     .fetchOne()
 
                 if (current == null) {
-                    return@withContext OutboxRepositoryPort.Result.Err(
+                    return@withContext Result.Err(
                         DomainError.NotFoundError("OutboxEntry", id.toString()),
                     )
                 }
 
                 val retryCount = current.get(RETRY_COUNT) ?: 0
                 if (retryCount >= OutboxEntry.MAX_RETRY_COUNT) {
-                    return@withContext OutboxRepositoryPort.Result.Err(
+                    return@withContext Result.Err(
                         DomainError.InvariantViolation("Max retry count exceeded"),
                     )
                 }
@@ -583,19 +584,22 @@ class JooqOutboxRepository(
                     .set(STATUS, OutboxStatus.PENDING.name)
                     .where(ID.eq(id))
                     .returning()
-                    .fetchOne()!!
+                    .fetchOne()
+                    ?: return@withContext Result.Err(
+                        DomainError.StorageError("Failed to fetch updated record for entry: $id")
+                    )
 
                 logger.debug("Reset entry {} to pending", id)
-                OutboxRepositoryPort.Result.Ok(rowToEntry(updated))
+                Result.Ok(rowToEntry(updated))
             } catch (e: Exception) {
                 logger.error("Failed to reset to pending", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to reset to pending: ${e.message}"),
                 )
             }
         }
 
-    override suspend fun findFailed(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> =
+    override suspend fun findFailed(limit: Int): Result<List<OutboxEntry>> =
         withContext(Dispatchers.IO) {
             try {
                 val rows = dsl.selectFrom(OUTBOX)
@@ -604,16 +608,16 @@ class JooqOutboxRepository(
                     .limit(limit)
                     .fetch()
 
-                OutboxRepositoryPort.Result.Ok(rows.map { rowToEntry(it) })
+                Result.Ok(rows.map { rowToEntry(it) })
             } catch (e: Exception) {
                 logger.error("Failed to find failed outbox entries", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to find failed entries: ${e.message}"),
                 )
             }
         }
 
-    override suspend fun resetAllFailed(limit: Int): OutboxRepositoryPort.Result<Int> =
+    override suspend fun resetAllFailed(limit: Int): Result<Int> =
         withContext(Dispatchers.IO) {
             try {
                 val count = dsl.update(OUTBOX)
@@ -626,10 +630,10 @@ class JooqOutboxRepository(
                 if (count > 0) {
                     logger.info("Reset {} failed entries to pending", count)
                 }
-                OutboxRepositoryPort.Result.Ok(count)
+                Result.Ok(count)
             } catch (e: Exception) {
                 logger.error("Failed to reset all failed entries", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to reset all failed: ${e.message}"),
                 )
             }
@@ -637,7 +641,7 @@ class JooqOutboxRepository(
 
     // ==================== Tier 1: Visibility Timeout ====================
 
-    override suspend fun releaseExpiredClaims(visibilityTimeoutSeconds: Long): OutboxRepositoryPort.Result<Int> =
+    override suspend fun releaseExpiredClaims(visibilityTimeoutSeconds: Long): Result<Int> =
         withContext(Dispatchers.IO) {
             try {
                 val cutoff = OffsetDateTime.now(ZoneOffset.UTC).minusSeconds(visibilityTimeoutSeconds)
@@ -655,10 +659,10 @@ class JooqOutboxRepository(
                         released, visibilityTimeoutSeconds)
                 }
                 
-                OutboxRepositoryPort.Result.Ok(released)
+                Result.Ok(released)
             } catch (e: Exception) {
                 logger.error("Failed to release expired claims", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to release expired claims: ${e.message}"),
                 )
             }
@@ -667,30 +671,30 @@ class JooqOutboxRepository(
     // ==================== Tier 1: Dead Letter Queue ====================
     // TODO: DLQ 테이블 마이그레이션 필요 (V021__outbox_dlq.sql)
 
-    override suspend fun moveToDlq(maxRetryCount: Int): OutboxRepositoryPort.Result<Int> {
+    override suspend fun moveToDlq(maxRetryCount: Int): Result<Int> {
         // TODO: INSERT INTO outbox_dlq SELECT * FROM outbox WHERE status = 'FAILED' AND retry_count > maxRetryCount
         // TODO: DELETE FROM outbox WHERE ...
         logger.warn("moveToDlq not implemented for PostgreSQL yet")
-        return OutboxRepositoryPort.Result.Ok(0)
+        return Result.Ok(0)
     }
 
-    override suspend fun findDlq(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+    override suspend fun findDlq(limit: Int): Result<List<OutboxEntry>> {
         // TODO: SELECT * FROM outbox_dlq ORDER BY created_at LIMIT limit
         logger.warn("findDlq not implemented for PostgreSQL yet")
-        return OutboxRepositoryPort.Result.Ok(emptyList())
+        return Result.Ok(emptyList())
     }
 
-    override suspend fun replayFromDlq(id: UUID): OutboxRepositoryPort.Result<Boolean> {
+    override suspend fun replayFromDlq(id: UUID): Result<Boolean> {
         // TODO: INSERT INTO outbox SELECT * FROM outbox_dlq WHERE id = id (with reset)
         // TODO: DELETE FROM outbox_dlq WHERE id = id
         logger.warn("replayFromDlq not implemented for PostgreSQL yet")
-        return OutboxRepositoryPort.Result.Ok(false)
+        return Result.Ok(false)
     }
 
     // ==================== Tier 1: Priority Queue ====================
     // TODO: outbox 테이블에 priority 컬럼 마이그레이션 필요 (V021__outbox_tier1.sql)
 
-    override suspend fun claimByPriority(limit: Int, workerId: String?): OutboxRepositoryPort.Result<List<OutboxEntry>> =
+    override suspend fun claimByPriority(limit: Int, workerId: String?): Result<List<OutboxEntry>> =
         withContext(Dispatchers.IO) {
             try {
                 val now = OffsetDateTime.now(ZoneOffset.UTC)
@@ -713,10 +717,10 @@ class JooqOutboxRepository(
                     .returning()
                     .fetch()
                 
-                OutboxRepositoryPort.Result.Ok(rows.map { rowToEntry(it) })
+                Result.Ok(rows.map { rowToEntry(it) })
             } catch (e: Exception) {
                 logger.error("Failed to claim by priority", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to claim by priority: ${e.message}"),
                 )
             }
@@ -725,7 +729,7 @@ class JooqOutboxRepository(
     // ==================== Tier 1: Entity-Level Ordering ====================
     // TODO: outbox 테이블에 entity_version 컬럼 마이그레이션 필요 (V021__outbox_tier1.sql)
 
-    override suspend fun claimWithOrdering(limit: Int, workerId: String?): OutboxRepositoryPort.Result<List<OutboxEntry>> =
+    override suspend fun claimWithOrdering(limit: Int, workerId: String?): Result<List<OutboxEntry>> =
         withContext(Dispatchers.IO) {
             try {
                 val now = OffsetDateTime.now(ZoneOffset.UTC)
@@ -735,7 +739,8 @@ class JooqOutboxRepository(
                     .from(OUTBOX)
                     .where(STATUS.eq(OutboxStatus.PROCESSING.name))
                     .fetch()
-                    .map { row -> row.get(AGGREGATE_ID)!! }
+                    .into(String::class.java)
+                    .filterNotNull()
                     .toSet()
                 
                 // 2. PENDING 엔트리 조회 (PROCESSING 중인 entity 제외)
@@ -758,7 +763,7 @@ class JooqOutboxRepository(
                     .take(limit)
                 
                 if (candidates.isEmpty()) {
-                    return@withContext OutboxRepositoryPort.Result.Ok(emptyList())
+                    return@withContext Result.Ok(emptyList<OutboxEntry>())
                 }
                 
                 // 4. claim
@@ -772,10 +777,10 @@ class JooqOutboxRepository(
                     .returning()
                     .fetch()
                 
-                OutboxRepositoryPort.Result.Ok(rows.map { row -> rowToEntry(row) })
+                Result.Ok(rows.map { row -> rowToEntry(row) })
             } catch (e: Exception) {
                 logger.error("Failed to claim with ordering", e)
-                OutboxRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to claim with ordering: ${e.message}"),
                 )
             }
@@ -784,8 +789,8 @@ class JooqOutboxRepository(
     private fun rowToEntry(row: org.jooq.Record): OutboxEntry {
         val processedAtValue = PROCESSED_AT.get(row)
         val claimedAtValue = CLAIMED_AT.get(row)
-        val aggregateId = AGGREGATE_ID.get(row)!!
-        val eventType = TYPE.get(row)!!
+        val aggregateId = requireField(AGGREGATE_ID.get(row), "aggregate_id")
+        val eventType = requireField(TYPE.get(row), "event_type")
         val payload = PAYLOAD.get(row)?.data() ?: "{}"
 
         // idempotencyKey: 마이그레이션 후에는 항상 존재, 없으면 즉시 생성
@@ -794,14 +799,14 @@ class JooqOutboxRepository(
             ?: OutboxEntry.generateIdempotencyKey(aggregateId, eventType, payload)
 
         return OutboxEntry(
-            id = ID.get(row)!!,
+            id = requireField(ID.get(row), "id"),
             idempotencyKey = idempotencyKey,
-            aggregateType = AggregateType.valueOf(AGGREGATE_TYPE.get(row)!!),
+            aggregateType = AggregateType.valueOf(requireField(AGGREGATE_TYPE.get(row), "aggregate_type")),
             aggregateId = aggregateId,
             eventType = eventType,
             payload = payload,
-            status = OutboxStatus.valueOf(STATUS.get(row)!!),
-            createdAt = CREATED_AT.get(row)!!.toInstant(),
+            status = OutboxStatus.valueOf(requireField(STATUS.get(row), "status")),
+            createdAt = requireField(CREATED_AT.get(row), "created_at").toInstant(),
             claimedAt = claimedAtValue?.toInstant(),
             claimedBy = CLAIMED_BY.get(row),
             processedAt = processedAtValue?.toInstant(),
@@ -809,4 +814,7 @@ class JooqOutboxRepository(
             failureReason = FAILURE_REASON.get(row),
         )
     }
+
+    private fun <T> requireField(value: T?, fieldName: String): T =
+        value ?: throw IllegalStateException("Required field '$fieldName' is null in outbox record")
 }

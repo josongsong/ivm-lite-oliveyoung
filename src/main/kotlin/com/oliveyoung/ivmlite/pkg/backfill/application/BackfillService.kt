@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.pkg.backfill.application
 import com.oliveyoung.ivmlite.pkg.backfill.domain.*
 import com.oliveyoung.ivmlite.pkg.backfill.ports.*
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.coroutines.*
 import org.slf4j.LoggerFactory
 import java.util.UUID
@@ -73,11 +74,11 @@ class BackfillService(
         
         // 저장
         return when (val r = jobRepository.save(job)) {
-            is BackfillJobRepositoryPort.Result.Ok -> {
+            is Result.Ok -> {
                 logger.info("Created backfill job: {} [{}]", job.name, job.id)
                 Result.Ok(r.value)
             }
-            is BackfillJobRepositoryPort.Result.Err -> {
+            is Result.Err -> {
                 Result.Err(r.error)
             }
         }
@@ -102,13 +103,13 @@ class BackfillService(
         
         // Dry Run 실행
         return when (val result = executor.dryRun(job.scope)) {
-            is BackfillExecutorPort.Result.Ok -> {
+            is Result.Ok -> {
                 val completedJob = dryRunJob.completeDryRun(result.value)
                 jobRepository.save(completedJob)
                 notifyStatusChange(jobId, BackfillStatus.PENDING)
                 Result.Ok(result.value)
             }
-            is BackfillExecutorPort.Result.Err -> {
+            is Result.Err -> {
                 val failedJob = dryRunJob.fail("Dry run failed: ${result.error}")
                 jobRepository.save(failedJob)
                 notifyStatusChange(jobId, BackfillStatus.FAILED)
@@ -131,8 +132,8 @@ class BackfillService(
         
         // Scope 해석
         val resolution = when (val r = executor.resolveScope(job.scope)) {
-            is BackfillExecutorPort.Result.Ok -> r.value
-            is BackfillExecutorPort.Result.Err -> return Result.Err(r.error)
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Err(r.error)
         }
         
         // 시작
@@ -238,8 +239,8 @@ class BackfillService(
      */
     suspend fun getActiveJobs(): List<BackfillJob> {
         return when (val r = jobRepository.findActive()) {
-            is BackfillJobRepositoryPort.Result.Ok -> r.value
-            is BackfillJobRepositoryPort.Result.Err -> emptyList()
+            is Result.Ok -> r.value
+            is Result.Err -> emptyList()
         }
     }
     
@@ -248,8 +249,8 @@ class BackfillService(
      */
     suspend fun getRecentJobs(limit: Int = 20): List<BackfillJob> {
         return when (val r = jobRepository.findRecent(limit)) {
-            is BackfillJobRepositoryPort.Result.Ok -> r.value
-            is BackfillJobRepositoryPort.Result.Err -> emptyList()
+            is Result.Ok -> r.value
+            is Result.Err -> emptyList()
         }
     }
     
@@ -258,8 +259,8 @@ class BackfillService(
      */
     suspend fun getStats(): BackfillStats? {
         return when (val r = jobRepository.getStats()) {
-            is BackfillJobRepositoryPort.Result.Ok -> r.value
-            is BackfillJobRepositoryPort.Result.Err -> null
+            is Result.Ok -> r.value
+            is Result.Err -> null
         }
     }
     
@@ -267,8 +268,8 @@ class BackfillService(
     
     private suspend fun findJob(id: UUID): BackfillJob? {
         return when (val r = jobRepository.findById(id)) {
-            is BackfillJobRepositoryPort.Result.Ok -> r.value
-            is BackfillJobRepositoryPort.Result.Err -> null
+            is Result.Ok -> r.value
+            is Result.Err -> null
         }
     }
     
@@ -302,7 +303,7 @@ class BackfillService(
                 val result = executor.processBatch(batch, job.type, job.config)
                 
                 when (result) {
-                    is BackfillExecutorPort.Result.Ok -> {
+                    is Result.Ok -> {
                         val batchResult = result.value
                         processed += batchResult.total
                         
@@ -320,7 +321,7 @@ class BackfillService(
                         jobRepository.save(currentJob)
                         notifyProgress(job.id, newProgress)
                     }
-                    is BackfillExecutorPort.Result.Err -> {
+                    is Result.Err -> {
                         if (!job.config.continueOnError) {
                             throw RuntimeException("Batch failed: ${result.error}")
                         }
@@ -366,13 +367,6 @@ class BackfillService(
         progressListeners.forEach {
             try { it.onStatusChange(jobId, status) } catch (e: Exception) { /* ignore */ }
         }
-    }
-    
-    // ==================== Result Type ====================
-    
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
     }
 }
 

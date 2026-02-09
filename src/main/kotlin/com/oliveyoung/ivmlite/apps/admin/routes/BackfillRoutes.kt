@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.apps.admin.dto.ApiError
 import com.oliveyoung.ivmlite.pkg.backfill.application.BackfillService
 import com.oliveyoung.ivmlite.pkg.backfill.application.CreateBackfillRequest
 import com.oliveyoung.ivmlite.pkg.backfill.domain.*
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -100,10 +101,10 @@ fun Route.backfillRoutes() {
             )
             
             when (val result = backfillService.createJob(createRequest)) {
-                is BackfillService.Result.Ok -> {
+                is Result.Ok -> {
                     call.respond(HttpStatusCode.Created, result.value.toDto())
                 }
-                is BackfillService.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiError(code = "CREATE_ERROR", message = result.error.toString())
@@ -175,10 +176,10 @@ fun Route.backfillRoutes() {
             }
             
             when (val result = backfillService.dryRun(id)) {
-                is BackfillService.Result.Ok -> {
+                is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, result.value.toDto())
                 }
-                is BackfillService.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiError(code = "DRY_RUN_ERROR", message = result.error.toString())
@@ -206,13 +207,13 @@ fun Route.backfillRoutes() {
             }
             
             when (val result = backfillService.startJob(id)) {
-                is BackfillService.Result.Ok -> {
+                is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf(
                         "success" to true,
                         "job" to result.value.toDto()
                     ))
                 }
-                is BackfillService.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiError(code = "START_ERROR", message = result.error.toString())
@@ -240,10 +241,10 @@ fun Route.backfillRoutes() {
             }
             
             when (val result = backfillService.pauseJob(id)) {
-                is BackfillService.Result.Ok -> {
+                is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf("success" to true, "status" to "PAUSED"))
                 }
-                is BackfillService.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiError(code = "PAUSE_ERROR", message = result.error.toString())
@@ -270,10 +271,10 @@ fun Route.backfillRoutes() {
             }
             
             when (val result = backfillService.resumeJob(id)) {
-                is BackfillService.Result.Ok -> {
+                is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf("success" to true, "status" to "RUNNING"))
                 }
-                is BackfillService.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiError(code = "RESUME_ERROR", message = result.error.toString())
@@ -300,10 +301,10 @@ fun Route.backfillRoutes() {
             }
             
             when (val result = backfillService.cancelJob(id)) {
-                is BackfillService.Result.Ok -> {
+                is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf("success" to true, "status" to "CANCELLED"))
                 }
-                is BackfillService.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiError(code = "CANCEL_ERROR", message = result.error.toString())
@@ -330,10 +331,10 @@ fun Route.backfillRoutes() {
             }
             
             when (val result = backfillService.retryJob(id)) {
-                is BackfillService.Result.Ok -> {
+                is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf("success" to true, "status" to "PENDING"))
                 }
-                is BackfillService.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         HttpStatusCode.BadRequest,
                         ApiError(code = "RETRY_ERROR", message = result.error.toString())

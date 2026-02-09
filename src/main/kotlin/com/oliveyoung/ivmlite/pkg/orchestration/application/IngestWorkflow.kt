@@ -10,12 +10,16 @@ import com.oliveyoung.ivmlite.shared.domain.determinism.CanonicalJson
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Tracer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Cross-domain orchestration workflow for runtime ingestion flow.
@@ -106,8 +110,8 @@ class IngestWorkflow private constructor(
             if (unitOfWork != null) {
                 // UnitOfWork: 단일 트랜잭션으로 원자적 처리
                 when (val r = unitOfWork.executeIngest(record, outboxEntry)) {
-                    is IngestUnitOfWorkPort.Result.Ok -> Result.Ok(Unit)
-                    is IngestUnitOfWorkPort.Result.Err -> Result.Err(r.error)
+                    is Result.Ok -> Result.Ok(Unit)
+                    is Result.Err -> Result.Err(r.error)
                 }
             } else {
                 // Legacy: 순차 실행 (하위 호환성)
@@ -119,45 +123,31 @@ class IngestWorkflow private constructor(
                 )
 
                 when (val r = rawRepoNonNull.putIdempotent(record)) {
-                    is RawDataRepositoryPort.Result.Ok -> { /* continue */ }
-                    is RawDataRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                    is Result.Ok -> { /* continue */ }
+                    is Result.Err -> return@withSpanSuspend Result.Err(r.error)
                 }
 
                 when (val r = outboxRepoNonNull.insert(outboxEntry)) {
-                    is OutboxRepositoryPort.Result.Ok -> Result.Ok(Unit)
-                    is OutboxRepositoryPort.Result.Err -> Result.Err(r.error)
+                    is Result.Ok -> Result.Ok(Unit)
+                    is Result.Err -> Result.Err(r.error)
                 }
             }
         }
     }
 
     /**
-     * Outbox payload를 안전하게 생성 (JSON escape 적용)
+     * Outbox payload를 안전하게 생성
      *
-     * NOTE: XSS/Injection 방지를 위해 특수문자 escape
+     * kotlinx.serialization 사용으로 자동 escape 처리 (XSS/Injection 방지)
      * NOTE: payloadVersion 필드로 스키마 버전 관리 (확장성 보장)
      */
     private fun buildOutboxPayload(tenantId: String, entityKey: String, version: Long): String {
-        val safeTenantId = escapeJsonString(tenantId)
-        val safeEntityKey = escapeJsonString(entityKey)
-        return """{"payloadVersion":"1.0","tenantId":"$safeTenantId","entityKey":"$safeEntityKey","version":$version}"""
-    }
-
-    /**
-     * JSON 문자열 escape (RFC 8259 준수)
-     */
-    private fun escapeJsonString(s: String): String {
-        return s.replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-            .replace("\b", "\\b")
-            .replace("\u000C", "\\f")
-    }
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
+        val payload = buildJsonObject {
+            put("payloadVersion", "1.0")
+            put("tenantId", tenantId)
+            put("entityKey", entityKey)
+            put("version", version)
+        }
+        return Json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), payload)
     }
 }

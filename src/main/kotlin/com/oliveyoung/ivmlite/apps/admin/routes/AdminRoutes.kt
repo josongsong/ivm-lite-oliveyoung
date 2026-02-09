@@ -1,6 +1,7 @@
 package com.oliveyoung.ivmlite.apps.admin.routes
 
 import com.oliveyoung.ivmlite.apps.admin.application.*
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -41,10 +42,10 @@ fun Route.adminRoutes() {
      */
     get("/dashboard") {
         when (val result = dashboardService.getDashboard()) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -56,10 +57,10 @@ fun Route.adminRoutes() {
      */
     get("/outbox/stats") {
         when (val result = dashboardService.getOutboxStats()) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -71,10 +72,10 @@ fun Route.adminRoutes() {
      */
     get("/worker/status") {
         when (val result = dashboardService.getWorkerStatus()) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -86,10 +87,10 @@ fun Route.adminRoutes() {
      */
     get("/db/stats") {
         when (val result = dashboardService.getDatabaseStats()) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -103,13 +104,13 @@ fun Route.adminRoutes() {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
 
         when (val result = dashboardService.getRecentOutbox(limit)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, RecentOutboxResponse(
                     items = result.value.map { it.toResponse() },
                     count = result.value.size
                 ))
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -123,13 +124,13 @@ fun Route.adminRoutes() {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
 
         when (val result = dashboardService.getFailedOutbox(limit)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, FailedOutboxResponse(
                     items = result.value.map { it.toResponse() },
                     count = result.value.size
                 ))
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -149,10 +150,10 @@ fun Route.adminRoutes() {
         }
 
         when (val result = dashboardService.getOutboxEntry(id)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -166,13 +167,13 @@ fun Route.adminRoutes() {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
 
         when (val result = dashboardService.getDlq(limit)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, DlqResponse(
                     items = result.value.map { it.toResponse() },
                     count = result.value.size
                 ))
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -192,13 +193,13 @@ fun Route.adminRoutes() {
         }
 
         when (val result = dashboardService.replayDlq(id)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, mapOf(
                     "success" to result.value,
                     "message" to if (result.value) "Replay successful" else "Replay failed"
                 ))
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -212,13 +213,13 @@ fun Route.adminRoutes() {
         val timeoutSeconds = call.request.queryParameters["timeout"]?.toLongOrNull() ?: 300L
 
         when (val result = dashboardService.releaseStale(timeoutSeconds)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, mapOf(
                     "released" to result.value,
                     "message" to "Released ${result.value} stale entries"
                 ))
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -238,14 +239,14 @@ fun Route.adminRoutes() {
         }
 
         when (val result = dashboardService.retryEntry(id)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, RetryResponse(
                     success = true,
                     message = "Entry reset to PENDING for retry",
                     entry = result.value.toResponse()
                 ))
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -259,14 +260,14 @@ fun Route.adminRoutes() {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 100
 
         when (val result = dashboardService.retryAllFailed(limit)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, BatchRetryResponse(
                     success = true,
                     retriedCount = result.value,
                     message = "Reset ${result.value} failed entries to PENDING"
                 ))
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -280,10 +281,10 @@ fun Route.adminRoutes() {
         val hours = call.request.queryParameters["hours"]?.toIntOrNull() ?: 24
 
         when (val result = dashboardService.getHourlyStats(hours)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -297,14 +298,14 @@ fun Route.adminRoutes() {
         val timeoutSeconds = call.request.queryParameters["timeout"]?.toLongOrNull() ?: 300L
 
         when (val result = dashboardService.getStaleEntries(timeoutSeconds)) {
-            is AdminDashboardService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, StaleOutboxResponse(
                     items = result.value.map { it.toResponse() },
                     count = result.value.size,
                     timeoutSeconds = timeoutSeconds
                 ))
             }
-            is AdminDashboardService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }

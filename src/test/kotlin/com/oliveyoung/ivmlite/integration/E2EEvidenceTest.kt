@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
@@ -104,12 +105,12 @@ class E2EEvidenceTest : StringSpec({
             schemaVersion = SemVer.parse("1.0.0"),
             payloadJson = productFixture,
         )
-        ingestResult.shouldBeInstanceOf<IngestWorkflow.Result.Ok<*>>()
+        ingestResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // RawData 조회
         val rawDataResult = rawDataRepo.get(tenantId, entityKey, 1L)
-        rawDataResult.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok<*>>()
-        val rawData = (rawDataResult as com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort.Result.Ok).value
+        rawDataResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val rawData = (rawDataResult as Result.Ok).value
 
         println("✅ RawData 저장 완료")
         println("   - TenantId: ${rawData.tenantId.value}")
@@ -123,8 +124,8 @@ class E2EEvidenceTest : StringSpec({
 
         // Outbox 확인
         val outboxPending = outboxRepo.findPending(10)
-        outboxPending.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        val outboxEntries = (outboxPending as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value
+        outboxPending.shouldBeInstanceOf<Result.Ok<*>>()
+        val outboxEntries = (outboxPending as Result.Ok).value
         println("✅ Outbox 저장 완료")
         println("   - PENDING 항목 수: ${outboxEntries.size}")
         if (outboxEntries.isNotEmpty()) {
@@ -138,8 +139,8 @@ class E2EEvidenceTest : StringSpec({
         println("-".repeat(80))
 
         val sliceResult = slicingWorkflow.execute(tenantId, entityKey, 1L)
-        sliceResult.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
-        val sliceKeys = (sliceResult as SlicingWorkflow.Result.Ok).value
+        sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val sliceKeys = (sliceResult as Result.Ok).value
 
         println("✅ 슬라이싱 완료")
         println("   - 생성된 Slice 수: ${sliceKeys.size}")
@@ -148,8 +149,8 @@ class E2EEvidenceTest : StringSpec({
 
         // 각 Slice 상세 조회
         val allSlicesResult = sliceRepo.getByVersion(tenantId, entityKey, 1L)
-        allSlicesResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val allSlices = (allSlicesResult as SliceRepositoryPort.Result.Ok).value
+        allSlicesResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val allSlices = (allSlicesResult as Result.Ok).value
 
         println("📦 생성된 Slice 상세:")
         allSlices.forEach { slice ->
@@ -232,8 +233,8 @@ class E2EEvidenceTest : StringSpec({
             entityKey = entityKey,
             version = 1L,
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val viewResponse = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val viewResponse = (queryResult as Result.Ok).value
 
         println("✅ Query 완료")
         println("   - ViewId: view.product.pdp.v1")
@@ -302,16 +303,16 @@ class E2EEvidenceTest : StringSpec({
 
         // executeAuto (INCREMENTAL 선택)
         val incrementalResult = slicingWorkflow.executeAuto(tenantId, entityKey, 2L)
-        incrementalResult.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
-        val incrementalSliceKeys = (incrementalResult as SlicingWorkflow.Result.Ok).value
+        incrementalResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val incrementalSliceKeys = (incrementalResult as Result.Ok).value
 
         println("✅ INCREMENTAL 슬라이싱 완료")
         println("   - 재생성된 Slice 수: ${incrementalSliceKeys.size}")
         println("   - SliceTypes: ${incrementalSliceKeys.map { it.sliceType.name }.joinToString(", ")}")
 
         // v1과 v2 Slice 비교
-        val v1Slices = (sliceRepo.getByVersion(tenantId, entityKey, 1L) as SliceRepositoryPort.Result.Ok).value
-        val v2Slices = (sliceRepo.getByVersion(tenantId, entityKey, 2L) as SliceRepositoryPort.Result.Ok).value
+        val v1Slices = (sliceRepo.getByVersion(tenantId, entityKey, 1L) as Result.Ok).value
+        val v2Slices = (sliceRepo.getByVersion(tenantId, entityKey, 2L) as Result.Ok).value
 
         println("\n   📊 버전별 Slice 비교:")
         println("   - v1 Slice 수: ${v1Slices.size}")

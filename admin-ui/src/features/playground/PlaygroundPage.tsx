@@ -14,7 +14,7 @@ import {
   Share2,
   Zap,
 } from 'lucide-react'
-import { YamlEditor } from './components/YamlEditor/YamlEditor'
+import { YamlEditor } from '@/shared/ui'
 import { SampleInput } from './components/SampleInput/SampleInput'
 import { PreviewPanel } from './components/Preview/PreviewPanel'
 import { usePlayground } from './hooks/usePlayground'
@@ -293,7 +293,12 @@ export function PlaygroundPage() {
               <YamlEditor
                 value={yaml}
                 onChange={setYaml}
-                errors={validationResult?.errors}
+                errors={validationResult?.errors?.map((e) => ({
+                  line: e.line,
+                  column: e.column,
+                  message: e.message,
+                  severity: e.severity,
+                }))}
                 height="100%"
               />
             </div>

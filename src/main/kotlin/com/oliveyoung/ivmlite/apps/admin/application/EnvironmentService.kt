@@ -334,7 +334,10 @@ data class EnvironmentDynamoDBConfig(
 data class EnvironmentKafkaConfig(
     val bootstrapServers: String,
     val consumerGroup: String,
-    val topicPrefix: String
+    val topicPrefix: String,
+    val securityProtocol: String = "PLAINTEXT",
+    val saslMechanism: String? = null,
+    val awsRegion: String? = null
 )
 
 data class EnvironmentObservabilityConfig(

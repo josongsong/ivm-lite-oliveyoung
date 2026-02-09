@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
@@ -61,8 +62,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.id shouldBe "changeset.v1"
         contract.meta.status shouldBe ContractStatus.ACTIVE
         contract.entityKeyFormat shouldBe "{ENTITY_TYPE}#{tenantId}#{entityId}"
@@ -95,8 +96,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadJoinSpecContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.id shouldBe "join-spec.v1"
         contract.maxJoinDepth shouldBe 3
         contract.maxFanout shouldBe 5000
@@ -129,8 +130,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadInvertedIndexContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.id shouldBe "inverted-index.v1"
         contract.pkPattern shouldBe "INV#{ref_type}#{ref_value}"
         contract.skPattern shouldBe "TARGET#{target_type}#{target_id}"
@@ -146,8 +147,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     "loadChangeSetContract - kind 누락 → ContractError" {
@@ -165,8 +166,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadChangeSetContract - 잘못된 status → ContractError" {
@@ -184,8 +185,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadInvertedIndexContract - keySpec 누락 → ContractError" {
@@ -205,8 +206,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadInvertedIndexContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadChangeSetContract - 기본값 적용" {
@@ -226,8 +227,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.entityKeyFormat shouldBe "{ENTITY_TYPE}#{tenantId}#{entityId}"
         contract.externalizeThresholdBytes shouldBe 100000
         contract.fanoutEnabled shouldBe false
@@ -250,8 +251,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadChangeSetContract - data 누락 → ContractError" {
@@ -269,8 +270,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadJoinSpecContract - fanout.invertedIndex 누락 → ContractError" {
@@ -290,8 +291,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadJoinSpecContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadJoinSpecContract - contractRef.id 누락 → ContractError" {
@@ -318,8 +319,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadJoinSpecContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadInvertedIndexContract - pkPattern 누락 → ContractError" {
@@ -343,8 +344,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadInvertedIndexContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadInvertedIndexContract - skPattern 누락 → ContractError" {
@@ -368,8 +369,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadInvertedIndexContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadChangeSetContract - DEPRECATED 상태 contract → 정상 로드" {
@@ -389,8 +390,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.meta.status shouldBe ContractStatus.DEPRECATED
     }
 
@@ -418,8 +419,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadJoinSpecContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         // 기본값 검증 (코드에서 기본값은 1)
         contract.maxJoinDepth shouldBe 1
     }
@@ -446,8 +447,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadInvertedIndexContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         // 기본값 검증
         contract.padWidth shouldBe 12
         contract.separator shouldBe "#"
@@ -475,7 +476,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "checksum 불일치 → Err(ContractIntegrityError)" {
@@ -497,8 +498,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
     }
 
     "checksum 필드 누락 → 경고 로그 + Ok (migration 호환)" {
@@ -519,7 +520,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "checksum 형식 - sha256: prefix 없이 순수 hex만 있을 때도 검증" {
@@ -541,7 +542,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "빈 data → 빈 문자열 hash와 비교" {
@@ -564,8 +565,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
         val result = adapter.loadChangeSetContract(ref)
 
         // 빈 data는 파싱 실패하므로 ContractError (checksum은 통과)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "loadJoinSpecContract - checksum 일치 시 정상 로드" {
@@ -595,7 +596,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadJoinSpecContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "loadInvertedIndexContract - checksum 불일치 시 ContractIntegrityError" {
@@ -622,8 +623,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadInvertedIndexContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
     }
 
     // ==================== Phase C-2: 엣지/코너 케이스 (수학적 완결성) ====================
@@ -644,8 +645,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        val error = (result as ContractRegistryPort.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
         (error as DomainError.ContractIntegrityError).actual shouldBe "<data_missing>"
     }
@@ -668,8 +669,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        val error = (result as ContractRegistryPort.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
     }
 
@@ -691,8 +692,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
     }
 
     "Unicode/특수문자 포함 data → 정상 checksum 검증" {
@@ -714,7 +715,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "대용량 data (100KB) → checksum 검증 정상 동작" {
@@ -737,7 +738,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "결정성: 동일 data → 동일 checksum (반복 검증)" {
@@ -767,8 +768,8 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
         val result = adapter.loadChangeSetContract(ref)
 
         // checksum 검증은 통과하지만, parse에서 "missing data" 에러
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        val error = (result as ContractRegistryPort.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.ContractError>()
         error.message shouldContain "missing data"
     }
@@ -793,7 +794,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadChangeSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractIntegrityError>()
     }
 })

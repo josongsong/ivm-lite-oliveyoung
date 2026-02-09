@@ -9,6 +9,7 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.ktor.http.ContentType
@@ -49,7 +50,7 @@ fun Route.queryRoutes() {
             )
 
             when (result) {
-                is SlicingWorkflow.Result.Ok -> {
+                is Result.Ok -> {
                     val sliceTypes = result.value.map { it.sliceType.name }
                     call.respond(
                         HttpStatusCode.OK,
@@ -60,7 +61,7 @@ fun Route.queryRoutes() {
                         ),
                     )
                 }
-                is SlicingWorkflow.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         result.error.toKtorStatus(),
                         ApiError.from(result.error),
@@ -86,14 +87,14 @@ fun Route.queryRoutes() {
                     version = request.version,
                 )
                 when (result) {
-                    is QueryViewWorkflow.Result.Ok -> {
+                    is Result.Ok -> {
                         call.respondText(
                             serializeViewResponse(result.value),
                             ContentType.Application.Json,
                             HttpStatusCode.OK,
                         )
                     }
-                    is QueryViewWorkflow.Result.Err -> {
+                    is Result.Err -> {
                         call.respond(result.error.toKtorStatus(), ApiError.from(result.error))
                     }
                 }
@@ -117,14 +118,14 @@ fun Route.queryRoutes() {
             )
 
             when (result) {
-                is QueryViewWorkflow.Result.Ok -> {
+                is Result.Ok -> {
                     call.respondText(
                         serializeViewResponse(result.value),
                         ContentType.Application.Json,
                         HttpStatusCode.OK,
                     )
                 }
-                is QueryViewWorkflow.Result.Err -> {
+                is Result.Err -> {
                     call.respond(result.error.toKtorStatus(), ApiError.from(result.error))
                 }
             }
@@ -147,14 +148,14 @@ fun Route.queryRoutes() {
             )
 
             when (result) {
-                is QueryViewWorkflow.Result.Ok -> {
+                is Result.Ok -> {
                     call.respondText(
                         serializeViewResponse(result.value),
                         ContentType.Application.Json,
                         HttpStatusCode.OK,
                     )
                 }
-                is QueryViewWorkflow.Result.Err -> {
+                is Result.Err -> {
                     call.respond(result.error.toKtorStatus(), ApiError.from(result.error))
                 }
             }

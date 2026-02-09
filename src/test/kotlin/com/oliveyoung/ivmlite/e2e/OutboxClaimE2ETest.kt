@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.e2e
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
@@ -92,7 +93,7 @@ class OutboxClaimE2ETest : StringSpec({
                         ruleSetVersion = SemVer.parse("1.0.0"),
                     ),
                 )
-                SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
+                Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
             }
         }
 
@@ -128,11 +129,11 @@ class OutboxClaimE2ETest : StringSpec({
             schemaVersion = SemVer.parse("1.0.0"),
             payloadJson = """{"name": "E2E Test Product", "price": 1000}""",
         )
-        ingestResult shouldBe IngestWorkflow.Result.Ok(Unit)
+        ingestResult shouldBe Result.Ok(Unit)
 
         // Outbox에 PENDING 엔트리 있음
         val pending = outboxRepo.findPending(10)
-        (pending as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (pending as Result.Ok).value shouldHaveSize 1
         pending.value[0].status shouldBe OutboxStatus.PENDING
 
         // Step 2: Worker 실행
@@ -153,11 +154,11 @@ class OutboxClaimE2ETest : StringSpec({
 
         // Outbox: PENDING 없음
         val afterPending = outboxRepo.findPending(10)
-        (afterPending as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 0
+        (afterPending as Result.Ok).value shouldHaveSize 0
 
         // Slice 생성됨
         val slices = sliceRepo.getLatestVersion(tenantId, entityKey)
-        (slices as com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort.Result.Ok).value shouldHaveSize 1
+        (slices as Result.Ok).value shouldHaveSize 1
     }
 
     "E2E: 대량 데이터 처리 (100개)" {
@@ -193,7 +194,7 @@ class OutboxClaimE2ETest : StringSpec({
 
         // PENDING 없음
         val pending = outboxRepo.findPending(10)
-        (pending as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 0
+        (pending as Result.Ok).value shouldHaveSize 0
     }
 
     "E2E: 여러 Worker 동시 처리 - 중복 없음" {
@@ -290,7 +291,7 @@ class OutboxClaimE2ETest : StringSpec({
 
         // PENDING/PROCESSING 없음
         val pending = outboxRepo.findPending(10)
-        (pending as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 0
+        (pending as Result.Ok).value shouldHaveSize 0
     }
 
     "E2E: 실패 후 재시도" {
@@ -301,13 +302,13 @@ class OutboxClaimE2ETest : StringSpec({
                 callCount++
                 if (callCount <= 2) {
                     // 처음 2번은 실패
-                    SlicingEnginePort.Result.Err(
+                    Result.Err(
                         com.oliveyoung.ivmlite.shared.domain.errors.DomainError.StorageError("Simulated failure")
                     )
                 } else {
                     // 3번째부터 성공
                     val rawData = firstArg<com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord>()
-                    SlicingEnginePort.Result.Ok(
+                    Result.Ok(
                         SlicingEnginePort.SlicingResult(
                             listOf(
                                 SliceRecord(
@@ -388,7 +389,7 @@ class OutboxClaimE2ETest : StringSpec({
 
         // 페이지 1 조회
         val page1 = outboxRepo.findPendingWithCursor(limit = 10, cursor = null, type = null)
-        (page1 as OutboxRepositoryPort.Result.Ok).value.entries shouldHaveSize 10
+        (page1 as Result.Ok).value.entries shouldHaveSize 10
         page1.value.hasMore shouldBe true
         page1.value.nextCursor shouldBe page1.value.nextCursor // not null
 
@@ -398,7 +399,7 @@ class OutboxClaimE2ETest : StringSpec({
             cursor = page1.value.nextCursor, 
             type = null
         )
-        (page2 as OutboxRepositoryPort.Result.Ok).value.entries shouldHaveSize 10
+        (page2 as Result.Ok).value.entries shouldHaveSize 10
         page2.value.hasMore shouldBe true
 
         // 페이지 3 조회
@@ -407,7 +408,7 @@ class OutboxClaimE2ETest : StringSpec({
             cursor = page2.value.nextCursor, 
             type = null
         )
-        (page3 as OutboxRepositoryPort.Result.Ok).value.entries shouldHaveSize 5
+        (page3 as Result.Ok).value.entries shouldHaveSize 5
         page3.value.hasMore shouldBe false
         page3.value.nextCursor shouldBe null
 
@@ -469,6 +470,6 @@ class OutboxClaimE2ETest : StringSpec({
 
         // PENDING 없음
         val pending = outboxRepo.findPending(10)
-        (pending as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 0
+        (pending as Result.Ok).value shouldHaveSize 0
     }
 })

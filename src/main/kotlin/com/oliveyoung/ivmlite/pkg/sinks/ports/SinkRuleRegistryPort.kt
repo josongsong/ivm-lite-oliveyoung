@@ -1,7 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.sinks.ports
 
 import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkRule
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 
 /**
@@ -41,11 +41,4 @@ interface SinkRuleRegistryPort {
      * ID로 SinkRule 조회
      */
     suspend fun findById(id: String): Result<SinkRule?>
-
-    // === Result Types ===
-
-    sealed interface Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>
-        data class Err(val error: DomainError) : Result<Nothing>
-    }
 }

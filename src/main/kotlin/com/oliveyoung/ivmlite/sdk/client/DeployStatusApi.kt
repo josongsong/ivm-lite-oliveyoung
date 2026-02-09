@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.DeployJobRepositoryP
 import com.oliveyoung.ivmlite.sdk.model.DeployJobStatus
 import com.oliveyoung.ivmlite.sdk.model.DeployResult
 import com.oliveyoung.ivmlite.sdk.model.DeployState
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.coroutines.delay
 import java.time.Duration
 import java.time.Instant
@@ -26,7 +27,7 @@ class DeployStatusApi internal constructor(
         // Repository가 있으면 실제 조회
         if (repository != null) {
             when (val result = repository.get(jobId)) {
-                is DeployJobRepositoryPort.Result.Ok -> {
+                is Result.Ok -> {
                     val record = result.value
                     if (record != null) {
                         return DeployJobStatus(
@@ -40,7 +41,7 @@ class DeployStatusApi internal constructor(
                         )
                     }
                 }
-                is DeployJobRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     // 에러 시 기본값 반환
                 }
             }

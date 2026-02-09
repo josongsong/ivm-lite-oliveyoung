@@ -6,6 +6,7 @@ import com.oliveyoung.ivmlite.pkg.slices.domain.Tombstone
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
@@ -63,7 +64,7 @@ class JooqSliceRepository(
         private val DELETE_REASON = DSL.field("delete_reason", String::class.java)
     }
 
-    override suspend fun putAllIdempotent(slices: List<SliceRecord>): SliceRepositoryPort.Result<Unit> =
+    override suspend fun putAllIdempotent(slices: List<SliceRecord>): Result<Unit> =
         tracer.withSpanSuspend(
             "PostgreSQL.putAllIdempotent",
             mapOf(
@@ -74,7 +75,7 @@ class JooqSliceRepository(
         ) {
             withContext(Dispatchers.IO) {
                 if (slices.isEmpty()) {
-                    return@withContext SliceRepositoryPort.Result.Ok(Unit)
+                    return@withContext Result.Ok(Unit)
                 }
 
                 try {
@@ -142,12 +143,12 @@ class JooqSliceRepository(
                     }
                 }
 
-                    SliceRepositoryPort.Result.Ok(Unit)
+                    Result.Ok(Unit)
                 } catch (e: DomainError.InvariantViolation) {
-                    SliceRepositoryPort.Result.Err(e)
+                    Result.Err(e)
                 } catch (e: Exception) {
                     logger.error("Failed to put slices", e)
-                    SliceRepositoryPort.Result.Err(
+                    Result.Err(
                         DomainError.StorageError("Failed to put slices: ${e.message}"),
                     )
                 }
@@ -158,7 +159,7 @@ class JooqSliceRepository(
         tenantId: TenantId,
         keys: List<SliceRepositoryPort.SliceKey>,
         includeTombstones: Boolean,
-    ): SliceRepositoryPort.Result<List<SliceRecord>> = tracer.withSpanSuspend(
+    ): Result<List<SliceRecord>> = tracer.withSpanSuspend(
         "PostgreSQL.batchGet",
         mapOf(
             "db.system" to "postgresql",
@@ -167,81 +168,60 @@ class JooqSliceRepository(
         ),
     ) {
         withContext(Dispatchers.IO) {
-        if (keys.isEmpty()) {
-            return@withContext SliceRepositoryPort.Result.Ok(emptyList())
-        }
+            if (keys.isEmpty()) {
+                return@withContext Result.Ok(emptyList())
+            }
 
-        try {
-            val results = mutableListOf<SliceRecord>()
+            try {
+                // N+1 방지: 단일 쿼리로 모든 키 조회
+                // (entity_key, slice_type, slice_version) 튜플 조건 생성
+                val conditions = keys.map { key ->
+                    DSL.and(
+                        TENANT_ID.eq(key.tenantId.value),
+                        ENTITY_KEY.eq(key.entityKey.value),
+                        SLICE_TYPE.eq(key.sliceType.name),
+                        SLICE_VERSION.eq(key.version),
+                    )
+                }
 
-            for (key in keys) {
                 var query = dsl.selectFrom(SLICES)
-                    .where(TENANT_ID.eq(key.tenantId.value))
-                    .and(ENTITY_KEY.eq(key.entityKey.value))
-                    .and(SLICE_TYPE.eq(key.sliceType.name))
-                    .and(SLICE_VERSION.eq(key.version))
+                    .where(DSL.or(conditions))
 
-                // tombstone 필터링
                 if (!includeTombstones) {
                     query = query.and(IS_DELETED.eq(false))
                 }
 
-                val row = query.fetchOne()
+                val rows = query.fetch()
 
-                if (row == null) {
-                    return@withContext SliceRepositoryPort.Result.Err(
-                        DomainError.NotFoundError(
-                            "Slice",
-                            "${key.tenantId.value}:${key.entityKey.value}:${key.sliceType.name}@${key.version}",
-                        ),
+                // 조회된 결과를 키 기준으로 매핑
+                val rowMap = rows.associateBy { row ->
+                    Triple(
+                        row.get(ENTITY_KEY)!!,
+                        row.get(SLICE_TYPE)!!,
+                        row.get(SLICE_VERSION)!!,
                     )
                 }
 
-                val rulesetRef = row.get(RULESET_REF)
-                    ?: throw DomainError.StorageError("Missing required field 'ruleset_ref' in slice row")
-                val (ruleSetId, ruleSetVersionStr) = if (rulesetRef.contains("@")) {
-                    val parts = rulesetRef.split("@", limit = 2)
-                    if (parts.size != 2) {
-                        throw DomainError.StorageError("Invalid ruleset_ref format in slice row: $rulesetRef")
-                    }
-                    parts[0] to parts[1]
-                } else {
-                    throw DomainError.StorageError("Invalid ruleset_ref format in slice row (missing @): $rulesetRef")
+                // 요청된 키 순서대로 결과 구성, 누락 시 에러
+                val results = mutableListOf<SliceRecord>()
+                for (key in keys) {
+                    val lookupKey = Triple(key.entityKey.value, key.sliceType.name, key.version)
+                    val row = rowMap[lookupKey]
+                        ?: return@withContext Result.Err(
+                            DomainError.NotFoundError(
+                                "Slice",
+                                "${key.tenantId.value}:${key.entityKey.value}:${key.sliceType.name}@${key.version}",
+                            ),
+                        )
+                    results.add(parseRow(row))
                 }
 
-                // Tombstone 복원
-                val isDeleted = row.get(IS_DELETED) ?: false
-                val tombstone = if (isDeleted) {
-                    val deletedAtVersion = row.get(DELETED_AT_VERSION)!!
-                    val deleteReason = DeleteReason.fromDbValue(row.get(DELETE_REASON)!!)
-                    Tombstone(isDeleted = true, deletedAtVersion = deletedAtVersion, deleteReason = deleteReason)
-                } else {
-                    null
-                }
-
-                val record = SliceRecord(
-                    tenantId = TenantId(row.get(TENANT_ID)!!),
-                    entityKey = EntityKey(row.get(ENTITY_KEY)!!),
-                    version = row.get(SLICE_VERSION)!!,
-                    sliceType = SliceType.valueOf(row.get(SLICE_TYPE)!!),
-                    data = row.get(CONTENT)?.data()
-                        ?: throw DomainError.StorageError("Missing required field 'content' in slice row"),
-                    // DB에서 읽을 때는 "sha256:" 접두사 복원
-                    hash = "sha256:${row.get(CONTENT_HASH)!!}",
-                    ruleSetId = ruleSetId,
-                    ruleSetVersion = SemVer.parse(ruleSetVersionStr),
-                    tombstone = tombstone,
-                )
-
-                results.add(record)
-            }
-
-                SliceRepositoryPort.Result.Ok(results)
+                Result.Ok(results)
             } catch (e: DomainError) {
-                SliceRepositoryPort.Result.Err(e)
+                Result.Err(e)
             } catch (e: Exception) {
                 logger.error("Failed to batch get slices", e)
-                SliceRepositoryPort.Result.Err(
+                Result.Err(
                     DomainError.StorageError("Failed to batch get slices: ${e.message}"),
                 )
             }
@@ -253,7 +233,7 @@ class JooqSliceRepository(
         entityKey: EntityKey,
         version: Long,
         includeTombstones: Boolean,
-    ): SliceRepositoryPort.Result<List<SliceRecord>> = withContext(Dispatchers.IO) {
+    ): Result<List<SliceRecord>> = withContext(Dispatchers.IO) {
         try {
             var query = dsl.selectFrom(SLICES)
                 .where(TENANT_ID.eq(tenantId.value))
@@ -266,50 +246,14 @@ class JooqSliceRepository(
             }
 
             val rows = query.fetch()
-            val results = rows.map { row ->
-                val rulesetRef = row.get(RULESET_REF)
-                    ?: throw DomainError.StorageError("Missing required field 'ruleset_ref' in slice row")
-                val (ruleSetId, ruleSetVersionStr) = if (rulesetRef.contains("@")) {
-                    val parts = rulesetRef.split("@", limit = 2)
-                    if (parts.size != 2) {
-                        throw DomainError.StorageError("Invalid ruleset_ref format in slice row: $rulesetRef")
-                    }
-                    parts[0] to parts[1]
-                } else {
-                    throw DomainError.StorageError("Invalid ruleset_ref format in slice row (missing @): $rulesetRef")
-                }
+            val results = rows.map { row -> parseRow(row) }
 
-                // Tombstone 복원
-                val isDeleted = row.get(IS_DELETED) ?: false
-                val tombstone = if (isDeleted) {
-                    val deletedAtVersion = row.get(DELETED_AT_VERSION)!!
-                    val deleteReason = DeleteReason.fromDbValue(row.get(DELETE_REASON)!!)
-                    Tombstone(isDeleted = true, deletedAtVersion = deletedAtVersion, deleteReason = deleteReason)
-                } else {
-                    null
-                }
-
-                SliceRecord(
-                    tenantId = TenantId(row.get(TENANT_ID)!!),
-                    entityKey = EntityKey(row.get(ENTITY_KEY)!!),
-                    version = row.get(SLICE_VERSION)!!,
-                    sliceType = SliceType.valueOf(row.get(SLICE_TYPE)!!),
-                    data = row.get(CONTENT)?.data()
-                        ?: throw DomainError.StorageError("Missing required field 'content' in slice row"),
-                    // DB에서 읽을 때는 "sha256:" 접두사 복원
-                    hash = "sha256:${row.get(CONTENT_HASH)!!}",
-                    ruleSetId = ruleSetId,
-                    ruleSetVersion = SemVer.parse(ruleSetVersionStr),
-                    tombstone = tombstone,
-                )
-            }
-
-            SliceRepositoryPort.Result.Ok(results)
+            Result.Ok(results)
         } catch (e: DomainError) {
-            SliceRepositoryPort.Result.Err(e)
+            Result.Err(e)
         } catch (e: Exception) {
             logger.error("Failed to get slices by version", e)
-            SliceRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to get slices by version: ${e.message}"),
             )
         }
@@ -321,7 +265,7 @@ class JooqSliceRepository(
         sliceType: SliceType?,
         limit: Int,
         cursor: String?
-    ): SliceRepositoryPort.Result<SliceRepositoryPort.RangeQueryResult> = withContext(Dispatchers.IO) {
+    ): Result<SliceRepositoryPort.RangeQueryResult> = withContext(Dispatchers.IO) {
         try {
             var query = dsl.selectFrom(SLICES)
                 .where(TENANT_ID.eq(tenantId.value))
@@ -359,14 +303,14 @@ class JooqSliceRepository(
                 "${last.entityKey.value}|${last.version}"
             } else null
             
-            SliceRepositoryPort.Result.Ok(SliceRepositoryPort.RangeQueryResult(
+            Result.Ok(SliceRepositoryPort.RangeQueryResult(
                 items = items,
                 nextCursor = nextCursor,
                 hasMore = hasMore
             ))
         } catch (e: Exception) {
             logger.error("Failed to find slices by key prefix", e)
-            SliceRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to find slices by key prefix: ${e.message}")
             )
         }
@@ -376,7 +320,7 @@ class JooqSliceRepository(
         tenantId: TenantId,
         keyPrefix: String?,
         sliceType: SliceType?
-    ): SliceRepositoryPort.Result<Long> = withContext(Dispatchers.IO) {
+    ): Result<Long> = withContext(Dispatchers.IO) {
         try {
             var query = dsl.selectCount().from(SLICES)
                 .where(TENANT_ID.eq(tenantId.value))
@@ -391,10 +335,10 @@ class JooqSliceRepository(
             }
             
             val count = query.fetchOne(0, Long::class.java) ?: 0L
-            SliceRepositoryPort.Result.Ok(count)
+            Result.Ok(count)
         } catch (e: Exception) {
             logger.error("Failed to count slices", e)
-            SliceRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to count slices: ${e.message}")
             )
         }
@@ -404,7 +348,7 @@ class JooqSliceRepository(
         tenantId: TenantId,
         entityKey: EntityKey,
         sliceType: SliceType?
-    ): SliceRepositoryPort.Result<List<SliceRecord>> = withContext(Dispatchers.IO) {
+    ): Result<List<SliceRecord>> = withContext(Dispatchers.IO) {
         try {
             // 최신 버전 찾기
             var maxVersionQuery = dsl.select(DSL.max(SLICE_VERSION))
@@ -420,7 +364,7 @@ class JooqSliceRepository(
             val maxVersion = maxVersionQuery.fetchOne(0, Long::class.java)
             
             if (maxVersion == null) {
-                return@withContext SliceRepositoryPort.Result.Ok(emptyList())
+                return@withContext Result.Ok(emptyList())
             }
             
             // 최신 버전의 모든 슬라이스 조회
@@ -437,10 +381,10 @@ class JooqSliceRepository(
             val rows = query.fetch()
             val items = rows.map { row -> parseRow(row) }
             
-            SliceRepositoryPort.Result.Ok(items)
+            Result.Ok(items)
         } catch (e: Exception) {
             logger.error("Failed to get latest version", e)
-            SliceRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.StorageError("Failed to get latest version: ${e.message}")
             )
         }
@@ -468,6 +412,10 @@ class JooqSliceRepository(
             null
         }
 
+        // DB에서 읽을 때는 "sha256:" 접두사 복원 (DB에는 접두사 없이 저장됨)
+        val rawHash = row.get(CONTENT_HASH)!!
+        val normalizedHash = if (rawHash.startsWith("sha256:")) rawHash else "sha256:$rawHash"
+
         return SliceRecord(
             tenantId = TenantId(row.get(TENANT_ID)!!),
             entityKey = EntityKey(row.get(ENTITY_KEY)!!),
@@ -475,7 +423,7 @@ class JooqSliceRepository(
             sliceType = SliceType.valueOf(row.get(SLICE_TYPE)!!),
             data = row.get(CONTENT)?.data()
                 ?: throw DomainError.StorageError("Missing required field 'content' in slice row"),
-            hash = row.get(CONTENT_HASH)!!,
+            hash = normalizedHash,
             ruleSetId = ruleSetId,
             ruleSetVersion = SemVer.parse(ruleSetVersionStr),
             tombstone = tombstone,

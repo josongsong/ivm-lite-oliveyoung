@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.contracts.adapters
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 
 /**
@@ -22,11 +23,11 @@ class GatedContractRegistryAdapter(
         return (delegate as? HealthCheckable)?.healthCheck() ?: true
     }
 
-    override suspend fun loadChangeSetContract(ref: ContractRef): ContractRegistryPort.Result<ChangeSetContract> {
+    override suspend fun loadChangeSetContract(ref: ContractRef): Result<ChangeSetContract> {
         return gateCheck(delegate.loadChangeSetContract(ref)) { it.meta }
     }
 
-    override suspend fun loadJoinSpecContract(ref: ContractRef): ContractRegistryPort.Result<JoinSpecContract> {
+    override suspend fun loadJoinSpecContract(ref: ContractRef): Result<JoinSpecContract> {
         return gateCheck(delegate.loadJoinSpecContract(ref)) { it.meta }
     }
 
@@ -36,29 +37,29 @@ class GatedContractRegistryAdapter(
      */
     @Deprecated("Use IndexSpec.references in RuleSet instead")
     @Suppress("DEPRECATION")
-    override suspend fun loadInvertedIndexContract(ref: ContractRef): ContractRegistryPort.Result<InvertedIndexContract> {
+    override suspend fun loadInvertedIndexContract(ref: ContractRef): Result<InvertedIndexContract> {
         return gateCheck(delegate.loadInvertedIndexContract(ref)) { it.meta }
     }
 
-    override suspend fun loadRuleSetContract(ref: ContractRef): ContractRegistryPort.Result<RuleSetContract> {
+    override suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract> {
         return gateCheck(delegate.loadRuleSetContract(ref)) { it.meta }
     }
 
-    override suspend fun loadViewDefinitionContract(ref: ContractRef): ContractRegistryPort.Result<ViewDefinitionContract> {
+    override suspend fun loadViewDefinitionContract(ref: ContractRef): Result<ViewDefinitionContract> {
         return gateCheck(delegate.loadViewDefinitionContract(ref)) { it.meta }
     }
 
     private inline fun <T> gateCheck(
-        result: ContractRegistryPort.Result<T>,
+        result: Result<T>,
         getMeta: (T) -> ContractMeta,
-    ): ContractRegistryPort.Result<T> {
+    ): Result<T> {
         return when (result) {
-            is ContractRegistryPort.Result.Err -> result
-            is ContractRegistryPort.Result.Ok -> {
+            is Result.Err -> result
+            is Result.Ok -> {
                 val meta = getMeta(result.value)
                 when (val gateResult = statusGate.check(meta.id, meta.status)) {
                     is ContractStatusGate.GateResult.Ok -> result
-                    is ContractStatusGate.GateResult.Err -> ContractRegistryPort.Result.Err(gateResult.error)
+                    is ContractStatusGate.GateResult.Err -> Result.Err(gateResult.error)
                 }
             }
         }

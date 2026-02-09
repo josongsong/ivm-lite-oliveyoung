@@ -47,11 +47,49 @@ import org.koin.dsl.binds
 import org.koin.dsl.module
 
 /**
+ * Domain Service Module (RFC-IMPL-010)
+ *
+ * 도메인 서비스 Port/Adapter 바인딩.
+ * 모든 환경(InMemory, jOOQ, DynamoDB)에서 공통 사용.
+ * SOLID DIP 준수: Domain → Port ← Adapter
+ */
+val domainServiceModule = module {
+
+    // JoinExecutor (SlicingEngine 의존성)
+    single { JoinExecutor(rawRepo = get()) }
+
+    // SlicingEngine → SlicingEnginePort
+    single {
+        SlicingEngine(
+            contractRegistry = get(),
+            joinExecutor = get(),
+        )
+    }
+    single<SlicingEnginePort> {
+        DefaultSlicingEngineAdapter(delegate = get<SlicingEngine>())
+    }
+
+    // ChangeSetBuilder → ChangeSetBuilderPort
+    single { ChangeSetBuilder() }
+    single<ChangeSetBuilderPort> {
+        DefaultChangeSetBuilderAdapter(delegate = get<ChangeSetBuilder>())
+    }
+
+    // ImpactCalculator → ImpactCalculatorPort
+    single { ImpactCalculator() }
+    single<ImpactCalculatorPort> {
+        DefaultImpactCalculatorAdapter(delegate = get<ImpactCalculator>())
+    }
+}
+
+/**
  * Adapter Module (RFC-IMPL-009)
- * 
+ *
  * Port → Adapter 바인딩.
  * v1: InMemory/LocalYaml 어댑터 (개발/테스트)
  * v2: jOOQ/DynamoDB 어댑터로 교체 가능 (DI만 변경)
+ *
+ * NOTE: domainServiceModule을 함께 로드해야 함
  */
 val adapterModule = module {
 
@@ -84,37 +122,6 @@ val adapterModule = module {
     // ChangeSet Repository (v1.1: InMemory, v2: jOOQ)
     // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
     single { InMemoryChangeSetRepository() } binds arrayOf(ChangeSetRepositoryPort::class, HealthCheckable::class)
-
-    // ========================================
-    // Domain Service Port Adapters
-    // RFC-IMPL-010: Port 추상화로 SOLID DIP 준수
-    // ========================================
-
-    // JoinExecutor (SlicingEngine 의존성)
-    single { JoinExecutor(rawRepo = get()) }
-
-    // SlicingEngine → SlicingEnginePort
-    single {
-        SlicingEngine(
-            contractRegistry = get(),
-            joinExecutor = get(),
-        )
-    }
-    single<SlicingEnginePort> {
-        DefaultSlicingEngineAdapter(delegate = get<SlicingEngine>())
-    }
-
-    // ChangeSetBuilder → ChangeSetBuilderPort
-    single { ChangeSetBuilder() }
-    single<ChangeSetBuilderPort> {
-        DefaultChangeSetBuilderAdapter(delegate = get<ChangeSetBuilder>())
-    }
-
-    // ImpactCalculator → ImpactCalculatorPort
-    single { ImpactCalculator() }
-    single<ImpactCalculatorPort> {
-        DefaultImpactCalculatorAdapter(delegate = get<ImpactCalculator>())
-    }
 }
 
 /**

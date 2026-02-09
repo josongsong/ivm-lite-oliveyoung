@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.pkg.slices.ports
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 
@@ -26,7 +27,7 @@ interface SliceReaderPort {
         tenantId: TenantId,
         keys: List<SliceRepositoryPort.SliceKey>,
         includeTombstones: Boolean = false,
-    ): SliceRepositoryPort.Result<List<SliceRecord>>
+    ): Result<List<SliceRecord>>
     
     /**
      * 특정 버전의 모든 Slice 조회
@@ -36,7 +37,7 @@ interface SliceReaderPort {
         entityKey: EntityKey,
         version: Long,
         includeTombstones: Boolean = false,
-    ): SliceRepositoryPort.Result<List<SliceRecord>>
+    ): Result<List<SliceRecord>>
     
     /**
      * Range Query - 키 프리픽스로 조회
@@ -47,7 +48,7 @@ interface SliceReaderPort {
         sliceType: SliceType? = null,
         limit: Int = 100,
         cursor: String? = null,
-    ): SliceRepositoryPort.Result<SliceRepositoryPort.RangeQueryResult>
+    ): Result<SliceRepositoryPort.RangeQueryResult>
     
     /**
      * Count - 조건에 맞는 Slice 개수
@@ -56,7 +57,7 @@ interface SliceReaderPort {
         tenantId: TenantId,
         keyPrefix: String? = null,
         sliceType: SliceType? = null,
-    ): SliceRepositoryPort.Result<Long>
+    ): Result<Long>
     
     /**
      * 최신 버전 조회
@@ -65,5 +66,5 @@ interface SliceReaderPort {
         tenantId: TenantId,
         entityKey: EntityKey,
         sliceType: SliceType? = null,
-    ): SliceRepositoryPort.Result<List<SliceRecord>>
+    ): Result<List<SliceRecord>>
 }

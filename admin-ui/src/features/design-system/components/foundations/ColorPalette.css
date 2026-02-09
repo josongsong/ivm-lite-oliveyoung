@@ -1,0 +1,171 @@
+/**
+ * ColorPalette Styles
+ * Phase 4-A: 컬러 팔레트 스타일
+ */
+
+/* ============================================================================
+   Container
+   ============================================================================ */
+
+.color-palette {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.color-palette-header {
+  margin-bottom: 0.5rem;
+}
+
+.color-palette-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0;
+  line-height: 1.6;
+}
+
+.color-palette-description code {
+  background: var(--bg-tertiary);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+  font-family: var(--font-mono);
+  font-size: 0.8125rem;
+  color: var(--accent-purple);
+}
+
+/* ============================================================================
+   Categories
+   ============================================================================ */
+
+.color-palette-categories {
+  display: flex;
+  flex-direction: column;
+  gap: 2.5rem;
+}
+
+.color-category {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.color-category-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0;
+  padding-bottom: 0.75rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.color-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+  gap: 0.75rem;
+}
+
+/* ============================================================================
+   Color Swatch
+   ============================================================================ */
+
+.color-swatch {
+  display: flex;
+  flex-direction: column;
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--bg-secondary);
+  border: 1px solid var(--border-color);
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.color-swatch:hover {
+  border-color: var(--border-hover);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.color-swatch:focus {
+  outline: none;
+  border-color: var(--accent-purple);
+  box-shadow: 0 0 0 3px rgba(139, 92, 246, 0.2);
+}
+
+.color-swatch-preview {
+  position: relative;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-swatch-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.25rem;
+  background: rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.color-swatch-overlay.visible {
+  opacity: 1;
+}
+
+.color-swatch-copy-text {
+  font-size: 0.6875rem;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.color-swatch-info {
+  padding: 0.625rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.color-swatch-name {
+  font-size: 0.75rem;
+  font-weight: 500;
+  color: var(--text-primary);
+}
+
+.color-swatch-value {
+  font-size: 0.6875rem;
+  font-family: var(--font-mono);
+  color: var(--text-muted);
+  text-transform: uppercase;
+}
+
+/* ============================================================================
+   Responsive
+   ============================================================================ */
+
+@media (max-width: 768px) {
+  .color-category-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+
+  .color-swatch-preview {
+    height: 56px;
+  }
+}
+
+@media (max-width: 480px) {
+  .color-category-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+
+  .color-swatch-info {
+    padding: 0.5rem;
+  }
+
+  .color-swatch-name {
+    font-size: 0.6875rem;
+  }
+}

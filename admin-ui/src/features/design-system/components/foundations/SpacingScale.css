@@ -1,0 +1,188 @@
+/**
+ * SpacingScale Component Styles
+ * Phase 4-C: Spacing Foundation
+ */
+
+/* Layout */
+.spacing-scale {
+  padding: 1.5rem;
+}
+
+.spacing-header-section {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 2rem;
+  padding-bottom: 1.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+.spacing-header-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, #10b981 0%, #059669 100%);
+  color: white;
+  flex-shrink: 0;
+}
+
+.spacing-title {
+  font-size: 1.75rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin: 0;
+}
+
+.spacing-subtitle {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  margin: 0.25rem 0 0 0;
+  max-width: 600px;
+}
+
+/* Category */
+.spacing-category {
+  margin-bottom: 2.5rem;
+}
+
+.spacing-category-title {
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 0.5rem 0;
+}
+
+.spacing-category-description {
+  font-size: 0.875rem;
+  color: var(--text-secondary);
+  margin: 0 0 1.25rem 0;
+}
+
+/* Grid */
+.spacing-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 0.75rem;
+}
+
+/* Card */
+.spacing-card {
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  cursor: pointer;
+  transition: border-color 0.15s ease, transform 0.15s ease;
+}
+
+.spacing-card:hover {
+  border-color: var(--accent-cyan);
+  transform: translateX(2px);
+}
+
+/* Preview */
+.spacing-preview {
+  width: 140px;
+  height: 24px;
+  background: var(--bg-tertiary);
+  border-radius: 4px;
+  display: flex;
+  align-items: center;
+  padding: 0 4px;
+  flex-shrink: 0;
+}
+
+.spacing-bar {
+  height: 16px;
+  background: linear-gradient(90deg, #10b981 0%, #34d399 100%);
+  border-radius: 2px;
+  min-width: 2px;
+  transition: width 0.2s ease;
+}
+
+/* Info */
+.spacing-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.spacing-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.125rem;
+}
+
+.spacing-name {
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  font-family: var(--font-mono, monospace);
+}
+
+.spacing-value {
+  font-size: 0.75rem;
+  color: var(--accent-cyan);
+  font-family: var(--font-mono, monospace);
+  background: var(--bg-hover);
+  padding: 0.125rem 0.375rem;
+  border-radius: 4px;
+}
+
+.spacing-description {
+  font-size: 0.7rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.spacing-variable {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.65rem;
+  padding: 0.125rem 0.375rem;
+  background: var(--bg-hover);
+  border-radius: 4px;
+  color: var(--accent-cyan);
+  margin-top: 0.25rem;
+  font-family: var(--font-mono, monospace);
+}
+
+/* Usage */
+.spacing-usage {
+  background: var(--bg-tertiary);
+  border-radius: 8px;
+  padding: 1.25rem;
+}
+
+.spacing-usage-title {
+  font-size: 1rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  margin: 0 0 1rem 0;
+}
+
+.spacing-usage-code {
+  background: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  padding: 1rem;
+  margin: 0;
+  overflow-x: auto;
+}
+
+.spacing-usage-code code {
+  font-family: var(--font-mono, 'Fira Code', monospace);
+  font-size: 0.8rem;
+  line-height: 1.6;
+  color: var(--text-primary);
+  white-space: pre;
+}

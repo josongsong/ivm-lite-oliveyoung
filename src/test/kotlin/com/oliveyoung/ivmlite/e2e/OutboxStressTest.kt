@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.e2e
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
@@ -94,7 +95,7 @@ class OutboxStressTest : StringSpec({
                         ruleSetVersion = SemVer.parse("1.0.0"),
                     ),
                 )
-                SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
+                Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
             }
         }
         val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
@@ -156,7 +157,7 @@ class OutboxStressTest : StringSpec({
                 delay(100)
                 waited += 100
                 val pending = outboxRepo.findPending(1)
-                if ((pending as OutboxRepositoryPort.Result.Ok).value.isEmpty()) break
+                if ((pending as Result.Ok).value.isEmpty()) break
             }
             
             worker.stop()
@@ -210,7 +211,7 @@ class OutboxStressTest : StringSpec({
             delay(100)
             waited += 100
             val pending = outboxRepo.findPending(1)
-            if ((pending as OutboxRepositoryPort.Result.Ok).value.isEmpty()) break
+            if ((pending as Result.Ok).value.isEmpty()) break
         }
         
         workers.forEach { it.stop() }
@@ -220,7 +221,7 @@ class OutboxStressTest : StringSpec({
         totalProcessed shouldBe messageCount
 
         val pending = outboxRepo.findPending(100)
-        (pending as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (pending as Result.Ok).value.shouldBeEmpty()
 
         println("=== Concurrent Workers Test ===")
         workers.forEachIndexed { idx, w ->
@@ -262,7 +263,7 @@ class OutboxStressTest : StringSpec({
                         ruleSetVersion = SemVer.parse("1.0.0"),
                     ),
                 )
-                SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
+                Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
             }
         }
 
@@ -395,7 +396,7 @@ class OutboxStressTest : StringSpec({
 
         // When: 우선순위 기반 claim
         val firstBatch = outboxRepo.claimByPriority(5, "worker-1")
-        val firstEntries = (firstBatch as OutboxRepositoryPort.Result.Ok).value
+        val firstEntries = (firstBatch as Result.Ok).value
 
         // Then: 긴급 상품이 상위에 포함됨 (priority=1)
         val urgentCount = firstEntries.count { it.priority == 1 }
@@ -407,7 +408,7 @@ class OutboxStressTest : StringSpec({
         
         // 남은 PENDING 중 ordered-item의 버전들 확인
         val remainingPending = outboxRepo.findPending(100)
-        val orderedItemsPending = (remainingPending as OutboxRepositoryPort.Result.Ok).value
+        val orderedItemsPending = (remainingPending as Result.Ok).value
             .filter { it.aggregateId.contains("ordered-item") }
             .sortedBy { it.entityVersion }
 
@@ -415,7 +416,7 @@ class OutboxStressTest : StringSpec({
         if (orderedItemsPending.isNotEmpty()) {
             // claimWithOrdering으로 claim
             val orderedBatch = outboxRepo.claimWithOrdering(10, "worker-2")
-            val orderedBatchEntries = (orderedBatch as OutboxRepositoryPort.Result.Ok).value
+            val orderedBatchEntries = (orderedBatch as Result.Ok).value
             
             val orderedItem = orderedBatchEntries.find { it.aggregateId.contains("ordered-item") }
             if (orderedItem != null) {
@@ -449,7 +450,7 @@ class OutboxStressTest : StringSpec({
 
         // When: Worker 1이 claim 후 "크래시"
         val claimed = outboxRepo.claim(20, null, "crashed-worker")
-        (claimed as OutboxRepositoryPort.Result.Ok).value shouldHaveSize 20
+        (claimed as Result.Ok).value shouldHaveSize 20
 
         // 크래시 시뮬레이션: claimedAt을 과거로 변경
         val storeField = outboxRepo::class.java.getDeclaredField("store")
@@ -463,7 +464,7 @@ class OutboxStressTest : StringSpec({
 
         // Visibility timeout release
         val released = outboxRepo.releaseExpiredClaims(30)
-        (released as OutboxRepositoryPort.Result.Ok).value shouldBe 20
+        (released as Result.Ok).value shouldBe 20
 
         // Worker 2가 모든 메시지 처리
         val worker2 = OutboxPollingWorker(
@@ -480,7 +481,7 @@ class OutboxStressTest : StringSpec({
         worker2.getMetrics().processed shouldBe messageCount
 
         val pending = outboxRepo.findPending(100)
-        (pending as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (pending as Result.Ok).value.shouldBeEmpty()
     }
 
     // ==================== 6. 성능 테스트 ====================
@@ -519,7 +520,7 @@ class OutboxStressTest : StringSpec({
             delay(50)
             waited += 50
             val pending = outboxRepo.findPending(1)
-            if ((pending as OutboxRepositoryPort.Result.Ok).value.isEmpty()) break
+            if ((pending as Result.Ok).value.isEmpty()) break
         }
 
         workers.forEach { it.stop() }
@@ -563,22 +564,22 @@ class OutboxStressTest : StringSpec({
 
         // When: DLQ 이동
         val moved = outboxRepo.moveToDlq(maxRetryCount = 5)
-        (moved as OutboxRepositoryPort.Result.Ok).value shouldBe failedCount
+        (moved as Result.Ok).value shouldBe failedCount
 
         // Then: 원본 비어있음
         val pending = outboxRepo.findPending(200)
-        (pending as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (pending as Result.Ok).value.shouldBeEmpty()
 
         // DLQ에 100개
         val dlq = outboxRepo.findDlq(200)
-        (dlq as OutboxRepositoryPort.Result.Ok).value shouldHaveSize failedCount
+        (dlq as Result.Ok).value shouldHaveSize failedCount
 
         // 일괄 Replay
         val dlqEntries = dlq.value
         var replayedCount = 0
         dlqEntries.forEach { entry ->
             val result = outboxRepo.replayFromDlq(entry.id)
-            if ((result as OutboxRepositoryPort.Result.Ok).value) {
+            if ((result as Result.Ok).value) {
                 replayedCount++
             }
         }
@@ -587,7 +588,7 @@ class OutboxStressTest : StringSpec({
 
         // 원본에 100개 복귀
         val pendingAfterReplay = outboxRepo.findPending(200)
-        (pendingAfterReplay as OutboxRepositoryPort.Result.Ok).value shouldHaveSize failedCount
+        (pendingAfterReplay as Result.Ok).value shouldHaveSize failedCount
     }
 
     // ==================== 8. 극한 동시성 ====================
@@ -627,7 +628,7 @@ class OutboxStressTest : StringSpec({
             delay(100)
             waited += 100
             val pending = outboxRepo.findPending(1)
-            if ((pending as OutboxRepositoryPort.Result.Ok).value.isEmpty()) break
+            if ((pending as Result.Ok).value.isEmpty()) break
         }
 
         workers.forEach { it.stop() }
@@ -641,7 +642,7 @@ class OutboxStressTest : StringSpec({
         totalFailed shouldBe 0
 
         val pending = outboxRepo.findPending(100)
-        (pending as OutboxRepositoryPort.Result.Ok).value.shouldBeEmpty()
+        (pending as Result.Ok).value.shouldBeEmpty()
 
         println("=== Extreme Concurrency Test ===")
         println("Messages: $messageCount")

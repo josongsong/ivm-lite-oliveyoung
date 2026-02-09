@@ -1,6 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.slices.ports
 
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 /**
  * SliceWriterPort - Slice 쓰기 전용 인터페이스
@@ -18,5 +19,5 @@ interface SliceWriterPort {
     /**
      * 멱등성 보장 저장 (배치)
      */
-    suspend fun putAllIdempotent(slices: List<SliceRecord>): SliceRepositoryPort.Result<Unit>
+    suspend fun putAllIdempotent(slices: List<SliceRecord>): Result<Unit>
 }

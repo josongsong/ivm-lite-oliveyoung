@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.pkg.contracts.adapters
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractError
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceKind
@@ -24,12 +25,12 @@ class LocalYamlContractRegistryAdapter(
 
     private val yaml = Yaml()
 
-    override suspend fun loadChangeSetContract(ref: ContractRef): ContractRegistryPort.Result<ChangeSetContract> {
+    override suspend fun loadChangeSetContract(ref: ContractRef): Result<ChangeSetContract> {
         val map = loadYaml("changeset.v1.yaml") ?: return err("changeset.v1.yaml not found")
         return parseChangeSet(map)
     }
 
-    override suspend fun loadJoinSpecContract(ref: ContractRef): ContractRegistryPort.Result<JoinSpecContract> {
+    override suspend fun loadJoinSpecContract(ref: ContractRef): Result<JoinSpecContract> {
         val map = loadYaml("join-spec.v1.yaml") ?: return err("join-spec.v1.yaml not found")
         return parseJoinSpec(map)
     }
@@ -40,12 +41,12 @@ class LocalYamlContractRegistryAdapter(
      */
     @Deprecated("Use IndexSpec.references in RuleSet instead")
     @Suppress("DEPRECATION")
-    override suspend fun loadInvertedIndexContract(ref: ContractRef): ContractRegistryPort.Result<InvertedIndexContract> {
+    override suspend fun loadInvertedIndexContract(ref: ContractRef): Result<InvertedIndexContract> {
         val map = loadYaml("inverted-index.v1.yaml") ?: return err("inverted-index.v1.yaml not found (deprecated)")
         return parseInvertedIndex(map)
     }
 
-    override suspend fun loadRuleSetContract(ref: ContractRef): ContractRegistryPort.Result<RuleSetContract> {
+    override suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract> {
         // ID 기반 파일 찾기: ruleset.product.doc001.v1 -> ruleset-product-doc001.v1.yaml
         // fallback: ruleset.v1.yaml
         val filename = when {
@@ -59,13 +60,13 @@ class LocalYamlContractRegistryAdapter(
         val map = loadYaml(filename) ?: loadYaml("ruleset.v1.yaml") ?: return err("ruleset contract not found: $filename or ruleset.v1.yaml")
         val parsed = parseRuleSet(map)
         // ID 검증 (fail-closed)
-        if (parsed is ContractRegistryPort.Result.Ok && parsed.value.meta.id != ref.id) {
+        if (parsed is Result.Ok && parsed.value.meta.id != ref.id) {
             return err("RuleSet ID mismatch: expected ${ref.id}, got ${parsed.value.meta.id}")
         }
         return parsed
     }
 
-    override suspend fun loadViewDefinitionContract(ref: ContractRef): ContractRegistryPort.Result<ViewDefinitionContract> {
+    override suspend fun loadViewDefinitionContract(ref: ContractRef): Result<ViewDefinitionContract> {
         // ID 기반 파일 찾기: view.product.core.v1 -> view-product-core.v1.yaml
         // fallback: view-definition.v1.yaml
         val filename = when {
@@ -79,7 +80,7 @@ class LocalYamlContractRegistryAdapter(
         val map = loadYaml(filename) ?: loadYaml("view-definition.v1.yaml") ?: return err("view definition contract not found: $filename or view-definition.v1.yaml")
         val parsed = parseViewDefinition(map)
         // ID 검증 (fail-closed)
-        if (parsed is ContractRegistryPort.Result.Ok && parsed.value.meta.id != ref.id) {
+        if (parsed is Result.Ok && parsed.value.meta.id != ref.id) {
             return err("ViewDefinition ID mismatch: expected ${ref.id}, got ${parsed.value.meta.id}")
         }
         return parsed
@@ -92,12 +93,12 @@ class LocalYamlContractRegistryAdapter(
         return yaml.load(stream) as? Map<String, Any?>
     }
 
-    private fun parseMeta(map: Map<String, Any?>): ContractRegistryPort.Result<ContractMeta> {
+    private fun parseMeta(map: Map<String, Any?>): Result<ContractMeta> {
         val kind = map["kind"]?.toString() ?: return err("missing kind")
         val id = map["id"]?.toString() ?: return err("missing id")
         val version = map["version"]?.toString()?.let(SemVer::parse) ?: return err("missing version")
         val status = map["status"]?.toString()?.let { ContractStatus.valueOf(it) } ?: return err("missing status")
-        return ContractRegistryPort.Result.Ok(ContractMeta(kind, id, version, status))
+        return Result.Ok(ContractMeta(kind, id, version, status))
     }
 
     /**
@@ -105,8 +106,8 @@ class LocalYamlContractRegistryAdapter(
      */
     @Deprecated("Use IndexSpec.references in RuleSet instead")
     @Suppress("DEPRECATION")
-    private fun parseInvertedIndex(map: Map<String, Any?>): ContractRegistryPort.Result<InvertedIndexContract> {
-        val meta = (parseMeta(map) as? ContractRegistryPort.Result.Ok)?.value ?: return parseMeta(map) as ContractRegistryPort.Result.Err
+    private fun parseInvertedIndex(map: Map<String, Any?>): Result<InvertedIndexContract> {
+        val meta = (parseMeta(map) as? Result.Ok)?.value ?: return parseMeta(map) as Result.Err
 
         val keySpec = map["keySpec"] as? Map<*, *> ?: return err("missing keySpec")
         val pkPattern = keySpec["pkPattern"]?.toString() ?: return err("missing keySpec.pkPattern")
@@ -117,7 +118,7 @@ class LocalYamlContractRegistryAdapter(
         val guards = map["guards"] as? Map<*, *>
         val maxTargetsPerRef = guards?.get("maxTargetsPerRef")?.toString()?.toIntOrNull() ?: 500000
 
-        return ContractRegistryPort.Result.Ok(
+        return Result.Ok(
             InvertedIndexContract(
                 meta = meta,
                 pkPattern = pkPattern,
@@ -129,8 +130,8 @@ class LocalYamlContractRegistryAdapter(
         )
     }
 
-    private fun parseJoinSpec(map: Map<String, Any?>): ContractRegistryPort.Result<JoinSpecContract> {
-        val meta = (parseMeta(map) as? ContractRegistryPort.Result.Ok)?.value ?: return parseMeta(map) as ContractRegistryPort.Result.Err
+    private fun parseJoinSpec(map: Map<String, Any?>): Result<JoinSpecContract> {
+        val meta = (parseMeta(map) as? Result.Ok)?.value ?: return parseMeta(map) as Result.Err
 
         val constraints = map["constraints"] as? Map<*, *> ?: return err("missing constraints")
         val maxJoinDepth = constraints["maxJoinDepth"]?.toString()?.toIntOrNull() ?: 1
@@ -142,7 +143,7 @@ class LocalYamlContractRegistryAdapter(
         val refId = contractRef["id"]?.toString() ?: return err("missing invertedIndex.contractRef.id")
         val refVer = contractRef["version"]?.toString()?.let(SemVer::parse) ?: return err("missing invertedIndex.contractRef.version")
 
-        return ContractRegistryPort.Result.Ok(
+        return Result.Ok(
             JoinSpecContract(
                 meta = meta,
                 maxJoinDepth = maxJoinDepth,
@@ -152,8 +153,8 @@ class LocalYamlContractRegistryAdapter(
         )
     }
 
-    private fun parseChangeSet(map: Map<String, Any?>): ContractRegistryPort.Result<ChangeSetContract> {
-        val meta = (parseMeta(map) as? ContractRegistryPort.Result.Ok)?.value ?: return parseMeta(map) as ContractRegistryPort.Result.Err
+    private fun parseChangeSet(map: Map<String, Any?>): Result<ChangeSetContract> {
+        val meta = (parseMeta(map) as? Result.Ok)?.value ?: return parseMeta(map) as Result.Err
 
         val identity = map["identity"] as? Map<*, *> ?: return err("missing identity")
         val entityKeyFormat = identity["entityKeyFormat"]?.toString() ?: "{ENTITY_TYPE}#{tenantId}#{entityId}"
@@ -165,7 +166,7 @@ class LocalYamlContractRegistryAdapter(
         val fanout = map["fanout"] as? Map<*, *>
         val enabled = fanout?.get("enabled")?.toString()?.toBooleanStrictOrNull() ?: false
 
-        return ContractRegistryPort.Result.Ok(
+        return Result.Ok(
             ChangeSetContract(
                 meta = meta,
                 entityKeyFormat = entityKeyFormat,
@@ -175,8 +176,8 @@ class LocalYamlContractRegistryAdapter(
         )
     }
 
-    private fun parseRuleSet(map: Map<String, Any?>): ContractRegistryPort.Result<RuleSetContract> {
-        val meta = (parseMeta(map) as? ContractRegistryPort.Result.Ok)?.value ?: return parseMeta(map) as ContractRegistryPort.Result.Err
+    private fun parseRuleSet(map: Map<String, Any?>): Result<RuleSetContract> {
+        val meta = (parseMeta(map) as? Result.Ok)?.value ?: return parseMeta(map) as Result.Err
 
         // ACTIVE 상태만 허용 (fail-closed)
         if (meta.status != ContractStatus.ACTIVE) {
@@ -335,7 +336,7 @@ class LocalYamlContractRegistryAdapter(
             return err("invalid IndexSpec: ${e.message}")
         }
 
-        return ContractRegistryPort.Result.Ok(
+        return Result.Ok(
             RuleSetContract(
                 meta = meta,
                 entityType = entityType,
@@ -347,8 +348,8 @@ class LocalYamlContractRegistryAdapter(
         )
     }
 
-    private fun parseViewDefinition(map: Map<String, Any?>): ContractRegistryPort.Result<ViewDefinitionContract> {
-        val meta = (parseMeta(map) as? ContractRegistryPort.Result.Ok)?.value ?: return parseMeta(map) as ContractRegistryPort.Result.Err
+    private fun parseViewDefinition(map: Map<String, Any?>): Result<ViewDefinitionContract> {
+        val meta = (parseMeta(map) as? Result.Ok)?.value ?: return parseMeta(map) as Result.Err
 
         // ACTIVE 상태만 허용 (fail-closed)
         if (meta.status != ContractStatus.ACTIVE) {
@@ -414,7 +415,7 @@ class LocalYamlContractRegistryAdapter(
         val ruleSetRefVersion = ruleSetRefRaw["version"]?.toString()?.let(SemVer::parse) ?: return err("missing ruleSetRef.version")
         val ruleSetRef = ContractRef(ruleSetRefId, ruleSetRefVersion)
 
-        return ContractRegistryPort.Result.Ok(
+        return Result.Ok(
             ViewDefinitionContract(
                 meta = meta,
                 requiredSlices = requiredSlices,
@@ -427,6 +428,6 @@ class LocalYamlContractRegistryAdapter(
         )
     }
 
-    private fun err(msg: String): ContractRegistryPort.Result.Err =
-        ContractRegistryPort.Result.Err(ContractError(msg))
+    private fun err(msg: String): Result.Err =
+        Result.Err(ContractError(msg))
 }

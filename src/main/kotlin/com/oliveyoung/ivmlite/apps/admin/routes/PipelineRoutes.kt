@@ -1,6 +1,7 @@
 package com.oliveyoung.ivmlite.apps.admin.routes
 
 import com.oliveyoung.ivmlite.apps.admin.application.*
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.response.*
@@ -34,10 +35,10 @@ fun Route.pipelineRoutes() {
      */
     get("/pipeline/overview") {
         when (val result = pipelineService.getOverview()) {
-            is AdminPipelineService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminPipelineService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -49,10 +50,10 @@ fun Route.pipelineRoutes() {
      */
     get("/pipeline/rawdata") {
         when (val result = pipelineService.getRawDataStats()) {
-            is AdminPipelineService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminPipelineService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -64,10 +65,10 @@ fun Route.pipelineRoutes() {
      */
     get("/pipeline/slices") {
         when (val result = pipelineService.getSliceStats()) {
-            is AdminPipelineService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminPipelineService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -82,10 +83,10 @@ fun Route.pipelineRoutes() {
             ?: throw IllegalArgumentException("entityKey is required")
 
         when (val result = pipelineService.getEntityFlow(entityKey)) {
-            is AdminPipelineService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminPipelineService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -99,13 +100,13 @@ fun Route.pipelineRoutes() {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
 
         when (val result = pipelineService.getRecentItems(limit)) {
-            is AdminPipelineService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, RecentPipelineResponse(
                     items = result.value.map { it.toResponse() },
                     count = result.value.size
                 ))
             }
-            is AdminPipelineService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }
@@ -117,10 +118,10 @@ fun Route.pipelineRoutes() {
      */
     get("/pipeline/indexes") {
         when (val result = pipelineService.getInvertedIndexStats()) {
-            is AdminPipelineService.Result.Ok -> {
+            is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
-            is AdminPipelineService.Result.Err -> {
+            is Result.Err -> {
                 throw result.error
             }
         }

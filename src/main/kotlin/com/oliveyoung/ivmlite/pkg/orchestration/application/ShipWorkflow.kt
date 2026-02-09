@@ -7,6 +7,7 @@ import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import org.slf4j.LoggerFactory
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 /**
  * Ship Workflow - Slice 데이터를 외부 Sink로 전파
@@ -43,8 +44,8 @@ class ShipWorkflow(
         
         // 2. Slice 조회
         val slices = when (val result = sliceRepository.getByVersion(tenantId, entityKey, version)) {
-            is SliceRepositoryPort.Result.Ok -> result.value
-            is SliceRepositoryPort.Result.Err -> {
+            is Result.Ok -> result.value
+            is Result.Err -> {
                 logger.error("Failed to get slices: {}", result.error)
                 return Result.Err(result.error)
             }
@@ -56,11 +57,17 @@ class ShipWorkflow(
         }
         
         // 3. Slice들을 하나의 문서로 병합 (SOLID: SliceMerger로 분리)
-        val mergedPayload = SliceMerger.merge(slices)
-        
+        val mergedPayload = when (val mergeResult = SliceMerger.merge(slices)) {
+            is Result.Ok -> mergeResult.value
+            is Result.Err -> {
+                logger.error("Failed to merge slices: {}", mergeResult.error)
+                return Result.Err(mergeResult.error)
+            }
+        }
+
         // 4. Sink로 Ship
         return when (val shipResult = sink.ship(tenantId, entityKey, version, mergedPayload)) {
-            is SinkPort.Result.Ok -> {
+            is Result.Ok -> {
                 logger.info("Ship success: sink={}, latency={}ms", sinkType, shipResult.value.latencyMs)
                 Result.Ok(ShipResult(
                     entityKey = entityKey.value,
@@ -70,7 +77,7 @@ class ShipWorkflow(
                     latencyMs = shipResult.value.latencyMs
                 ))
             }
-            is SinkPort.Result.Err -> {
+            is Result.Err -> {
                 logger.error("Ship failed: sink={}, error={}", sinkType, shipResult.error)
                 Result.Err(shipResult.error)
             }
@@ -91,8 +98,8 @@ class ShipWorkflow(
         
         // 1. Slice 조회 (한 번만)
         val slices = when (val result = sliceRepository.getByVersion(tenantId, entityKey, version)) {
-            is SliceRepositoryPort.Result.Ok -> result.value
-            is SliceRepositoryPort.Result.Err -> {
+            is Result.Ok -> result.value
+            is Result.Err -> {
                 return Result.Err(result.error)
             }
         }
@@ -100,9 +107,15 @@ class ShipWorkflow(
         if (slices.isEmpty()) {
             return Result.Err(DomainError.NotFoundError("slice", entityKey.value))
         }
-        
-        val mergedPayload = SliceMerger.merge(slices)
-        
+
+        val mergedPayload = when (val mergeResult = SliceMerger.merge(slices)) {
+            is Result.Ok -> mergeResult.value
+            is Result.Err -> {
+                logger.error("Failed to merge slices: {}", mergeResult.error)
+                return Result.Err(mergeResult.error)
+            }
+        }
+
         // 2. 각 Sink로 Ship
         val results = mutableListOf<SingleSinkResult>()
         val errors = mutableListOf<String>()
@@ -115,7 +128,7 @@ class ShipWorkflow(
             }
             
             when (val shipResult = sink.ship(tenantId, entityKey, version, mergedPayload)) {
-                is SinkPort.Result.Ok -> {
+                is Result.Ok -> {
                     results.add(SingleSinkResult(
                         sinkType = sinkType,
                         success = true,
@@ -123,7 +136,7 @@ class ShipWorkflow(
                         latencyMs = shipResult.value.latencyMs
                     ))
                 }
-                is SinkPort.Result.Err -> {
+                is Result.Err -> {
                     results.add(SingleSinkResult(
                         sinkType = sinkType,
                         success = false,
@@ -163,8 +176,8 @@ class ShipWorkflow(
         // 각 엔티티의 Slice 조회 및 변환
         val items = entities.mapNotNull { entity ->
             val slices = when (val result = sliceRepository.getByVersion(tenantId, entity.entityKey, entity.version)) {
-                is SliceRepositoryPort.Result.Ok -> result.value
-                is SliceRepositoryPort.Result.Err -> {
+                is Result.Ok -> result.value
+                is Result.Err -> {
                     logger.warn("Failed to get slices for {}: {}", entity.entityKey.value, result.error)
                     return@mapNotNull null
                 }
@@ -173,11 +186,19 @@ class ShipWorkflow(
             if (slices.isEmpty()) {
                 return@mapNotNull null
             }
-            
+
+            val mergedPayload = when (val mergeResult = SliceMerger.merge(slices)) {
+                is Result.Ok -> mergeResult.value
+                is Result.Err -> {
+                    logger.warn("Failed to merge slices for {}: {}", entity.entityKey.value, mergeResult.error)
+                    return@mapNotNull null
+                }
+            }
+
             SinkPort.ShipItem(
                 entityKey = entity.entityKey,
                 version = entity.version,
-                payload = SliceMerger.merge(slices)
+                payload = mergedPayload
             )
         }
         
@@ -193,7 +214,7 @@ class ShipWorkflow(
         
         // 배치 Ship 실행
         return when (val result = sink.shipBatch(tenantId, items)) {
-            is SinkPort.Result.Ok -> {
+            is Result.Ok -> {
                 Result.Ok(BatchShipResult(
                     sinkType = sinkType,
                     requestedCount = entities.size,
@@ -203,19 +224,14 @@ class ShipWorkflow(
                     totalLatencyMs = result.value.totalLatencyMs
                 ))
             }
-            is SinkPort.Result.Err -> {
+            is Result.Err -> {
                 Result.Err(result.error)
             }
         }
     }
     
-    // ===== Result Types =====
-    
-    sealed interface Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>
-        data class Err(val error: DomainError) : Result<Nothing>
-    }
-    
+    // ===== Data Types =====
+
     data class ShipResult(
         val entityKey: String,
         val version: Long,

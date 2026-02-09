@@ -1,0 +1,226 @@
+/**
+ * IconButton Component Styles
+ *
+ * SSOT for icon-only button styles.
+ * Consolidates .btn-icon from: Outbox.css, WebhooksPage.css
+ *
+ * @see IconButton.tsx
+ */
+
+/* ============================================
+   Base Icon Button
+   ============================================ */
+.ui-icon-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-secondary, #12121a);
+  border: none;
+  border-radius: var(--radius-sm, 6px);
+  color: var(--text-secondary, #8b8b9e);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.ui-icon-button:focus {
+  outline: none;
+}
+
+.ui-icon-button:focus-visible {
+  outline: 2px solid var(--accent-cyan, #00d4ff);
+  outline-offset: 2px;
+}
+
+.ui-icon-button:disabled,
+.ui-icon-button[aria-disabled="true"] {
+  opacity: 0.3;
+  cursor: not-allowed;
+  pointer-events: none;
+  background: transparent;
+}
+
+/* ============================================
+   Sizes
+   ============================================ */
+.ui-icon-button--sm {
+  width: 28px;
+  height: 28px;
+  border-radius: 6px;
+}
+
+.ui-icon-button--md {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+}
+
+.ui-icon-button--lg {
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+}
+
+/* ============================================
+   Variants: Default
+   ============================================ */
+.ui-icon-button--default {
+  background: var(--bg-secondary, #12121a);
+  color: var(--text-secondary, #8b8b9e);
+}
+
+.ui-icon-button--default:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  color: var(--accent-cyan, #00d4ff);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.2), 0 2px 8px rgba(0, 212, 255, 0.15);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   Variants: Primary
+   ============================================ */
+.ui-icon-button--primary {
+  background: rgba(0, 212, 255, 0.1);
+  color: var(--accent-cyan, #00d4ff);
+}
+
+.ui-icon-button--primary:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.2);
+  color: var(--accent-cyan, #00d4ff);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3), 0 2px 8px rgba(0, 212, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   Variants: Success
+   ============================================ */
+.ui-icon-button--success {
+  background: var(--bg-secondary, #12121a);
+  color: var(--text-secondary, #8b8b9e);
+}
+
+.ui-icon-button--success:hover:not(:disabled) {
+  background: rgba(0, 255, 136, 0.1);
+  color: var(--status-success, #00ff88);
+  box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.3), 0 2px 8px rgba(0, 255, 136, 0.2);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   Variants: Danger
+   ============================================ */
+.ui-icon-button--danger {
+  background: var(--bg-secondary, #12121a);
+  color: var(--text-secondary, #8b8b9e);
+}
+
+.ui-icon-button--danger:hover:not(:disabled) {
+  background: rgba(255, 68, 102, 0.1);
+  color: var(--status-error, #ff4466);
+  box-shadow: 0 0 0 1px rgba(255, 68, 102, 0.3), 0 2px 8px rgba(255, 68, 102, 0.2);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   Variants: Warning
+   ============================================ */
+.ui-icon-button--warning {
+  background: var(--bg-secondary, #12121a);
+  color: var(--text-secondary, #8b8b9e);
+}
+
+.ui-icon-button--warning:hover:not(:disabled) {
+  background: rgba(255, 204, 0, 0.1);
+  color: var(--status-warning, #ffcc00);
+  box-shadow: 0 0 0 1px rgba(255, 204, 0, 0.3), 0 2px 8px rgba(255, 204, 0, 0.2);
+  transform: translateY(-1px);
+}
+
+/* ============================================
+   Variants: Ghost
+   ============================================ */
+.ui-icon-button--ghost {
+  background: transparent;
+  color: var(--text-secondary, #8b8b9e);
+}
+
+.ui-icon-button--ghost:hover:not(:disabled) {
+  background: var(--bg-tertiary, #1a1a24);
+  color: var(--text-primary, #f0f0f5);
+}
+
+/* ============================================
+   Loading State
+   ============================================ */
+.ui-icon-button--loading {
+  cursor: wait;
+}
+
+.ui-icon-button__icon--spinning {
+  animation: ui-icon-button-spin 1s linear infinite;
+}
+
+@keyframes ui-icon-button-spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+/* ============================================
+   Legacy compatibility (.btn-icon)
+   ============================================ */
+.btn-icon {
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: 8px;
+  color: var(--text-secondary, #8b8b9e);
+  cursor: pointer;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  border-color: var(--border-accent, rgba(0, 212, 255, 0.3));
+  color: var(--text-primary, #f0f0f5);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.1);
+}
+
+.btn-icon.retry:hover:not(:disabled),
+.btn-icon.replay:hover:not(:disabled) {
+  color: var(--status-success, #00ff88);
+  background: rgba(0, 255, 136, 0.1);
+  border-color: rgba(0, 255, 136, 0.3);
+  box-shadow: 0 0 0 1px rgba(0, 255, 136, 0.2);
+}
+
+.btn-icon.btn-process {
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  color: var(--accent-cyan, #00d4ff);
+}
+
+.btn-icon.btn-process:hover:not(:disabled) {
+  background: rgba(0, 212, 255, 0.1);
+  border-color: var(--accent-cyan, #00d4ff);
+  color: var(--accent-cyan, #00d4ff);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.3), 0 2px 8px rgba(0, 212, 255, 0.15);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+  border-color: var(--border-color, rgba(255, 255, 255, 0.08));
+}
+
+/* Global spin animation (SSOT - remove from other files) */
+.spin {
+  animation: ui-icon-button-spin 1s linear infinite;
+}

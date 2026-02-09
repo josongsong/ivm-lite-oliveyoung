@@ -1,0 +1,191 @@
+/**
+ * ValidationPanel Styles (Phase 1: DX Platform)
+ */
+
+.validation-panel {
+  padding: 1rem;
+  background: var(--bg-secondary);
+  border-radius: 8px;
+  font-size: 0.875rem;
+}
+
+.validation-panel--loading,
+.validation-panel--empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 150px;
+  color: var(--text-secondary);
+  gap: 0.5rem;
+}
+
+.validation-panel__spinner {
+  width: 20px;
+  height: 20px;
+  border: 2px solid var(--border-color);
+  border-top-color: var(--primary);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+/* Status */
+.validation-panel__status {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem 1rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+}
+
+.validation-panel__status--valid {
+  background: #16a34a20;
+  color: #22c55e;
+}
+
+.validation-panel__status--invalid {
+  background: #dc262620;
+  color: #ef4444;
+}
+
+.validation-panel__status-icon {
+  font-size: 1.25rem;
+  font-weight: 700;
+}
+
+.validation-panel__status-text {
+  font-weight: 600;
+}
+
+/* Section titles */
+.validation-panel__section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  margin: 0 0 0.5rem 0;
+}
+
+/* Error list */
+.validation-panel__error-list,
+.validation-panel__warning-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.validation-panel__error-item {
+  background: var(--bg-tertiary);
+  border-radius: 6px;
+  padding: 0.75rem;
+  border-left: 3px solid var(--border-color);
+}
+
+.validation-panel__error-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.validation-panel__error-level {
+  font-size: 0.65rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  padding: 0.125rem 0.375rem;
+  border-radius: 3px;
+}
+
+.validation-panel__error-location {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 0.7rem;
+  background: none;
+  border: none;
+  color: var(--text-secondary);
+  cursor: pointer;
+  padding: 0.125rem 0.25rem;
+  border-radius: 3px;
+}
+
+.validation-panel__error-location:hover {
+  background: var(--bg-secondary);
+  color: var(--primary);
+}
+
+.validation-panel__error-message {
+  margin: 0;
+  color: var(--text-primary);
+  line-height: 1.4;
+}
+
+/* Quick Fix */
+.validation-panel__fix-button {
+  margin-top: 0.5rem;
+  font-size: 0.75rem;
+  background: var(--primary);
+  color: white;
+  border: none;
+  padding: 0.375rem 0.75rem;
+  border-radius: 4px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.validation-panel__fix-button:hover {
+  filter: brightness(1.1);
+}
+
+/* Warning */
+.validation-panel__warning-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding: 0.5rem;
+  background: #eab30820;
+  border-radius: 4px;
+  color: #eab308;
+}
+
+.validation-panel__warning-icon {
+  flex-shrink: 0;
+}
+
+/* Success */
+.validation-panel__success {
+  text-align: center;
+  color: var(--text-secondary);
+}
+
+.validation-panel__success p {
+  margin: 0 0 1rem 0;
+  color: #22c55e;
+  font-weight: 500;
+}
+
+.validation-panel__checks {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  text-align: left;
+  display: inline-block;
+}
+
+.validation-panel__checks li {
+  padding: 0.25rem 0;
+  color: var(--text-secondary);
+}
+
+/* Warnings section */
+.validation-panel__warnings {
+  margin-top: 1rem;
+  padding-top: 1rem;
+  border-top: 1px solid var(--border-color);
+}

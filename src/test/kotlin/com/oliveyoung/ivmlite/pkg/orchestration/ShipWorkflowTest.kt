@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.orchestration.application.ShipWorkflow
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkAdapter
@@ -41,8 +42,8 @@ class ShipWorkflowTest : StringSpec({
         // Ship 실행
         val result = workflow.execute(tenantId, entityKey, version, "opensearch")
         
-        result.shouldBeInstanceOf<ShipWorkflow.Result.Ok<ShipWorkflow.ShipResult>>()
-        val shipResult = (result as ShipWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<ShipWorkflow.ShipResult>>()
+        val shipResult = (result as Result.Ok).value
         shipResult.entityKey shouldBe entityKey.value
         shipResult.sinkType shouldBe "opensearch"
         
@@ -56,7 +57,7 @@ class ShipWorkflowTest : StringSpec({
         
         val result = workflow.execute(tenantId, entityKey, version, "unknown")
         
-        result.shouldBeInstanceOf<ShipWorkflow.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
     
     "ShipWorkflow: execute returns error for missing slice" {
@@ -67,7 +68,7 @@ class ShipWorkflowTest : StringSpec({
         // Slice 없이 Ship 시도
         val result = workflow.execute(tenantId, entityKey, version, "opensearch")
         
-        result.shouldBeInstanceOf<ShipWorkflow.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
     
     "ShipWorkflow: executeToMultipleSinks ships to multiple sinks" {
@@ -98,8 +99,8 @@ class ShipWorkflowTest : StringSpec({
             listOf("opensearch", "personalize")
         )
         
-        result.shouldBeInstanceOf<ShipWorkflow.Result.Ok<ShipWorkflow.MultiShipResult>>()
-        val multiResult = (result as ShipWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<ShipWorkflow.MultiShipResult>>()
+        val multiResult = (result as Result.Ok).value
         multiResult.successCount shouldBe 2
         multiResult.failedCount shouldBe 0
         
@@ -136,8 +137,8 @@ class ShipWorkflowTest : StringSpec({
             "opensearch"
         )
         
-        result.shouldBeInstanceOf<ShipWorkflow.Result.Ok<ShipWorkflow.BatchShipResult>>()
-        val batchResult = (result as ShipWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<ShipWorkflow.BatchShipResult>>()
+        val batchResult = (result as Result.Ok).value
         batchResult.successCount shouldBe 3
         batchResult.failedCount shouldBe 0
     }

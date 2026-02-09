@@ -9,11 +9,16 @@ import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.opentelemetry.api.trace.Tracer
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.buildJsonObject
+import kotlinx.serialization.json.put
 
 /**
  * Cross-domain orchestration workflow for runtime view query flow.
@@ -65,8 +70,8 @@ class QueryViewWorkflow(
             // 1. ViewDefinitionContract 로드
             val viewRef = ContractRef(viewId, defaultViewVersion)
             val viewDef = when (val r = registry.loadViewDefinitionContract(viewRef)) {
-                is ContractRegistryPort.Result.Ok -> r.value
-                is ContractRegistryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
 
             // 2. 필요한 모든 SliceType 결정 (required + optional)
@@ -74,8 +79,8 @@ class QueryViewWorkflow(
 
             // 3. Slice 조회 (getByVersion은 없는 슬라이스를 에러로 반환하지 않음)
             val allSlices = when (val r = sliceRepo.getByVersion(tenantId, entityKey, version)) {
-                is SliceRepositoryPort.Result.Ok -> r.value
-                is SliceRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
             // 필요한 SliceType만 필터링
             val slices = allSlices.filter { it.sliceType in allSliceTypes }
@@ -154,8 +159,8 @@ class QueryViewWorkflow(
         val sliceTypes = requiredSliceTypes.distinct().sortedBy { it.name }
         val keys = sliceTypes.map { st -> SliceRepositoryPort.SliceKey(tenantId, entityKey, version, st) }
         val slices = when (val r = sliceRepo.batchGet(tenantId, keys)) {
-            is SliceRepositoryPort.Result.Ok -> r.value
-            is SliceRepositoryPort.Result.Err -> return Result.Err(r.error)
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Err(r.error)
         }
 
         // Fail-closed: required sliceTypes가 누락되면 즉시 오류
@@ -171,9 +176,10 @@ class QueryViewWorkflow(
 
     /**
      * View 데이터 JSON 생성 (결정성 보장: sliceTypes 순서대로)
-     * 
-     * NOTE: slices 배열은 각 slice의 data(이미 JSON string)를 그대로 포함
-     * escape 처리는 slice.data가 이미 valid JSON이므로 불필요
+     *
+     * kotlinx.serialization 사용으로 안전한 JSON 생성
+     * - 자동 escape 처리 (XSS 방지)
+     * - 타입 안전성 보장
      */
     private fun buildViewData(
         viewId: String,
@@ -185,31 +191,19 @@ class QueryViewWorkflow(
     ): String {
         // Determinism: sliceTypes 순서대로, 존재하는 것만 출력
         val existingTypes = allSliceTypes.filter { it in gotTypes }
-        val slicesJson = existingTypes.map { st ->
-            slices.first { it.sliceType == st }.data
-        }.joinToString(",")
-        
-        // viewId와 entityKey는 안전한 문자열이어야 함 (특수문자 escape)
-        val safeViewId = escapeJsonString(viewId)
-        val safeEntityKey = escapeJsonString(entityKey.value)
-        
-        return """{"viewId":"$safeViewId","entityKey":"$safeEntityKey","version":$version,"slices":[$slicesJson]}"""
-    }
-    
-    /**
-     * JSON 문자열 escape (XSS 방지)
-     */
-    private fun escapeJsonString(s: String): String {
-        return s.replace("\\", "\\\\")
-            .replace("\"", "\\\"")
-            .replace("\n", "\\n")
-            .replace("\r", "\\r")
-            .replace("\t", "\\t")
-    }
+        val sliceJsonElements = existingTypes.map { st ->
+            val sliceData = slices.first { it.sliceType == st }.data
+            Json.parseToJsonElement(sliceData)
+        }
 
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
+        val result = buildJsonObject {
+            put("viewId", viewId)
+            put("entityKey", entityKey.value)
+            put("version", version)
+            put("slices", JsonArray(sliceJsonElements))
+        }
+
+        return Json.encodeToString(kotlinx.serialization.json.JsonObject.serializer(), result)
     }
 
     /**
@@ -257,8 +251,8 @@ class QueryViewWorkflow(
             ),
         ) {
             val queryResult = when (val r = sliceRepo.findByKeyPrefix(tenantId, keyPrefix, sliceType, limit, cursor)) {
-                is SliceRepositoryPort.Result.Ok -> r.value
-                is SliceRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
             
             val items = queryResult.items.map { slice ->
@@ -297,8 +291,8 @@ class QueryViewWorkflow(
             ),
         ) {
             when (val r = sliceRepo.count(tenantId, keyPrefix, sliceType)) {
-                is SliceRepositoryPort.Result.Ok -> Result.Ok(r.value)
-                is SliceRepositoryPort.Result.Err -> Result.Err(r.error)
+                is Result.Ok -> Result.Ok(r.value)
+                is Result.Err -> Result.Err(r.error)
             }
         }
     }
@@ -320,8 +314,8 @@ class QueryViewWorkflow(
             ),
         ) {
             val slices = when (val r = sliceRepo.getLatestVersion(tenantId, entityKey, sliceType)) {
-                is SliceRepositoryPort.Result.Ok -> r.value
-                is SliceRepositoryPort.Result.Err -> return@withSpanSuspend Result.Err(r.error)
+                is Result.Ok -> r.value
+                is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
             
             if (slices.isEmpty()) {

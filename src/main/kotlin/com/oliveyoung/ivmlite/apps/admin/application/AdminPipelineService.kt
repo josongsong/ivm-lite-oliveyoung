@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.apps.admin.application
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
 import java.time.Instant
@@ -20,13 +21,6 @@ class AdminPipelineService(
     private val dsl: DSLContext,
     private val contractRegistry: ContractRegistryPort? = null
 ) {
-    // ==================== Result 타입 ====================
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-    }
-
     // ==================== Public API ====================
 
     /**
@@ -378,8 +372,8 @@ class AdminPipelineService(
         return contractRegistry?.let { registry ->
             try {
                 when (val result = registry.listContractRefs(kind, null)) {
-                    is ContractRegistryPort.Result.Ok -> result.value.size.toLong()
-                    is ContractRegistryPort.Result.Err -> 0L
+                    is Result.Ok -> result.value.size.toLong()
+                    is Result.Err -> 0L
                 }
             } catch (e: Exception) {
                 0L

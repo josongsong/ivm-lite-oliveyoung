@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.contracts.adapters
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
@@ -66,13 +67,13 @@ class DynamoDBContractRegistryAdapter(
     private val log = LoggerFactory.getLogger(DynamoDBContractRegistryAdapter::class.java)
     private val json = Json { ignoreUnknownKeys = true }
 
-    override suspend fun loadChangeSetContract(ref: ContractRef): ContractRegistryPort.Result<ChangeSetContract> {
+    override suspend fun loadChangeSetContract(ref: ContractRef): Result<ChangeSetContract> {
         val cacheKey = ContractCachePort.key("CHANGESET", ref.id, ref.version.toString())
 
         // 캐시 hit → 즉시 반환
         cache?.get(cacheKey, ChangeSetContract::class)?.let { cached ->
             log.debug("Cache hit for ChangeSetContract: {}", cacheKey)
-            return ContractRegistryPort.Result.Ok(cached)
+            return Result.Ok(cached)
         }
 
         // 캐시 miss → DynamoDB 조회
@@ -80,7 +81,7 @@ class DynamoDBContractRegistryAdapter(
         val result = parseChangeSet(item, ref)
 
         // 성공 시에만 캐시 저장 (negative caching 금지)
-        if (result is ContractRegistryPort.Result.Ok) {
+        if (result is Result.Ok) {
             cache?.put(cacheKey, result.value)
             log.debug("Cache put for ChangeSetContract: {}", cacheKey)
         }
@@ -88,13 +89,13 @@ class DynamoDBContractRegistryAdapter(
         return result
     }
 
-    override suspend fun loadJoinSpecContract(ref: ContractRef): ContractRegistryPort.Result<JoinSpecContract> {
+    override suspend fun loadJoinSpecContract(ref: ContractRef): Result<JoinSpecContract> {
         val cacheKey = ContractCachePort.key("JOIN_SPEC", ref.id, ref.version.toString())
 
         // 캐시 hit → 즉시 반환
         cache?.get(cacheKey, JoinSpecContract::class)?.let { cached ->
             log.debug("Cache hit for JoinSpecContract: {}", cacheKey)
-            return ContractRegistryPort.Result.Ok(cached)
+            return Result.Ok(cached)
         }
 
         // 캐시 miss → DynamoDB 조회
@@ -102,7 +103,7 @@ class DynamoDBContractRegistryAdapter(
         val result = parseJoinSpec(item, ref)
 
         // 성공 시에만 캐시 저장 (negative caching 금지)
-        if (result is ContractRegistryPort.Result.Ok) {
+        if (result is Result.Ok) {
             cache?.put(cacheKey, result.value)
             log.debug("Cache put for JoinSpecContract: {}", cacheKey)
         }
@@ -116,14 +117,14 @@ class DynamoDBContractRegistryAdapter(
      */
     @Deprecated("Use IndexSpec.references in RuleSet instead")
     @Suppress("DEPRECATION")
-    override suspend fun loadInvertedIndexContract(ref: ContractRef): ContractRegistryPort.Result<InvertedIndexContract> {
+    override suspend fun loadInvertedIndexContract(ref: ContractRef): Result<InvertedIndexContract> {
         log.warn("loadInvertedIndexContract is deprecated. Use IndexSpec.references in RuleSet instead. ref={}", ref)
         val cacheKey = ContractCachePort.key("INVERTED_INDEX", ref.id, ref.version.toString())
 
         // 캐시 hit → 즉시 반환
         cache?.get(cacheKey, InvertedIndexContract::class)?.let { cached ->
             log.debug("Cache hit for InvertedIndexContract: {}", cacheKey)
-            return ContractRegistryPort.Result.Ok(cached)
+            return Result.Ok(cached)
         }
 
         // 캐시 miss → DynamoDB 조회
@@ -131,7 +132,7 @@ class DynamoDBContractRegistryAdapter(
         val result = parseInvertedIndex(item, ref)
 
         // 성공 시에만 캐시 저장 (negative caching 금지)
-        if (result is ContractRegistryPort.Result.Ok) {
+        if (result is Result.Ok) {
             cache?.put(cacheKey, result.value)
             log.debug("Cache put for InvertedIndexContract: {}", cacheKey)
         }
@@ -139,7 +140,7 @@ class DynamoDBContractRegistryAdapter(
         return result
     }
 
-    override suspend fun loadRuleSetContract(ref: ContractRef): ContractRegistryPort.Result<RuleSetContract> {
+    override suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract> {
         return tracer.withSpanSuspend(
             "DynamoDB.loadRuleSetContract",
             mapOf(
@@ -152,7 +153,7 @@ class DynamoDBContractRegistryAdapter(
             cache?.get(cacheKey, RuleSetContract::class)?.let { cached ->
                 log.debug("Cache hit for RuleSetContract: {}", cacheKey)
                 span.setAttribute("cache.hit", true)
-                return@withSpanSuspend ContractRegistryPort.Result.Ok(cached)
+                return@withSpanSuspend Result.Ok(cached)
             }
 
             val item = getItem(ref) ?: return@withSpanSuspend notFound(ref)
@@ -160,7 +161,7 @@ class DynamoDBContractRegistryAdapter(
             span.setAttribute("dynamodb.calls", 1)
             val result = parseRuleSet(item, ref)
 
-            if (result is ContractRegistryPort.Result.Ok) {
+            if (result is Result.Ok) {
                 cache?.put(cacheKey, result.value)
                 log.debug("Cache put for RuleSetContract: {}", cacheKey)
             }
@@ -169,7 +170,7 @@ class DynamoDBContractRegistryAdapter(
         }
     }
 
-    override suspend fun loadViewDefinitionContract(ref: ContractRef): ContractRegistryPort.Result<ViewDefinitionContract> {
+    override suspend fun loadViewDefinitionContract(ref: ContractRef): Result<ViewDefinitionContract> {
         return tracer.withSpanSuspend(
             "DynamoDB.loadViewDefinitionContract",
             mapOf(
@@ -182,7 +183,7 @@ class DynamoDBContractRegistryAdapter(
             cache?.get(cacheKey, ViewDefinitionContract::class)?.let { cached ->
                 log.debug("Cache hit for ViewDefinitionContract: {}", cacheKey)
                 span.setAttribute("cache.hit", true)
-                return@withSpanSuspend ContractRegistryPort.Result.Ok(cached)
+                return@withSpanSuspend Result.Ok(cached)
             }
 
             val item = getItem(ref) ?: return@withSpanSuspend notFound(ref)
@@ -190,7 +191,7 @@ class DynamoDBContractRegistryAdapter(
             span.setAttribute("dynamodb.calls", 1)
             val result = parseViewDefinition(item, ref)
 
-            if (result is ContractRegistryPort.Result.Ok) {
+            if (result is Result.Ok) {
                 cache?.put(cacheKey, result.value)
                 log.debug("Cache put for ViewDefinitionContract: {}", cacheKey)
             }
@@ -226,7 +227,7 @@ class DynamoDBContractRegistryAdapter(
         }
     }
 
-    private fun parseMeta(item: Map<String, AttributeValue>, ref: ContractRef): ContractRegistryPort.Result<ContractMeta> {
+    private fun parseMeta(item: Map<String, AttributeValue>, ref: ContractRef): Result<ContractMeta> {
         val kind = item["kind"]?.s() ?: return err("missing kind for ${ref.id}")
         val statusStr = item["status"]?.s() ?: return err("missing status for ${ref.id}")
         val status = try {
@@ -235,7 +236,7 @@ class DynamoDBContractRegistryAdapter(
             return err("invalid status '$statusStr' for ${ref.id}")
         }
 
-        return ContractRegistryPort.Result.Ok(
+        return Result.Ok(
             ContractMeta(
                 kind = kind,
                 id = ref.id,
@@ -248,14 +249,14 @@ class DynamoDBContractRegistryAdapter(
     private fun parseChangeSet(
         item: Map<String, AttributeValue>,
         ref: ContractRef,
-    ): ContractRegistryPort.Result<ChangeSetContract> {
+    ): Result<ChangeSetContract> {
         val checksumResult = verifyChecksum(item, ref)
-        if (checksumResult is ContractRegistryPort.Result.Err) return checksumResult
+        if (checksumResult is Result.Err) return checksumResult
 
         val metaResult = parseMeta(item, ref)
-        if (metaResult is ContractRegistryPort.Result.Err) return metaResult
+        if (metaResult is Result.Err) return metaResult
 
-        val meta = (metaResult as ContractRegistryPort.Result.Ok).value
+        val meta = (metaResult as Result.Ok).value
         val dataJson = item["data"]?.s() ?: return err("missing data for ${ref.id}")
 
         return try {
@@ -271,7 +272,7 @@ class DynamoDBContractRegistryAdapter(
             val fanout = data["fanout"]?.jsonObject
             val enabled = fanout?.get("enabled")?.jsonPrimitive?.booleanOrNull ?: false
 
-            ContractRegistryPort.Result.Ok(
+            Result.Ok(
                 ChangeSetContract(
                     meta = meta,
                     entityKeyFormat = entityKeyFormat,
@@ -287,14 +288,14 @@ class DynamoDBContractRegistryAdapter(
     private fun parseJoinSpec(
         item: Map<String, AttributeValue>,
         ref: ContractRef,
-    ): ContractRegistryPort.Result<JoinSpecContract> {
+    ): Result<JoinSpecContract> {
         val checksumResult = verifyChecksum(item, ref)
-        if (checksumResult is ContractRegistryPort.Result.Err) return checksumResult
+        if (checksumResult is Result.Err) return checksumResult
 
         val metaResult = parseMeta(item, ref)
-        if (metaResult is ContractRegistryPort.Result.Err) return metaResult
+        if (metaResult is Result.Err) return metaResult
 
-        val meta = (metaResult as ContractRegistryPort.Result.Ok).value
+        val meta = (metaResult as Result.Ok).value
         val dataJson = item["data"]?.s() ?: return err("missing data for ${ref.id}")
 
         return try {
@@ -312,7 +313,7 @@ class DynamoDBContractRegistryAdapter(
             val refVer = contractRef["version"]?.jsonPrimitive?.content?.let(SemVer::parse)
                 ?: return err("missing invertedIndex.contractRef.version for ${ref.id}")
 
-            ContractRegistryPort.Result.Ok(
+            Result.Ok(
                 JoinSpecContract(
                     meta = meta,
                     maxJoinDepth = maxJoinDepth,
@@ -328,14 +329,14 @@ class DynamoDBContractRegistryAdapter(
     private fun parseInvertedIndex(
         item: Map<String, AttributeValue>,
         ref: ContractRef,
-    ): ContractRegistryPort.Result<InvertedIndexContract> {
+    ): Result<InvertedIndexContract> {
         val checksumResult = verifyChecksum(item, ref)
-        if (checksumResult is ContractRegistryPort.Result.Err) return checksumResult
+        if (checksumResult is Result.Err) return checksumResult
 
         val metaResult = parseMeta(item, ref)
-        if (metaResult is ContractRegistryPort.Result.Err) return metaResult
+        if (metaResult is Result.Err) return metaResult
 
-        val meta = (metaResult as ContractRegistryPort.Result.Ok).value
+        val meta = (metaResult as Result.Ok).value
         val dataJson = item["data"]?.s() ?: return err("missing data for ${ref.id}")
 
         return try {
@@ -353,7 +354,7 @@ class DynamoDBContractRegistryAdapter(
             val guards = data["guards"]?.jsonObject
             val maxTargetsPerRef = guards?.get("maxTargetsPerRef")?.jsonPrimitive?.intOrNull ?: 500000
 
-            ContractRegistryPort.Result.Ok(
+            Result.Ok(
                 InvertedIndexContract(
                     meta = meta,
                     pkPattern = pkPattern,
@@ -371,14 +372,14 @@ class DynamoDBContractRegistryAdapter(
     private fun parseRuleSet(
         item: Map<String, AttributeValue>,
         ref: ContractRef,
-    ): ContractRegistryPort.Result<RuleSetContract> {
+    ): Result<RuleSetContract> {
         val checksumResult = verifyChecksum(item, ref)
-        if (checksumResult is ContractRegistryPort.Result.Err) return checksumResult
+        if (checksumResult is Result.Err) return checksumResult
 
         val metaResult = parseMeta(item, ref)
-        if (metaResult is ContractRegistryPort.Result.Err) return metaResult
+        if (metaResult is Result.Err) return metaResult
 
-        val meta = (metaResult as ContractRegistryPort.Result.Ok).value
+        val meta = (metaResult as Result.Ok).value
 
         // ACTIVE 상태만 허용 (fail-closed)
         if (meta.status != ContractStatus.ACTIVE) {
@@ -554,7 +555,7 @@ class DynamoDBContractRegistryAdapter(
                 ))
             }
 
-            ContractRegistryPort.Result.Ok(
+            Result.Ok(
                 RuleSetContract(
                     meta = meta,
                     entityType = entityType,
@@ -572,14 +573,14 @@ class DynamoDBContractRegistryAdapter(
     private fun parseViewDefinition(
         item: Map<String, AttributeValue>,
         ref: ContractRef,
-    ): ContractRegistryPort.Result<ViewDefinitionContract> {
+    ): Result<ViewDefinitionContract> {
         val checksumResult = verifyChecksum(item, ref)
-        if (checksumResult is ContractRegistryPort.Result.Err) return checksumResult
+        if (checksumResult is Result.Err) return checksumResult
 
         val metaResult = parseMeta(item, ref)
-        if (metaResult is ContractRegistryPort.Result.Err) return metaResult
+        if (metaResult is Result.Err) return metaResult
 
-        val meta = (metaResult as ContractRegistryPort.Result.Ok).value
+        val meta = (metaResult as Result.Ok).value
 
         // ACTIVE 상태만 허용 (fail-closed)
         if (meta.status != ContractStatus.ACTIVE) {
@@ -669,7 +670,7 @@ class DynamoDBContractRegistryAdapter(
                 ?: return err("missing ruleSetRef.version for ${ref.id}")
             val ruleSetRef = ContractRef(ruleSetRefId, ruleSetRefVersion)
 
-            ContractRegistryPort.Result.Ok(
+            Result.Ok(
                 ViewDefinitionContract(
                     meta = meta,
                     requiredSlices = requiredSlices,
@@ -702,24 +703,24 @@ class DynamoDBContractRegistryAdapter(
     private fun verifyChecksum(
         item: Map<String, AttributeValue>,
         ref: ContractRef,
-    ): ContractRegistryPort.Result<Unit> {
+    ): Result<Unit> {
         val storedChecksum = item["checksum"]?.s()
         val dataJson = item["data"]?.s()
 
         // Case 1: checksum, data 둘 다 없음 → Ok (이후 parse에서 "missing data" 에러)
         if (storedChecksum == null && dataJson == null) {
-            return ContractRegistryPort.Result.Ok(Unit)
+            return Result.Ok(Unit)
         }
 
         // Case 2: checksum 없음, data 있음 → Ok + 경고 (migration 호환)
         if (storedChecksum == null && dataJson != null) {
             log.warn("Contract '${ref.id}@${ref.version}' missing checksum field (migration compatibility)")
-            return ContractRegistryPort.Result.Ok(Unit)
+            return Result.Ok(Unit)
         }
 
         // Case 3: checksum 있음, data 없음 → Err (데이터 손상)
         if (storedChecksum != null && dataJson == null) {
-            return ContractRegistryPort.Result.Err(
+            return Result.Err(
                 ContractIntegrityError(
                     contractId = "${ref.id}@${ref.version}",
                     expected = storedChecksum,
@@ -730,7 +731,7 @@ class DynamoDBContractRegistryAdapter(
 
         // Case 4: checksum이 빈 문자열 → Err (잘못된 형식)
         if (storedChecksum!!.isBlank()) {
-            return ContractRegistryPort.Result.Err(
+            return Result.Err(
                 ContractIntegrityError(
                     contractId = "${ref.id}@${ref.version}",
                     expected = "<non-empty checksum>",
@@ -746,9 +747,9 @@ class DynamoDBContractRegistryAdapter(
         val isValid = storedChecksum == actualHash || storedChecksum == actualTagged
 
         return if (isValid) {
-            ContractRegistryPort.Result.Ok(Unit)
+            Result.Ok(Unit)
         } else {
-            ContractRegistryPort.Result.Err(
+            Result.Err(
                 ContractIntegrityError(
                     contractId = "${ref.id}@${ref.version}",
                     expected = storedChecksum,
@@ -758,13 +759,13 @@ class DynamoDBContractRegistryAdapter(
         }
     }
 
-    private fun notFound(ref: ContractRef): ContractRegistryPort.Result.Err =
-        ContractRegistryPort.Result.Err(
+    private fun notFound(ref: ContractRef): Result.Err =
+        Result.Err(
             DomainError.NotFoundError("Contract", "${ref.id}@${ref.version}"),
         )
 
-    private fun err(msg: String): ContractRegistryPort.Result.Err =
-        ContractRegistryPort.Result.Err(ContractError(msg))
+    private fun err(msg: String): Result.Err =
+        Result.Err(ContractError(msg))
 
     // ===== List Operations (GSI 사용) =====
 
@@ -774,10 +775,10 @@ class DynamoDBContractRegistryAdapter(
     override suspend fun listContractRefs(
         kind: String,
         status: ContractStatus?
-    ): ContractRegistryPort.Result<List<ContractRef>> {
+    ): Result<List<ContractRef>> {
         return try {
             val refs = queryByKindStatus(kind, status)
-            ContractRegistryPort.Result.Ok(refs)
+            Result.Ok(refs)
         } catch (e: Exception) {
             log.error("Failed to list contracts: kind=$kind, status=$status", e)
             err("Failed to list contracts: ${e.message}")
@@ -789,18 +790,18 @@ class DynamoDBContractRegistryAdapter(
      */
     override suspend fun listViewDefinitions(
         status: ContractStatus?
-    ): ContractRegistryPort.Result<List<ViewDefinitionContract>> {
+    ): Result<List<ViewDefinitionContract>> {
         return try {
             val refs = queryByKindStatus("VIEW_DEFINITION", status)
             val contracts = refs.map { ref ->
                 when (val result = loadViewDefinitionContract(ref)) {
-                    is ContractRegistryPort.Result.Ok -> result.value
-                    is ContractRegistryPort.Result.Err -> {
+                    is Result.Ok -> result.value
+                    is Result.Err -> {
                         throw DomainError.StorageError("Failed to load ViewDefinition: ${ref.id}@${ref.version}, error: ${result.error}")
                     }
                 }
             }
-            ContractRegistryPort.Result.Ok(contracts)
+            Result.Ok(contracts)
         } catch (e: Exception) {
             log.error("Failed to list ViewDefinitions", e)
             err("Failed to list ViewDefinitions: ${e.message}")
@@ -856,7 +857,7 @@ class DynamoDBContractRegistryAdapter(
 
     override suspend fun saveViewDefinitionContract(
         contract: ViewDefinitionContract
-    ): ContractRegistryPort.Result<Unit> {
+    ): Result<Unit> {
         return saveContract(
             kind = "VIEW_DEFINITION",
             id = contract.meta.id,
@@ -868,7 +869,7 @@ class DynamoDBContractRegistryAdapter(
 
     override suspend fun saveRuleSetContract(
         contract: RuleSetContract
-    ): ContractRegistryPort.Result<Unit> {
+    ): Result<Unit> {
         return saveContract(
             kind = "RULE_SET",
             id = contract.meta.id,
@@ -880,7 +881,7 @@ class DynamoDBContractRegistryAdapter(
 
     suspend fun saveChangeSetContract(
         contract: ChangeSetContract
-    ): ContractRegistryPort.Result<Unit> {
+    ): Result<Unit> {
         return saveContract(
             kind = "CHANGESET",
             id = contract.meta.id,
@@ -892,7 +893,7 @@ class DynamoDBContractRegistryAdapter(
 
     suspend fun saveJoinSpecContract(
         contract: JoinSpecContract
-    ): ContractRegistryPort.Result<Unit> {
+    ): Result<Unit> {
         return saveContract(
             kind = "JOIN_SPEC",
             id = contract.meta.id,
@@ -908,7 +909,7 @@ class DynamoDBContractRegistryAdapter(
         version: String,
         status: ContractStatus,
         data: String
-    ): ContractRegistryPort.Result<Unit> = suspendCoroutine { cont ->
+    ): Result<Unit> = suspendCoroutine { cont ->
         val checksum = Hashing.sha256Tagged(data)
         val now = java.time.Instant.now().toString()
 
@@ -934,7 +935,7 @@ class DynamoDBContractRegistryAdapter(
                 cont.resume(err("Failed to save contract: ${error.message}"))
             } else {
                 log.info("Contract saved: $kind $id@$version")
-                cont.resume(ContractRegistryPort.Result.Ok(Unit))
+                cont.resume(Result.Ok(Unit))
             }
         }
     }

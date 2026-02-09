@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.GatedContractRegistryAdapter
@@ -116,13 +117,13 @@ class RuleSetIntegrationTest : StringSpec({
         // 1. ViewDefinition 로드
         val viewRef = ContractRef("view.product.v1", SemVer.parse("1.0.0"))
         val viewResult = adapter.loadViewDefinitionContract(viewRef)
-        viewResult.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val viewContract = (viewResult as ContractRegistryPort.Result.Ok).value
+        viewResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val viewContract = (viewResult as Result.Ok).value
 
         // 2. ViewDefinition의 ruleSetRef로 RuleSet 로드
         val ruleSetResult = adapter.loadRuleSetContract(viewContract.ruleSetRef)
-        ruleSetResult.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val ruleSetContract = (ruleSetResult as ContractRegistryPort.Result.Ok).value
+        ruleSetResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val ruleSetContract = (ruleSetResult as Result.Ok).value
 
         // 3. 참조 무결성 검증
         ruleSetContract.meta.id shouldBe "ruleset.core.v1"
@@ -178,13 +179,13 @@ class RuleSetIntegrationTest : StringSpec({
 
         val viewRef = ContractRef("view.product.v1", SemVer.parse("1.0.0"))
         val viewResult = adapter.loadViewDefinitionContract(viewRef)
-        viewResult.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val viewContract = (viewResult as ContractRegistryPort.Result.Ok).value
+        viewResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val viewContract = (viewResult as Result.Ok).value
 
         // RuleSet 로드 실패
         val ruleSetResult = adapter.loadRuleSetContract(viewContract.ruleSetRef)
-        ruleSetResult.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (ruleSetResult as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
+        ruleSetResult.shouldBeInstanceOf<Result.Err>()
+        (ruleSetResult as Result.Err).error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
     // ==================== GatedContractRegistryAdapter 연동 ====================
@@ -215,7 +216,7 @@ class RuleSetIntegrationTest : StringSpec({
         val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
         val result = gatedAdapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "GatedAdapter - RuleSet DRAFT → ContractStatusError" {
@@ -255,8 +256,8 @@ class RuleSetIntegrationTest : StringSpec({
         val result = gatedAdapter.loadRuleSetContract(ref)
 
         // DynamoDB adapter에서 ACTIVE만 허용하므로 이미 ContractError
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     // ==================== 캐시 연동 ====================
@@ -285,18 +286,18 @@ class RuleSetIntegrationTest : StringSpec({
 
         // 첫 번째 로드 (캐시 miss)
         val result1 = adapter.loadRuleSetContract(ref)
-        result1.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
         cache.stats().misses shouldBe 1
         cache.stats().hits shouldBe 0
 
         // 두 번째 로드 (캐시 hit)
         val result2 = adapter.loadRuleSetContract(ref)
-        result2.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
         cache.stats().hits shouldBe 1
 
         // 동일한 객체 반환 확인
-        val contract1 = (result1 as ContractRegistryPort.Result.Ok).value
-        val contract2 = (result2 as ContractRegistryPort.Result.Ok).value
+        val contract1 = (result1 as Result.Ok).value
+        val contract2 = (result2 as Result.Ok).value
         contract1.meta.id shouldBe contract2.meta.id
         contract1.entityType shouldBe contract2.entityType
     }
@@ -310,7 +311,7 @@ class RuleSetIntegrationTest : StringSpec({
 
         // 로드 실패
         val result = adapter.loadRuleSetContract(ref)
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
 
         // 캐시에 저장되지 않음
         cache.size() shouldBe 0
@@ -323,8 +324,8 @@ class RuleSetIntegrationTest : StringSpec({
         val localAdapter = LocalYamlContractRegistryAdapter()
         val ref = ContractRef("ruleset.core.v1", SemVer.parse("1.0.0"))
         val localResult = localAdapter.loadRuleSetContract(ref)
-        localResult.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val localContract = (localResult as ContractRegistryPort.Result.Ok).value
+        localResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val localContract = (localResult as Result.Ok).value
 
         // DynamoDB (동일한 YAML 내용을 JSON으로 변환)
         val ruleSetDataJson = """{
@@ -359,8 +360,8 @@ class RuleSetIntegrationTest : StringSpec({
         val mockClient = createMockClient(responseItem)
         val dynamoAdapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
         val dynamoResult = dynamoAdapter.loadRuleSetContract(ref)
-        dynamoResult.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val dynamoContract = (dynamoResult as ContractRegistryPort.Result.Ok).value
+        dynamoResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val dynamoContract = (dynamoResult as Result.Ok).value
 
         // 동일성 검증
         localContract.meta.id shouldBe dynamoContract.meta.id
@@ -380,12 +381,12 @@ class RuleSetIntegrationTest : StringSpec({
         }
 
         // 모두 성공
-        results.forEach { it.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>() }
+        results.forEach { it.shouldBeInstanceOf<Result.Ok<*>>() }
 
         // 모든 결과가 동일
-        val first = (results[0] as ContractRegistryPort.Result.Ok).value
+        val first = (results[0] as Result.Ok).value
         results.forEach { result ->
-            val contract = (result as ContractRegistryPort.Result.Ok).value
+            val contract = (result as Result.Ok).value
             contract.meta.id shouldBe first.meta.id
             contract.entityType shouldBe first.entityType
             contract.impactMap.size shouldBe first.impactMap.size
@@ -400,8 +401,8 @@ class RuleSetIntegrationTest : StringSpec({
         val ref = ContractRef("ruleset.core.v1", SemVer.parse("1.0.0"))
         val result = localAdapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
 
         // indexes 필드가 로드됨
         contract.indexes.size shouldBe 3
@@ -438,8 +439,8 @@ class RuleSetIntegrationTest : StringSpec({
         val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.indexes.size shouldBe 2
         contract.indexes[0].type shouldBe "brand"
         contract.indexes[0].selector shouldBe "$.brand"
@@ -466,8 +467,8 @@ class RuleSetIntegrationTest : StringSpec({
         val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val contract = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
         contract.indexes.size shouldBe 0
     }
 
@@ -495,8 +496,8 @@ class RuleSetIntegrationTest : StringSpec({
         val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - index selector 누락 → ContractError" {
@@ -523,8 +524,8 @@ class RuleSetIntegrationTest : StringSpec({
         val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - index selector가 $ 없음 → ContractError" {
@@ -551,8 +552,8 @@ class RuleSetIntegrationTest : StringSpec({
         val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
     "DynamoDB - indexes가 배열이 아닌 경우 → ContractError (잘못된 형식)" {
@@ -577,7 +578,7 @@ class RuleSetIntegrationTest : StringSpec({
         val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
         val result = adapter.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Err>()
-        (result as ContractRegistryPort.Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 })

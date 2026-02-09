@@ -5,6 +5,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxPage
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import java.time.Instant
@@ -22,12 +23,12 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
 
     private val store = ConcurrentHashMap<UUID, OutboxEntry>()
 
-    override suspend fun insert(entry: OutboxEntry): OutboxRepositoryPort.Result<OutboxEntry> {
+    override suspend fun insert(entry: OutboxEntry): Result<OutboxEntry> {
         val prev = store.putIfAbsent(entry.id, entry)
         return if (prev == null) {
-            OutboxRepositoryPort.Result.Ok(entry)
+            Result.Ok(entry)
         } else {
-            OutboxRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.IdempotencyViolation("OutboxEntry already exists: ${entry.id}"),
             )
         }
@@ -36,9 +37,9 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
     // insertAll 원자성을 위한 lock 객체
     private val insertLock = Any()
     
-    override suspend fun insertAll(entries: List<OutboxEntry>): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+    override suspend fun insertAll(entries: List<OutboxEntry>): Result<List<OutboxEntry>> {
         if (entries.isEmpty()) {
-            return OutboxRepositoryPort.Result.Ok(emptyList())
+            return Result.Ok(emptyList())
         }
 
         // 원자성 보장: synchronized 블록으로 중복 체크 + 저장을 원자적으로
@@ -46,14 +47,14 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             // 중복 체크 (id 또는 idempotencyKey)
             for (entry in entries) {
                 if (store.containsKey(entry.id)) {
-                    return OutboxRepositoryPort.Result.Err(
+                    return Result.Err(
                         DomainError.IdempotencyViolation("OutboxEntry already exists: ${entry.id}"),
                     )
                 }
                 // idempotencyKey 중복 체크
                 val duplicateByKey = store.values.any { it.idempotencyKey == entry.idempotencyKey }
                 if (duplicateByKey) {
-                    return OutboxRepositoryPort.Result.Err(
+                    return Result.Err(
                         DomainError.IdempotencyViolation("OutboxEntry with same idempotencyKey already exists: ${entry.idempotencyKey}"),
                     )
                 }
@@ -62,45 +63,45 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             // 모두 저장
             entries.forEach { store[it.id] = it }
         }
-        return OutboxRepositoryPort.Result.Ok(entries)
+        return Result.Ok(entries)
     }
 
-    override suspend fun findById(id: UUID): OutboxRepositoryPort.Result<OutboxEntry> {
+    override suspend fun findById(id: UUID): Result<OutboxEntry> {
         val entry = store[id]
-            ?: return OutboxRepositoryPort.Result.Err(
+            ?: return Result.Err(
                 DomainError.NotFoundError("OutboxEntry", id.toString()),
             )
-        return OutboxRepositoryPort.Result.Ok(entry)
+        return Result.Ok(entry)
     }
 
-    override suspend fun findPending(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+    override suspend fun findPending(limit: Int): Result<List<OutboxEntry>> {
         val pending = store.values
             .filter { it.status == OutboxStatus.PENDING }
             .sortedBy { it.createdAt }
             .take(limit)
-        return OutboxRepositoryPort.Result.Ok(pending)
+        return Result.Ok(pending)
     }
 
     override suspend fun findPendingByType(
         type: AggregateType,
         limit: Int,
-    ): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+    ): Result<List<OutboxEntry>> {
         val pending = store.values
             .filter { it.status == OutboxStatus.PENDING && it.aggregateType == type }
             .sortedBy { it.createdAt }
             .take(limit)
-        return OutboxRepositoryPort.Result.Ok(pending)
+        return Result.Ok(pending)
     }
 
-    override suspend fun findFailed(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+    override suspend fun findFailed(limit: Int): Result<List<OutboxEntry>> {
         val failed = store.values
             .filter { it.status == OutboxStatus.FAILED }
             .sortedByDescending { it.createdAt }
             .take(limit)
-        return OutboxRepositoryPort.Result.Ok(failed)
+        return Result.Ok(failed)
     }
 
-    override suspend fun resetAllFailed(limit: Int): OutboxRepositoryPort.Result<Int> {
+    override suspend fun resetAllFailed(limit: Int): Result<Int> {
         var count = 0
         synchronized(claimLock) {
             val failed = store.values
@@ -115,14 +116,14 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
                 count++
             }
         }
-        return OutboxRepositoryPort.Result.Ok(count)
+        return Result.Ok(count)
     }
 
     override suspend fun findPendingWithCursor(
         limit: Int,
         cursor: String?,
         type: AggregateType?
-    ): OutboxRepositoryPort.Result<OutboxPage> {
+    ): Result<OutboxPage> {
         // 커서 파싱
         val (cursorTime, cursorId) = if (cursor != null) {
             val parts = cursor.split("_", limit = 2)
@@ -167,7 +168,7 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             null
         }
 
-        return OutboxRepositoryPort.Result.Ok(OutboxPage(entries, nextCursor, hasMore))
+        return Result.Ok(OutboxPage(entries, nextCursor, hasMore))
     }
 
     // claim을 위한 락
@@ -177,8 +178,8 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
         limit: Int,
         type: AggregateType?,
         workerId: String?
-    ): OutboxRepositoryPort.Result<List<OutboxEntry>> {
-        if (limit <= 0) return OutboxRepositoryPort.Result.Ok(emptyList())
+    ): Result<List<OutboxEntry>> {
+        if (limit <= 0) return Result.Ok(emptyList())
         
         val now = Instant.now()
         val claimed = mutableListOf<OutboxEntry>()
@@ -200,23 +201,23 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             }
         }
         
-        return OutboxRepositoryPort.Result.Ok(claimed)
+        return Result.Ok(claimed)
     }
 
     override suspend fun claimOne(
         type: AggregateType?,
         workerId: String?
-    ): OutboxRepositoryPort.Result<OutboxEntry?> {
+    ): Result<OutboxEntry?> {
         return when (val result = claim(1, type, workerId)) {
-            is OutboxRepositoryPort.Result.Ok -> 
-                OutboxRepositoryPort.Result.Ok(result.value.firstOrNull())
-            is OutboxRepositoryPort.Result.Err -> result
+            is Result.Ok -> 
+                Result.Ok(result.value.firstOrNull())
+            is Result.Err -> result
         }
     }
 
     override suspend fun recoverStaleProcessing(
         olderThanSeconds: Long
-    ): OutboxRepositoryPort.Result<Int> {
+    ): Result<Int> {
         val cutoff = Instant.now().minusSeconds(olderThanSeconds)
         var recovered = 0
         
@@ -241,12 +242,12 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             }
         }
         
-        return OutboxRepositoryPort.Result.Ok(recovered)
+        return Result.Ok(recovered)
     }
 
-    override suspend fun markProcessed(ids: List<UUID>): OutboxRepositoryPort.Result<Int> {
+    override suspend fun markProcessed(ids: List<UUID>): Result<Int> {
         if (ids.isEmpty()) {
-            return OutboxRepositoryPort.Result.Ok(0)
+            return Result.Ok(0)
         }
 
         var count = 0
@@ -259,10 +260,10 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             }
         }
 
-        return OutboxRepositoryPort.Result.Ok(count)
+        return Result.Ok(count)
     }
 
-    override suspend fun markFailed(id: UUID, reason: String): OutboxRepositoryPort.Result<OutboxEntry> {
+    override suspend fun markFailed(id: UUID, reason: String): Result<OutboxEntry> {
         var result: OutboxEntry? = null
         store.compute(id) { _, entry ->
             if (entry != null) {
@@ -272,24 +273,24 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
                 null
             }
         }
-        return result?.let { OutboxRepositoryPort.Result.Ok(it) }
-            ?: OutboxRepositoryPort.Result.Err(
+        return result?.let { Result.Ok(it) }
+            ?: Result.Err(
                 DomainError.NotFoundError("OutboxEntry", id.toString()),
             )
     }
 
-    override suspend fun resetToPending(id: UUID): OutboxRepositoryPort.Result<OutboxEntry> {
+    override suspend fun resetToPending(id: UUID): Result<OutboxEntry> {
         val entry = store[id]
-            ?: return OutboxRepositoryPort.Result.Err(
+            ?: return Result.Err(
                 DomainError.NotFoundError("OutboxEntry", id.toString()),
             )
 
         return try {
             val reset = entry.resetToPending()
             store[id] = reset
-            OutboxRepositoryPort.Result.Ok(reset)
+            Result.Ok(reset)
         } catch (e: IllegalStateException) {
-            OutboxRepositoryPort.Result.Err(
+            Result.Err(
                 DomainError.InvariantViolation(e.message ?: "Max retry exceeded"),
             )
         }
@@ -297,7 +298,7 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
 
     // ==================== Tier 1: Visibility Timeout ====================
 
-    override suspend fun releaseExpiredClaims(visibilityTimeoutSeconds: Long): OutboxRepositoryPort.Result<Int> {
+    override suspend fun releaseExpiredClaims(visibilityTimeoutSeconds: Long): Result<Int> {
         val cutoff = Instant.now().minusSeconds(visibilityTimeoutSeconds)
         var released = 0
 
@@ -320,14 +321,14 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             }
         }
 
-        return OutboxRepositoryPort.Result.Ok(released)
+        return Result.Ok(released)
     }
 
     // ==================== Tier 1: Dead Letter Queue ====================
 
     private val dlqStore = mutableMapOf<UUID, OutboxEntry>()
 
-    override suspend fun moveToDlq(maxRetryCount: Int): OutboxRepositoryPort.Result<Int> {
+    override suspend fun moveToDlq(maxRetryCount: Int): Result<Int> {
         var moved = 0
 
         synchronized(claimLock) {
@@ -343,18 +344,18 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             }
         }
 
-        return OutboxRepositoryPort.Result.Ok(moved)
+        return Result.Ok(moved)
     }
 
-    override suspend fun findDlq(limit: Int): OutboxRepositoryPort.Result<List<OutboxEntry>> {
+    override suspend fun findDlq(limit: Int): Result<List<OutboxEntry>> {
         val entries = dlqStore.values
             .sortedBy { it.createdAt }
             .take(limit)
-        return OutboxRepositoryPort.Result.Ok(entries)
+        return Result.Ok(entries)
     }
 
-    override suspend fun replayFromDlq(id: UUID): OutboxRepositoryPort.Result<Boolean> {
-        val entry = dlqStore[id] ?: return OutboxRepositoryPort.Result.Ok(false)
+    override suspend fun replayFromDlq(id: UUID): Result<Boolean> {
+        val entry = dlqStore[id] ?: return Result.Ok(false)
 
         synchronized(claimLock) {
             // DLQ에서 제거
@@ -372,13 +373,13 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             store[id] = reset
         }
 
-        return OutboxRepositoryPort.Result.Ok(true)
+        return Result.Ok(true)
     }
 
     // ==================== Tier 1: Priority Queue ====================
 
-    override suspend fun claimByPriority(limit: Int, workerId: String?): OutboxRepositoryPort.Result<List<OutboxEntry>> {
-        if (limit <= 0) return OutboxRepositoryPort.Result.Ok(emptyList())
+    override suspend fun claimByPriority(limit: Int, workerId: String?): Result<List<OutboxEntry>> {
+        if (limit <= 0) return Result.Ok(emptyList())
 
         val now = Instant.now()
         val claimed = mutableListOf<OutboxEntry>()
@@ -401,13 +402,13 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             }
         }
 
-        return OutboxRepositoryPort.Result.Ok(claimed)
+        return Result.Ok(claimed)
     }
 
     // ==================== Tier 1: Entity-Level Ordering ====================
 
-    override suspend fun claimWithOrdering(limit: Int, workerId: String?): OutboxRepositoryPort.Result<List<OutboxEntry>> {
-        if (limit <= 0) return OutboxRepositoryPort.Result.Ok(emptyList())
+    override suspend fun claimWithOrdering(limit: Int, workerId: String?): Result<List<OutboxEntry>> {
+        if (limit <= 0) return Result.Ok(emptyList())
 
         val now = Instant.now()
         val claimed = mutableListOf<OutboxEntry>()
@@ -450,7 +451,7 @@ class InMemoryOutboxRepository : OutboxRepositoryPort, HealthCheckable {
             }
         }
 
-        return OutboxRepositoryPort.Result.Ok(claimed)
+        return Result.Ok(claimed)
     }
 
     // ==================== 테스트 헬퍼 ====================

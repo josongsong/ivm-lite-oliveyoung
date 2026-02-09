@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.apps.runtimeapi.dto.ApiError
 import com.oliveyoung.ivmlite.apps.runtimeapi.dto.toKtorStatus
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.HttpStatusCode
 import io.ktor.server.application.call
 import io.ktor.server.response.respond
@@ -54,17 +55,19 @@ fun Route.outboxRoutes() {
             }
 
             when (result) {
-                is OutboxRepositoryPort.Result.Ok -> {
+                is Result.Ok<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val entries = result.value as List<com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry>
                     call.respond(
                         HttpStatusCode.OK,
                         OutboxListResponse(
                             success = true,
-                            entries = result.value.map { it.toDto() },
-                            count = result.value.size
+                            entries = entries.map { it.toDto() },
+                            count = entries.size
                         )
                     )
                 }
-                is OutboxRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         result.error.toKtorStatus(),
                         ApiError.from(result.error)
@@ -103,16 +106,18 @@ fun Route.outboxRoutes() {
             }
 
             when (val result = outboxRepo.findById(id)) {
-                is OutboxRepositoryPort.Result.Ok -> {
+                is Result.Ok<*> -> {
+                    @Suppress("UNCHECKED_CAST")
+                    val entry = result.value as com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
                     call.respond(
                         HttpStatusCode.OK,
                         OutboxResponse(
                             success = true,
-                            entry = result.value.toDto()
+                            entry = entry.toDto()
                         )
                     )
                 }
-                is OutboxRepositoryPort.Result.Err -> {
+                is Result.Err -> {
                     call.respond(
                         result.error.toKtorStatus(),
                         ApiError.from(result.error)

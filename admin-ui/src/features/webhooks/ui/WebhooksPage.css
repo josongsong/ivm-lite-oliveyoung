@@ -163,22 +163,28 @@
 }
 
 .btn-icon {
-  background: none;
-  border: 1px solid var(--color-border, #e5e5e5);
-  border-radius: 4px;
+  background: transparent;
+  border: 1px solid var(--border-color, rgba(255, 255, 255, 0.08));
+  border-radius: var(--radius-sm, 6px);
   padding: 4px 8px;
   cursor: pointer;
   font-size: 14px;
-  transition: background 0.2s;
+  color: var(--text-secondary, #8b8b9e);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.btn-icon:hover {
-  background: var(--color-bg-secondary, #f5f5f5);
+.btn-icon:hover:not(:disabled) {
+  background: var(--bg-hover, rgba(255, 255, 255, 0.05));
+  border-color: var(--border-accent, rgba(0, 212, 255, 0.3));
+  color: var(--text-primary, #f0f0f5);
+  box-shadow: 0 0 0 1px rgba(0, 212, 255, 0.1);
 }
 
-.btn-icon.danger:hover {
-  background: #fee2e2;
-  border-color: #ef4444;
+.btn-icon.danger:hover:not(:disabled) {
+  background: rgba(255, 68, 102, 0.1);
+  border-color: var(--status-error, #ff4466);
+  color: var(--status-error, #ff4466);
+  box-shadow: 0 0 0 1px rgba(255, 68, 102, 0.2);
 }
 
 .webhook-details {

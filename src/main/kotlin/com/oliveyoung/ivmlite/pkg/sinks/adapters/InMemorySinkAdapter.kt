@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.sinks.adapters
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPort
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
@@ -41,7 +42,7 @@ class InMemorySinkAdapter(
         entityKey: EntityKey,
         version: Long,
         payload: String
-    ): SinkPort.Result<SinkPort.ShipResult> {
+    ): Result<SinkPort.ShipResult> {
         val startTime = Instant.now()
         
         val tenantStorage = storage.getOrPut(tenantId.value) { ConcurrentHashMap() }
@@ -49,7 +50,7 @@ class InMemorySinkAdapter(
         
         shipHistory.add(ShipRecord(tenantId.value, entityKey.value, version, startTime))
         
-        return SinkPort.Result.Ok(SinkPort.ShipResult(
+        return Result.Ok(SinkPort.ShipResult(
             entityKey = entityKey.value,
             version = version,
             sinkId = "$sinkType/${tenantId.value}/${entityKey.value}",
@@ -60,7 +61,7 @@ class InMemorySinkAdapter(
     override suspend fun shipBatch(
         tenantId: TenantId,
         items: List<SinkPort.ShipItem>
-    ): SinkPort.Result<SinkPort.BatchShipResult> {
+    ): Result<SinkPort.BatchShipResult> {
         val startTime = Instant.now()
         
         val tenantStorage = storage.getOrPut(tenantId.value) { ConcurrentHashMap() }
@@ -70,7 +71,7 @@ class InMemorySinkAdapter(
             shipHistory.add(ShipRecord(tenantId.value, item.entityKey.value, item.version, startTime))
         }
         
-        return SinkPort.Result.Ok(SinkPort.BatchShipResult(
+        return Result.Ok(SinkPort.BatchShipResult(
             successCount = items.size,
             failedCount = 0,
             failedKeys = emptyList(),
@@ -81,9 +82,9 @@ class InMemorySinkAdapter(
     override suspend fun delete(
         tenantId: TenantId,
         entityKey: EntityKey
-    ): SinkPort.Result<Unit> {
+    ): Result<Unit> {
         storage[tenantId.value]?.remove(entityKey.value)
-        return SinkPort.Result.Ok(Unit)
+        return Result.Ok(Unit)
     }
     
     override suspend fun healthCheck(): Boolean = true

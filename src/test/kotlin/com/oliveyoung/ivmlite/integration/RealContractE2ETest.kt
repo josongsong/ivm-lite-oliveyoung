@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.integration
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
@@ -173,8 +174,8 @@ class RealContractE2ETest : StringSpec({
         val ref = ContractRef("ruleset.core.v1", SemVer.parse("1.0.0"))
         val result = contractRegistry.loadRuleSetContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val ruleSet = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val ruleSet = (result as Result.Ok).value
 
         // RuleSet 기본 정보 검증
         ruleSet.meta.id shouldBe "ruleset.core.v1"
@@ -200,8 +201,8 @@ class RealContractE2ETest : StringSpec({
         val ref = ContractRef("view.product.pdp.v1", SemVer.parse("1.0.0"))
         val result = contractRegistry.loadViewDefinitionContract(ref)
 
-        result.shouldBeInstanceOf<ContractRegistryPort.Result.Ok<*>>()
-        val viewDef = (result as ContractRegistryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val viewDef = (result as Result.Ok).value
 
         viewDef.meta.id shouldBe "view.product.pdp.v1"
         viewDef.requiredSlices shouldBe listOf(SliceType.CORE)
@@ -220,21 +221,21 @@ class RealContractE2ETest : StringSpec({
             schemaVersion = SemVer.parse("1.0.0"),
             payloadJson = productFixtureV1,
         )
-        ingestResult.shouldBeInstanceOf<IngestWorkflow.Result.Ok<*>>()
+        ingestResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 2: Slicing (실제 RuleSet 기반)
         val sliceResult = slicingWorkflow.execute(tenantId, entityKey, 1L)
-        sliceResult.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 3: 생성된 Slice 검증
-        val sliceKeys = (sliceResult as SlicingWorkflow.Result.Ok).value
+        val sliceKeys = (sliceResult as Result.Ok).value
         sliceKeys.size shouldBe 5 // CORE, PRICE, INVENTORY, MEDIA, CATEGORY
 
         // CORE Slice 내용 검증
         val coreKey = SliceRepositoryPort.SliceKey(tenantId, entityKey, 1L, SliceType.CORE)
         val coreResult = sliceRepo.batchGet(tenantId, listOf(coreKey))
-        coreResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val coreSlice = (coreResult as SliceRepositoryPort.Result.Ok).value.first()
+        coreResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val coreSlice = (coreResult as Result.Ok).value.first()
 
         coreSlice.sliceType shouldBe SliceType.CORE
         coreSlice.data shouldContain "라운드랩"
@@ -283,8 +284,8 @@ class RealContractE2ETest : StringSpec({
             version = 1L,
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (result as QueryViewWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (result as Result.Ok).value
 
         // ViewResponse 내용 검증
         response.data shouldContain "라운드랩"
@@ -301,8 +302,8 @@ class RealContractE2ETest : StringSpec({
             version = 1L,
         )
 
-        result.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
-        val error = (result as QueryViewWorkflow.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.MissingSliceError>()
     }
 
@@ -319,7 +320,7 @@ class RealContractE2ETest : StringSpec({
             payloadJson = productFixtureV1,
         )
         val v1SliceResult = slicingWorkflow.execute(tenantId, entityKey, 1L)
-        v1SliceResult.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        v1SliceResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // v2 Ingest (title, price 변경)
         ingestWorkflow.execute(
@@ -333,7 +334,7 @@ class RealContractE2ETest : StringSpec({
 
         // executeAuto: v1이 있으므로 INCREMENTAL 선택
         val result = slicingWorkflow.executeAuto(tenantId, entityKey, 2L)
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
 
         // v2 Slice 검증: title/price 변경 반영 (CORE 슬라이스는 impactMap에서 /title, /price에 영향받음)
         val v2Result = queryViewWorkflowV2.execute(
@@ -342,8 +343,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = entityKey,
             version = 2L,
         )
-        v2Result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val v2Response = (v2Result as QueryViewWorkflow.Result.Ok).value
+        v2Result.shouldBeInstanceOf<Result.Ok<*>>()
+        val v2Response = (v2Result as Result.Ok).value
         v2Response.data shouldContain "리뉴얼" // title 변경됨
         v2Response.data shouldContain "23000" // price 변경됨
 
@@ -354,8 +355,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = entityKey,
             version = 1L,
         )
-        v1Result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val v1Response = (v1Result as QueryViewWorkflow.Result.Ok).value
+        v1Result.shouldBeInstanceOf<Result.Ok<*>>()
+        val v1Response = (v1Result as Result.Ok).value
         v1Response.data shouldContain "25000" // v1 price 유지
     }
 
@@ -372,10 +373,10 @@ class RealContractE2ETest : StringSpec({
 
         // executeAuto: 이전 버전 없으므로 FULL
         val result = slicingWorkflow.executeAuto(tenantId, entityKey, 1L)
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
 
         // 모든 Slice 생성됨
-        val sliceKeys = (result as SlicingWorkflow.Result.Ok).value
+        val sliceKeys = (result as Result.Ok).value
         sliceKeys.size shouldBe 5
     }
 
@@ -410,8 +411,8 @@ class RealContractE2ETest : StringSpec({
         val key1 = SliceRepositoryPort.SliceKey(tenantId, entityKey1, 1L, SliceType.CORE)
         val key2 = SliceRepositoryPort.SliceKey(tenantId, entityKey2, 1L, SliceType.CORE)
 
-        val slice1 = (sliceRepo.batchGet(tenantId, listOf(key1)) as SliceRepositoryPort.Result.Ok).value.first()
-        val slice2 = (sliceRepo.batchGet(tenantId, listOf(key2)) as SliceRepositoryPort.Result.Ok).value.first()
+        val slice1 = (sliceRepo.batchGet(tenantId, listOf(key1)) as Result.Ok).value.first()
+        val slice2 = (sliceRepo.batchGet(tenantId, listOf(key2)) as Result.Ok).value.first()
 
         // 동일 payload → 동일 Hash (결정성 보장)
         slice1.hash shouldBe slice2.hash
@@ -440,8 +441,8 @@ class RealContractE2ETest : StringSpec({
             version = 1L,
             requiredSliceTypes = listOf(SliceType.CORE),
         )
-        v1Result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val v1Data = (v1Result as QueryViewWorkflow.Result.Ok).value.data
+        v1Result.shouldBeInstanceOf<Result.Ok<*>>()
+        val v1Data = (v1Result as Result.Ok).value.data
 
         // v2 API (ViewDefinition 기반)
         val v2Result = queryViewWorkflowV2.execute(
@@ -450,8 +451,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = entityKey,
             version = 1L,
         )
-        v2Result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val v2Data = (v2Result as QueryViewWorkflow.Result.Ok).value.data
+        v2Result.shouldBeInstanceOf<Result.Ok<*>>()
+        val v2Data = (v2Result as Result.Ok).value.data
 
         // 동일 CORE 데이터 포함
         v1Data shouldContain "라운드랩"
@@ -479,9 +480,9 @@ class RealContractE2ETest : StringSpec({
             SliceRepositoryPort.SliceKey(tenantId, entityKey, 1L, SliceType.INVENTORY),
         )
         val result = sliceRepo.batchGet(tenantId, keys)
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
 
-        val slices = (result as SliceRepositoryPort.Result.Ok).value
+        val slices = (result as Result.Ok).value
         slices.size shouldBe 3
         slices.map { it.sliceType }.toSet() shouldBe setOf(SliceType.CORE, SliceType.PRICE, SliceType.INVENTORY)
 
@@ -509,12 +510,12 @@ class RealContractE2ETest : StringSpec({
             schemaVersion = SemVer.parse("1.0.0"),
             payloadJson = productFixtureV1,
         )
-        ingestResult.shouldBeInstanceOf<IngestWorkflow.Result.Ok<*>>()
+        ingestResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 2: Outbox에 PENDING 상태로 저장 확인
         val pendingBefore = outboxRepo.findPending(10)
-        pendingBefore.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        val entriesBefore = (pendingBefore as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value
+        pendingBefore.shouldBeInstanceOf<Result.Ok<*>>()
+        val entriesBefore = (pendingBefore as Result.Ok).value
         entriesBefore.size shouldBe 1
 
         // Step 3: Worker 시작 → Polling → executeAuto 자동 실행
@@ -523,8 +524,8 @@ class RealContractE2ETest : StringSpec({
 
         // Step 4: Outbox 처리 완료 확인 (PENDING → PROCESSED)
         val pendingAfter = outboxRepo.findPending(10)
-        pendingAfter.shouldBeInstanceOf<com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok<*>>()
-        val entriesAfter = (pendingAfter as com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort.Result.Ok).value
+        pendingAfter.shouldBeInstanceOf<Result.Ok<*>>()
+        val entriesAfter = (pendingAfter as Result.Ok).value
         entriesAfter.size shouldBe 0 // 처리 완료
 
         // Step 5: Slice 생성 확인 (v2 Query로 검증)
@@ -534,8 +535,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = fullE2EEntityKey,
             version = 1L,
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (queryResult as Result.Ok).value
         response.data shouldContain "라운드랩"
         response.data shouldContain "자작나무 수분 선크림"
 
@@ -589,7 +590,7 @@ class RealContractE2ETest : StringSpec({
         // 현재 ruleset.v1.yaml의 CORE slice에 joins: brandInfo가 정의되어 있음
         // JoinExecutor는 brandId로 BRAND 엔티티를 조회하여 payload에 병합
         val sliceResult = slicingWorkflow.execute(tenantId, productEntityKey, 1L)
-        sliceResult.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 4: CORE Slice 검증 - JOIN 결과 확인
         // 주의: JoinExecutor의 실제 동작은 required=false이므로 JOIN 실패해도 슬라이싱은 진행됨
@@ -599,8 +600,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = productEntityKey,
             version = 1L,
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (queryResult as Result.Ok).value
         response.data shouldContain "라운드랩"
     }
 
@@ -627,7 +628,7 @@ class RealContractE2ETest : StringSpec({
             entityKey = tombstoneEntityKey,
             version = 1L,
         )
-        normalResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
+        normalResult.shouldBeInstanceOf<Result.Ok<*>>()
 
         // Step 3: Tombstone Slice 직접 저장 (삭제 시뮬레이션)
         val tombstoneSlice = com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord(
@@ -653,7 +654,7 @@ class RealContractE2ETest : StringSpec({
             entityKey = tombstoneEntityKey,
             version = 2L,
         )
-        tombstoneResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Err>()
+        tombstoneResult.shouldBeInstanceOf<Result.Err>()
 
         // Step 5: 이전 버전(v1)은 여전히 조회 가능 (버전 독립성)
         val v1Result = queryViewWorkflowV2.execute(
@@ -662,7 +663,7 @@ class RealContractE2ETest : StringSpec({
             entityKey = tombstoneEntityKey,
             version = 1L,
         )
-        v1Result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
+        v1Result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     // ==================== 핵심 시나리오 11: Batch Ingest (대량 처리) ====================
@@ -712,7 +713,7 @@ class RealContractE2ETest : StringSpec({
         // Step 2: Batch Slicing
         batchEntityKeys.forEach { key ->
             val result = slicingWorkflow.execute(tenantId, key, 1L)
-            result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+            result.shouldBeInstanceOf<Result.Ok<*>>()
         }
 
         // Step 3: Batch Query 검증
@@ -723,8 +724,8 @@ class RealContractE2ETest : StringSpec({
                 entityKey = key,
                 version = 1L,
             )
-            result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-            val response = (result as QueryViewWorkflow.Result.Ok).value
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val response = (result as Result.Ok).value
             response.data shouldContain "배치 상품 #$idx"
         }
 
@@ -787,7 +788,7 @@ class RealContractE2ETest : StringSpec({
         // executeAuto: v1 → v5 점프 (중간 버전 없음)
         // RFC 정책: 이전 버전(v1) 기준 INCREMENTAL 또는 FULL
         val result = slicingWorkflow.executeAuto(tenantId, gapEntityKey, 5L)
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
 
         // v5 Query 성공
         val v5Result = queryViewWorkflowV2.execute(
@@ -796,8 +797,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = gapEntityKey,
             version = 5L,
         )
-        v5Result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val v5Response = (v5Result as QueryViewWorkflow.Result.Ok).value
+        v5Result.shouldBeInstanceOf<Result.Ok<*>>()
+        val v5Response = (v5Result as Result.Ok).value
         v5Response.data shouldContain "V5"
         v5Response.data shouldContain "30000"
 
@@ -808,8 +809,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = gapEntityKey,
             version = 1L,
         )
-        v1Result.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val v1Response = (v1Result as QueryViewWorkflow.Result.Ok).value
+        v1Result.shouldBeInstanceOf<Result.Ok<*>>()
+        val v1Response = (v1Result as Result.Ok).value
         v1Response.data shouldContain "25000" // v1 원래 가격
     }
 
@@ -839,7 +840,7 @@ class RealContractE2ETest : StringSpec({
 
         // 모든 결과 성공 (멱등성)
         results.forEach { result ->
-            result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+            result.shouldBeInstanceOf<Result.Ok<*>>()
         }
 
         // Slice는 하나만 존재 (중복 없음)
@@ -847,8 +848,8 @@ class RealContractE2ETest : StringSpec({
             SliceRepositoryPort.SliceKey(tenantId, concurrentEntityKey, 1L, SliceType.CORE),
         )
         val sliceResult = sliceRepo.batchGet(tenantId, sliceKeys)
-        sliceResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<*>>()
-        val slices = (sliceResult as SliceRepositoryPort.Result.Ok).value
+        sliceResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (sliceResult as Result.Ok).value
         slices.size shouldBe 1
 
         // Query 정상
@@ -858,7 +859,7 @@ class RealContractE2ETest : StringSpec({
             entityKey = concurrentEntityKey,
             version = 1L,
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     // ==================== 핵심 시나리오 14: 다중 SliceType 변경 (INCREMENTAL) ====================
@@ -880,7 +881,7 @@ class RealContractE2ETest : StringSpec({
         // v1 Hash 저장
         val v1CoreKey = SliceRepositoryPort.SliceKey(tenantId, multiChangeKey, 1L, SliceType.CORE)
         val v1PriceKey = SliceRepositoryPort.SliceKey(tenantId, multiChangeKey, 1L, SliceType.PRICE)
-        val v1Slices = (sliceRepo.batchGet(tenantId, listOf(v1CoreKey, v1PriceKey)) as SliceRepositoryPort.Result.Ok).value
+        val v1Slices = (sliceRepo.batchGet(tenantId, listOf(v1CoreKey, v1PriceKey)) as Result.Ok).value
         val v1CoreHash = v1Slices.first { it.sliceType == SliceType.CORE }.hash
         val v1PriceHash = v1Slices.first { it.sliceType == SliceType.PRICE }.hash
 
@@ -925,12 +926,12 @@ class RealContractE2ETest : StringSpec({
 
         // executeAuto: INCREMENTAL (CORE, PRICE 재생성)
         val result = slicingWorkflow.executeAuto(tenantId, multiChangeKey, 2L)
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
 
         // v2 Hash 비교
         val v2CoreKey = SliceRepositoryPort.SliceKey(tenantId, multiChangeKey, 2L, SliceType.CORE)
         val v2PriceKey = SliceRepositoryPort.SliceKey(tenantId, multiChangeKey, 2L, SliceType.PRICE)
-        val v2Slices = (sliceRepo.batchGet(tenantId, listOf(v2CoreKey, v2PriceKey)) as SliceRepositoryPort.Result.Ok).value
+        val v2Slices = (sliceRepo.batchGet(tenantId, listOf(v2CoreKey, v2PriceKey)) as Result.Ok).value
         val v2CoreHash = v2Slices.first { it.sliceType == SliceType.CORE }.hash
         val v2PriceHash = v2Slices.first { it.sliceType == SliceType.PRICE }.hash
 
@@ -945,8 +946,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = multiChangeKey,
             version = 2L,
         )
-        queryResult.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val response = (queryResult as QueryViewWorkflow.Result.Ok).value
+        queryResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val response = (queryResult as Result.Ok).value
         response.data shouldContain "NEW 수분 선크림"
         response.data shouldContain "28000"
     }
@@ -969,7 +970,7 @@ class RealContractE2ETest : StringSpec({
 
         // v1 Hash 저장
         val v1Key = SliceRepositoryPort.SliceKey(tenantId, noOpKey, 1L, SliceType.CORE)
-        val v1Slice = (sliceRepo.batchGet(tenantId, listOf(v1Key)) as SliceRepositoryPort.Result.Ok).value.first()
+        val v1Slice = (sliceRepo.batchGet(tenantId, listOf(v1Key)) as Result.Ok).value.first()
         val v1Hash = v1Slice.hash
 
         // v2 Ingest (동일 데이터)
@@ -984,11 +985,11 @@ class RealContractE2ETest : StringSpec({
 
         // executeAuto
         val result = slicingWorkflow.executeAuto(tenantId, noOpKey, 2L)
-        result.shouldBeInstanceOf<SlicingWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
 
         // v2 Hash 비교 - 동일해야 함 (No-Op)
         val v2Key = SliceRepositoryPort.SliceKey(tenantId, noOpKey, 2L, SliceType.CORE)
-        val v2Slice = (sliceRepo.batchGet(tenantId, listOf(v2Key)) as SliceRepositoryPort.Result.Ok).value.first()
+        val v2Slice = (sliceRepo.batchGet(tenantId, listOf(v2Key)) as Result.Ok).value.first()
         val v2Hash = v2Slice.hash
 
         // 동일 데이터 → 동일 Hash (결정성)
@@ -1079,8 +1080,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = sameEntityKey,
             version = 1L,
         )
-        resultA.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val responseA = (resultA as QueryViewWorkflow.Result.Ok).value
+        resultA.shouldBeInstanceOf<Result.Ok<*>>()
+        val responseA = (resultA as Result.Ok).value
         responseA.data shouldContain "Tenant A 전용 상품"
         responseA.data shouldContain "10000"
 
@@ -1091,8 +1092,8 @@ class RealContractE2ETest : StringSpec({
             entityKey = sameEntityKey,
             version = 1L,
         )
-        resultB.shouldBeInstanceOf<QueryViewWorkflow.Result.Ok<*>>()
-        val responseB = (resultB as QueryViewWorkflow.Result.Ok).value
+        resultB.shouldBeInstanceOf<Result.Ok<*>>()
+        val responseB = (resultB as Result.Ok).value
         responseB.data shouldContain "Tenant B 전용 상품"
         responseB.data shouldContain "20000"
 

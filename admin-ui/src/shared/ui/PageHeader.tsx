@@ -1,7 +1,9 @@
 import { motion } from 'framer-motion'
 
-interface PageHeaderProps {
+export interface PageHeaderProps {
+  /** Page title */
   title: string
+  /** Page subtitle/description */
   subtitle: string
 }
 

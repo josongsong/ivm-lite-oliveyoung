@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.apps.admin
 
 import com.oliveyoung.ivmlite.apps.admin.application.AdminPipelineService
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -31,8 +32,8 @@ class AdminPipelineServiceTest : DescribeSpec({
             val result = service.getEntityFlow("")
 
             // Then
-            result.shouldBeInstanceOf<AdminPipelineService.Result.Err>()
-            val error = (result as AdminPipelineService.Result.Err).error
+            result.shouldBeInstanceOf<Result.Err>()
+            val error = (result as Result.Err).error
             error.shouldBeInstanceOf<DomainError.ValidationError>()
             (error as DomainError.ValidationError).field shouldBe "entityKey"
         }
@@ -45,8 +46,8 @@ class AdminPipelineServiceTest : DescribeSpec({
             val result = service.getEntityFlow(longKey)
 
             // Then
-            result.shouldBeInstanceOf<AdminPipelineService.Result.Err>()
-            val error = (result as AdminPipelineService.Result.Err).error
+            result.shouldBeInstanceOf<Result.Err>()
+            val error = (result as Result.Err).error
             error.shouldBeInstanceOf<DomainError.ValidationError>()
             (error as DomainError.ValidationError).field shouldBe "entityKey"
         }

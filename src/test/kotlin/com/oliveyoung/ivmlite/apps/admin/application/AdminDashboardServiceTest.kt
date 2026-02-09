@@ -6,6 +6,7 @@ import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.mockk.coEvery
 import io.mockk.every
 import io.mockk.mockk
@@ -53,8 +54,8 @@ class AdminDashboardServiceTest {
         val result = service.getWorkerStatus()
 
         // Then
-        assertTrue(result is AdminDashboardService.Result.Ok)
-        val status = (result as AdminDashboardService.Result.Ok).value
+        assertTrue(result is Result.Ok)
+        val status = (result as Result.Ok).value
         assertTrue(status.running)
         assertEquals(100L, status.processed)
         assertEquals(5L, status.failed)
@@ -74,14 +75,14 @@ class AdminDashboardServiceTest {
             status = OutboxStatus.PENDING,
             createdAt = Instant.now()
         )
-        coEvery { outboxRepo.findById(id) } returns OutboxRepositoryPort.Result.Ok(entry)
+        coEvery { outboxRepo.findById(id) } returns Result.Ok(entry)
 
         // When
         val result = service.getOutboxEntry(id)
 
         // Then
-        assertTrue(result is AdminDashboardService.Result.Ok)
-        val detail = (result as AdminDashboardService.Result.Ok).value
+        assertTrue(result is Result.Ok)
+        val detail = (result as Result.Ok).value
         assertEquals(id.toString(), detail.id)
         assertEquals("test-key", detail.idempotencyKey)
     }
@@ -90,7 +91,7 @@ class AdminDashboardServiceTest {
     fun `getOutboxEntry returns error when not found`() = runTest {
         // Given
         val id = UUID.randomUUID()
-        coEvery { outboxRepo.findById(id) } returns OutboxRepositoryPort.Result.Err(
+        coEvery { outboxRepo.findById(id) } returns Result.Err(
             DomainError.NotFoundError("OutboxEntry", id.toString())
         )
 
@@ -98,8 +99,8 @@ class AdminDashboardServiceTest {
         val result = service.getOutboxEntry(id)
 
         // Then
-        assertTrue(result is AdminDashboardService.Result.Err)
-        val error = (result as AdminDashboardService.Result.Err).error
+        assertTrue(result is Result.Err)
+        val error = (result as Result.Err).error
         assertEquals("ERR_NOT_FOUND", error.errorCode)
     }
 
@@ -107,20 +108,20 @@ class AdminDashboardServiceTest {
     fun `replayDlq calls repository and returns result`() = runTest {
         // Given
         val id = UUID.randomUUID()
-        coEvery { outboxRepo.replayFromDlq(id) } returns OutboxRepositoryPort.Result.Ok(true)
+        coEvery { outboxRepo.replayFromDlq(id) } returns Result.Ok(true)
 
         // When
         val result = service.replayDlq(id)
 
         // Then
-        assertTrue(result is AdminDashboardService.Result.Ok)
-        assertTrue((result as AdminDashboardService.Result.Ok).value)
+        assertTrue(result is Result.Ok)
+        assertTrue((result as Result.Ok).value)
     }
 
     @Test
     fun `releaseStale coerces timeout to valid range`() = runTest {
         // Given
-        coEvery { outboxRepo.releaseExpiredClaims(any()) } returns OutboxRepositoryPort.Result.Ok(5)
+        coEvery { outboxRepo.releaseExpiredClaims(any()) } returns Result.Ok(5)
 
         // When - too small timeout (should be coerced to 60)
         val result1 = service.releaseStale(10L)
@@ -129,8 +130,8 @@ class AdminDashboardServiceTest {
         val result2 = service.releaseStale(100000L)
 
         // Then
-        assertTrue(result1 is AdminDashboardService.Result.Ok)
-        assertTrue(result2 is AdminDashboardService.Result.Ok)
+        assertTrue(result1 is Result.Ok)
+        assertTrue(result2 is Result.Ok)
     }
 
     @Test
@@ -147,14 +148,14 @@ class AdminDashboardServiceTest {
             status = OutboxStatus.PENDING,
             createdAt = Instant.now()
         )
-        coEvery { outboxRepo.resetToPending(id) } returns OutboxRepositoryPort.Result.Ok(entry)
+        coEvery { outboxRepo.resetToPending(id) } returns Result.Ok(entry)
 
         // When
         val result = service.retryEntry(id)
 
         // Then
-        assertTrue(result is AdminDashboardService.Result.Ok)
-        val detail = (result as AdminDashboardService.Result.Ok).value
+        assertTrue(result is Result.Ok)
+        val detail = (result as Result.Ok).value
         assertEquals(id.toString(), detail.id)
         assertEquals("PENDING", detail.status)
     }
@@ -162,7 +163,7 @@ class AdminDashboardServiceTest {
     @Test
     fun `retryAllFailed coerces limit to valid range`() = runTest {
         // Given
-        coEvery { outboxRepo.resetAllFailed(any()) } returns OutboxRepositoryPort.Result.Ok(10)
+        coEvery { outboxRepo.resetAllFailed(any()) } returns Result.Ok(10)
 
         // When - too small limit (should be coerced to 1)
         val result1 = service.retryAllFailed(-5)
@@ -171,8 +172,8 @@ class AdminDashboardServiceTest {
         val result2 = service.retryAllFailed(5000)
 
         // Then
-        assertTrue(result1 is AdminDashboardService.Result.Ok)
-        assertTrue(result2 is AdminDashboardService.Result.Ok)
+        assertTrue(result1 is Result.Ok)
+        assertTrue(result2 is Result.Ok)
     }
 
     @Test
@@ -188,14 +189,14 @@ class AdminDashboardServiceTest {
             status = OutboxStatus.FAILED,
             createdAt = Instant.now()
         )
-        coEvery { outboxRepo.findDlq(any()) } returns OutboxRepositoryPort.Result.Ok(listOf(entry))
+        coEvery { outboxRepo.findDlq(any()) } returns Result.Ok(listOf(entry))
 
         // When
         val result = service.getDlq(50)
 
         // Then
-        assertTrue(result is AdminDashboardService.Result.Ok)
-        val entries = (result as AdminDashboardService.Result.Ok).value
+        assertTrue(result is Result.Ok)
+        val entries = (result as Result.Ok).value
         assertEquals(1, entries.size)
         assertEquals("dlq-key", entries[0].idempotencyKey)
     }

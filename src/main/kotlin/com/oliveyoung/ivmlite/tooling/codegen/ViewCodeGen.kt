@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ViewDefinitionContract
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.coroutines.runBlocking
 import org.yaml.snakeyaml.Yaml
 import java.io.File
@@ -79,14 +80,14 @@ object ViewCodeGen {
         val result = registry.listViewDefinitions(ContractStatus.ACTIVE)
         
         when (result) {
-            is ContractRegistryPort.Result.Err -> {
+            is Result.Err -> {
                 GenerationResult(
                     success = false,
                     message = "Failed to load ViewDefinitions from DynamoDB: ${result.error}",
                     generatedFiles = emptyList()
                 )
             }
-            is ContractRegistryPort.Result.Ok -> {
+            is Result.Ok -> {
                 val contracts = result.value
                 if (contracts.isEmpty()) {
                     return@runBlocking GenerationResult(

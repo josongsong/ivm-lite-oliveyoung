@@ -1,6 +1,7 @@
 package com.oliveyoung.ivmlite.apps.admin.routes
 
 import com.oliveyoung.ivmlite.apps.admin.application.*
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.ktor.http.*
 import io.ktor.server.application.*
 import io.ktor.server.request.*
@@ -51,8 +52,8 @@ fun Route.explorerRoutes() {
         val cursor = call.request.queryParameters["cursor"]
 
         when (val result = explorerService.listRawData(tenantId, entityPrefix, limit, cursor)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -76,8 +77,8 @@ fun Route.explorerRoutes() {
         val version = call.request.queryParameters["version"]?.toLongOrNull()
 
         when (val result = explorerService.getRawData(tenantId, entityKey, version)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -103,8 +104,8 @@ fun Route.explorerRoutes() {
         val sliceType = call.request.queryParameters["sliceType"] ?: call.request.queryParameters["type"]
 
         when (val result = explorerService.getSlices(tenantId, entityKey, version, sliceType)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -131,8 +132,8 @@ fun Route.explorerRoutes() {
         val cursor = call.request.queryParameters["cursor"]
 
         when (val result = explorerService.searchSlices(tenantId, keyPrefix, sliceType, limit, cursor)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -147,8 +148,8 @@ fun Route.explorerRoutes() {
         val tenantId = call.request.queryParameters["tenant"] ?: "oliveyoung"
 
         when (val result = explorerService.getSliceTypes(tenantId)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -174,8 +175,8 @@ fun Route.explorerRoutes() {
         val cursor = call.request.queryParameters["cursor"]
 
         when (val result = explorerService.listSlicesByType(tenantId, sliceType, limit, cursor)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -201,8 +202,8 @@ fun Route.explorerRoutes() {
             ?: "default"
 
         when (val result = explorerService.getView(tenantId, entityKey, viewDefId)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -226,8 +227,8 @@ fun Route.explorerRoutes() {
         val version = call.request.queryParameters["version"]?.toLongOrNull()
 
         when (val result = explorerService.getLineage(tenantId, entityKey, version)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -246,8 +247,8 @@ fun Route.explorerRoutes() {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
 
         when (val result = explorerService.search(tenantId, query, limit)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -271,14 +272,14 @@ fun Route.explorerRoutes() {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 10
 
         when (val result = explorerService.autocomplete(tenantId, prefix, limit)) {
-            is ExplorerService.Result.Ok -> call.respond(
+            is Result.Ok -> call.respond(
                 HttpStatusCode.OK,
                 AutocompleteResponse(
                     prefix = prefix,
                     suggestions = result.value
                 )
             )
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Err -> throw result.error
         }
     }
 
@@ -312,8 +313,8 @@ fun Route.explorerRoutes() {
             )
 
         when (val result = explorerService.diffVersions(tenantId, entityKey, fromVersion, toVersion)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -344,8 +345,8 @@ fun Route.explorerRoutes() {
             payload = request.payload,
             compile = request.compile
         )) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.Created, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.Created, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 
@@ -376,8 +377,8 @@ fun Route.explorerRoutes() {
         }
 
         when (val result = explorerService.ingestBatch(request.tenantId, items)) {
-            is ExplorerService.Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
-            is ExplorerService.Result.Err -> throw result.error
+            is Result.Ok -> call.respond(HttpStatusCode.OK, result.value.toResponse())
+            is Result.Err -> throw result.error
         }
     }
 }

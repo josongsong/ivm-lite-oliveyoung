@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultChangeSetBuilderAdapter
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.DefaultImpactCalculatorAdapter
@@ -59,7 +60,7 @@ class AutoTriggerShipTest : StringSpec({
                     ruleSetVersion = SemVer.parse("1.0.0"),
                 ),
             )
-            SlicingEnginePort.Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
+            Result.Ok(SlicingEnginePort.SlicingResult(slices, emptyList()))
         }
     }
 

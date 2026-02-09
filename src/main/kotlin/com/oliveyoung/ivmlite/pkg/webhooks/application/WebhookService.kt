@@ -14,6 +14,7 @@ import com.oliveyoung.ivmlite.pkg.webhooks.ports.DispatchResult
 import com.oliveyoung.ivmlite.pkg.webhooks.ports.WebhookDeliveryRepositoryPort
 import com.oliveyoung.ivmlite.pkg.webhooks.ports.WebhookDispatcherPort
 import com.oliveyoung.ivmlite.pkg.webhooks.ports.WebhookRepositoryPort
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import java.time.LocalDate
 import java.time.ZoneId
 import java.util.UUID
@@ -69,8 +70,8 @@ class WebhookService(
 
         val result = webhookRepo.save(webhook)
         when (result) {
-            is WebhookRepositoryPort.Result.Ok -> result.webhook
-            is WebhookRepositoryPort.Result.Error -> raise(WebhookError.StorageError(result.message))
+            is Result.Ok -> result.value
+            is Result.Err -> raise(WebhookError.StorageError(result.error.message ?: "Unknown error"))
         }
     }
 
@@ -107,8 +108,8 @@ class WebhookService(
 
         val result = webhookRepo.save(updated)
         when (result) {
-            is WebhookRepositoryPort.Result.Ok -> result.webhook
-            is WebhookRepositoryPort.Result.Error -> raise(WebhookError.StorageError(result.message))
+            is Result.Ok -> result.value
+            is Result.Err -> raise(WebhookError.StorageError(result.error.message ?: "Unknown error"))
         }
     }
 

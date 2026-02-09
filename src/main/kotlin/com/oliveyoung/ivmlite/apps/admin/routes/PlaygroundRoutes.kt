@@ -223,7 +223,7 @@ private fun ValidationError.toResponse() = ValidationErrorResponse(
     line = line,
     column = column,
     message = message,
-    severity = severity
+    severity = level.name
 )
 
 private fun SimulationResult.toResponse() = SimulationResultResponse(

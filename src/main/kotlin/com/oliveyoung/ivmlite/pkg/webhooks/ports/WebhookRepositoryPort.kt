@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.webhooks.ports
 
 import com.oliveyoung.ivmlite.pkg.webhooks.domain.Webhook
 import com.oliveyoung.ivmlite.pkg.webhooks.domain.WebhookEvent
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import java.util.UUID
 
 /**
@@ -13,7 +14,7 @@ interface WebhookRepositoryPort {
     /**
      * 웹훅 저장
      */
-    suspend fun save(webhook: Webhook): Result
+    suspend fun save(webhook: Webhook): Result<Webhook>
 
     /**
      * ID로 웹훅 조회
@@ -49,9 +50,4 @@ interface WebhookRepositoryPort {
      * 웹훅 개수
      */
     suspend fun count(): Long
-
-    sealed class Result {
-        data class Ok(val webhook: Webhook) : Result()
-        data class Error(val message: String) : Result()
-    }
 }

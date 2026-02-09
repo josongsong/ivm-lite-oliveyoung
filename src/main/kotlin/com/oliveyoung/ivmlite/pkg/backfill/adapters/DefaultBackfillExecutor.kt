@@ -6,6 +6,7 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import org.jooq.DSLContext
 import org.jooq.impl.DSL
@@ -33,11 +34,11 @@ class DefaultBackfillExecutor(
         BackfillType.FULL_REPROCESS
     )
     
-    override suspend fun dryRun(scope: BackfillScope): BackfillExecutorPort.Result<DryRunResult> {
+    override suspend fun dryRun(scope: BackfillScope): Result<DryRunResult> {
         return try {
             val resolution = resolveScope(scope)
             when (resolution) {
-                is BackfillExecutorPort.Result.Ok -> {
+                is Result.Ok -> {
                     val res = resolution.value
                     
                     // 샘플 추출
@@ -46,7 +47,7 @@ class DefaultBackfillExecutor(
                     // 예상 시간 계산 (100 entities/sec 가정)
                     val estimatedSeconds = res.totalCount / 100
                     
-                    BackfillExecutorPort.Result.Ok(DryRunResult(
+                    Result.Ok(DryRunResult(
                         estimatedCount = res.totalCount,
                         countByType = res.countByType,
                         estimatedDuration = Duration.ofSeconds(estimatedSeconds),
@@ -54,11 +55,11 @@ class DefaultBackfillExecutor(
                         warnings = buildWarnings(res.totalCount)
                     ))
                 }
-                is BackfillExecutorPort.Result.Err -> resolution
+                is Result.Err -> resolution
             }
         } catch (e: Exception) {
             logger.error("Dry run failed", e)
-            BackfillExecutorPort.Result.Err(
+            Result.Err(
                 com.oliveyoung.ivmlite.shared.domain.errors.DomainError.InternalError(
                     "Dry run failed: ${e.message}"
                 )
@@ -66,7 +67,7 @@ class DefaultBackfillExecutor(
         }
     }
     
-    override suspend fun resolveScope(scope: BackfillScope): BackfillExecutorPort.Result<ScopeResolution> {
+    override suspend fun resolveScope(scope: BackfillScope): Result<ScopeResolution> {
         return try {
             // SQL 조건 빌드
             var query = dsl.select(DSL.field("entity_key"), DSL.field("schema_id"))
@@ -141,14 +142,14 @@ class DefaultBackfillExecutor(
                     (it.get(0, String::class.java) ?: "unknown") to (it.get(1, Long::class.java) ?: 0L)
                 }
             
-            BackfillExecutorPort.Result.Ok(ScopeResolution(
+            Result.Ok(ScopeResolution(
                 totalCount = totalCount,
                 entityKeys = entityKeys,
                 countByType = byType
             ))
         } catch (e: Exception) {
             logger.error("Failed to resolve scope", e)
-            BackfillExecutorPort.Result.Err(
+            Result.Err(
                 com.oliveyoung.ivmlite.shared.domain.errors.DomainError.InternalError(
                     "Failed to resolve scope: ${e.message}"
                 )
@@ -160,7 +161,7 @@ class DefaultBackfillExecutor(
         entityKey: String,
         type: BackfillType,
         config: BackfillConfig
-    ): BackfillExecutorPort.Result<EntityProcessResult> {
+    ): Result<EntityProcessResult> {
         val startTime = System.currentTimeMillis()
         
         return try {
@@ -175,7 +176,7 @@ class DefaultBackfillExecutor(
                     replayFailedEntry(entityKey)
                 }
                 else -> {
-                    BackfillExecutorPort.Result.Err(
+                    Result.Err(
                         com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ValidationError(
                             field = "type",
                             msg = "Unsupported backfill type: $type"
@@ -184,17 +185,17 @@ class DefaultBackfillExecutor(
                 }
             }.let { result ->
                 when (result) {
-                    is BackfillExecutorPort.Result.Ok -> {
-                        BackfillExecutorPort.Result.Ok(result.value.copy(
+                    is Result.Ok -> {
+                        Result.Ok(result.value.copy(
                             durationMs = System.currentTimeMillis() - startTime
                         ))
                     }
-                    is BackfillExecutorPort.Result.Err -> result
+                    is Result.Err -> result
                 }
             }
         } catch (e: Exception) {
             logger.error("Failed to process entity: {}", entityKey, e)
-            BackfillExecutorPort.Result.Ok(EntityProcessResult(
+            Result.Ok(EntityProcessResult(
                 entityKey = entityKey,
                 success = false,
                 message = e.message,
@@ -207,7 +208,7 @@ class DefaultBackfillExecutor(
         entityKeys: List<String>,
         type: BackfillType,
         config: BackfillConfig
-    ): BackfillExecutorPort.Result<BatchProcessResult> {
+    ): Result<BatchProcessResult> {
         val startTime = System.currentTimeMillis()
         val results = mutableListOf<EntityProcessResult>()
         var succeeded = 0
@@ -217,7 +218,7 @@ class DefaultBackfillExecutor(
         for (entityKey in entityKeys) {
             val result = processEntity(entityKey, type, config)
             when (result) {
-                is BackfillExecutorPort.Result.Ok -> {
+                is Result.Ok -> {
                     results.add(result.value)
                     if (result.value.success) {
                         succeeded++
@@ -226,14 +227,14 @@ class DefaultBackfillExecutor(
                         if (!config.continueOnError) break
                     }
                 }
-                is BackfillExecutorPort.Result.Err -> {
+                is Result.Err -> {
                     failed++
                     if (!config.continueOnError) break
                 }
             }
         }
         
-        return BackfillExecutorPort.Result.Ok(BatchProcessResult(
+        return Result.Ok(BatchProcessResult(
             total = entityKeys.size,
             succeeded = succeeded,
             failed = failed,
@@ -245,12 +246,12 @@ class DefaultBackfillExecutor(
     
     // ==================== Internal ====================
     
-    private suspend fun reprocessRawToSlice(entityKey: String): BackfillExecutorPort.Result<EntityProcessResult> {
+    private suspend fun reprocessRawToSlice(entityKey: String): Result<EntityProcessResult> {
         // 최신 버전 조회
         val latestVersion = dsl.select(DSL.max(DSL.field("version")))
             .from(DSL.table("raw_data"))
             .where(DSL.field("entity_key").eq(entityKey))
-            .fetchOne(0, Long::class.java) ?: return BackfillExecutorPort.Result.Ok(
+            .fetchOne(0, Long::class.java) ?: return Result.Ok(
                 EntityProcessResult(entityKey, false, "No raw data found")
             )
         
@@ -269,15 +270,15 @@ class DefaultBackfillExecutor(
         )
         
         return when (result) {
-            is SlicingWorkflow.Result.Ok -> {
-                BackfillExecutorPort.Result.Ok(EntityProcessResult(
+            is Result.Ok -> {
+                Result.Ok(EntityProcessResult(
                     entityKey = entityKey,
                     success = true,
                     slicesCreated = result.value.size
                 ))
             }
-            is SlicingWorkflow.Result.Err -> {
-                BackfillExecutorPort.Result.Ok(EntityProcessResult(
+            is Result.Err -> {
+                Result.Ok(EntityProcessResult(
                     entityKey = entityKey,
                     success = false,
                     message = result.error.toString()
@@ -286,31 +287,31 @@ class DefaultBackfillExecutor(
         }
     }
     
-    private suspend fun replayDlqEntry(entityKey: String): BackfillExecutorPort.Result<EntityProcessResult> {
+    private suspend fun replayDlqEntry(entityKey: String): Result<EntityProcessResult> {
         // DLQ에서 해당 엔티티 찾기
         val dlqEntries = when (val r = outboxRepo.findDlq(100)) {
-            is OutboxRepositoryPort.Result.Ok -> r.value
-            is OutboxRepositoryPort.Result.Err -> return BackfillExecutorPort.Result.Ok(
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Ok(
                 EntityProcessResult(entityKey, false, "Failed to find DLQ entries")
             )
         }
         
         val entry = dlqEntries.find { it.aggregateId.contains(entityKey) }
-            ?: return BackfillExecutorPort.Result.Ok(
+            ?: return Result.Ok(
                 EntityProcessResult(entityKey, false, "No DLQ entry found")
             )
         
         // Replay
         return when (val r = outboxRepo.replayFromDlq(entry.id)) {
-            is OutboxRepositoryPort.Result.Ok -> {
-                BackfillExecutorPort.Result.Ok(EntityProcessResult(
+            is Result.Ok -> {
+                Result.Ok(EntityProcessResult(
                     entityKey = entityKey,
                     success = r.value,
                     outboxEntriesCreated = if (r.value) 1 else 0
                 ))
             }
-            is OutboxRepositoryPort.Result.Err -> {
-                BackfillExecutorPort.Result.Ok(EntityProcessResult(
+            is Result.Err -> {
+                Result.Ok(EntityProcessResult(
                     entityKey = entityKey,
                     success = false,
                     message = r.error.toString()
@@ -319,7 +320,7 @@ class DefaultBackfillExecutor(
         }
     }
     
-    private suspend fun replayFailedEntry(entityKey: String): BackfillExecutorPort.Result<EntityProcessResult> {
+    private suspend fun replayFailedEntry(entityKey: String): Result<EntityProcessResult> {
         // FAILED 상태 엔트리 찾기
         val failedEntries = dsl.select()
             .from(DSL.table("outbox"))
@@ -328,7 +329,7 @@ class DefaultBackfillExecutor(
             .fetch()
         
         if (failedEntries.isEmpty()) {
-            return BackfillExecutorPort.Result.Ok(
+            return Result.Ok(
                 EntityProcessResult(entityKey, false, "No failed entry found")
             )
         }
@@ -337,12 +338,12 @@ class DefaultBackfillExecutor(
         for (record in failedEntries) {
             val id = record.get("id", java.util.UUID::class.java) ?: continue
             when (outboxRepo.resetToPending(id)) {
-                is OutboxRepositoryPort.Result.Ok -> replayed++
-                is OutboxRepositoryPort.Result.Err -> {}
+                is Result.Ok -> replayed++
+                is Result.Err -> {}
             }
         }
         
-        return BackfillExecutorPort.Result.Ok(EntityProcessResult(
+        return Result.Ok(EntityProcessResult(
             entityKey = entityKey,
             success = replayed > 0,
             outboxEntriesCreated = replayed

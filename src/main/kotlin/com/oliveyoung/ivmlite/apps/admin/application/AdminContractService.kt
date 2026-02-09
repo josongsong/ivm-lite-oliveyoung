@@ -1,6 +1,8 @@
 package com.oliveyoung.ivmlite.apps.admin.application
 
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import org.yaml.snakeyaml.Yaml
 import java.io.BufferedReader
 import java.io.InputStreamReader
@@ -16,13 +18,6 @@ import java.nio.file.Paths
  * 동적으로 contracts/v1 디렉토리를 스캔하여 하드코딩 제거.
  */
 class AdminContractService {
-
-    // ==================== Result 타입 ====================
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-    }
 
     // ==================== Public API ====================
 
@@ -183,25 +178,7 @@ class AdminContractService {
 }
 
 // ==================== Domain Models ====================
-
-/**
- * Contract Kind Enum
- *
- * YAML kind 값과 매핑
- */
-enum class ContractKind(val yamlValue: String) {
-    ENTITY_SCHEMA("ENTITY_SCHEMA"),
-    RULESET("RULESET"),
-    VIEW_DEFINITION("VIEW_DEFINITION"),
-    SINK_RULE("SINK_RULE"),
-    JOIN_SPEC("JOIN_SPEC"),
-    CHANGESET("CHANGESET");
-
-    companion object {
-        fun fromString(value: String): ContractKind? =
-            entries.find { it.yamlValue.equals(value, ignoreCase = true) }
-    }
-}
+// ContractKind는 com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind 사용
 
 data class ContractInfo(
     val kind: String,

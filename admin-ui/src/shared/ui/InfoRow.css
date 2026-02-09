@@ -1,0 +1,192 @@
+/**
+ * InfoRow Component Styles
+ */
+
+/* =============================================================================
+   InfoRow
+   ============================================================================= */
+
+.ui-info-row {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.ui-info-row--horizontal {
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.ui-info-row--vertical {
+  flex-direction: column;
+  align-items: flex-start;
+}
+
+.ui-info-row__label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--text-secondary);
+  flex-shrink: 0;
+}
+
+.ui-info-row__content {
+  display: flex;
+  align-items: center;
+  gap: 0.375rem;
+  min-width: 0;
+}
+
+.ui-info-row--horizontal .ui-info-row__content {
+  justify-content: flex-end;
+}
+
+.ui-info-row__value {
+  font-size: 0.8125rem;
+  color: var(--text-primary);
+  word-break: break-word;
+}
+
+.ui-info-row__value--mono {
+  font-family: var(--font-mono);
+  font-size: 0.75rem;
+}
+
+.ui-info-row__value--highlight {
+  color: var(--accent-cyan);
+  font-weight: 500;
+}
+
+.ui-info-row__value--truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 200px;
+}
+
+/* Badge styles */
+.ui-info-row__badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.125rem 0.5rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 500;
+}
+
+.ui-info-row__badge--default {
+  background: var(--bg-tertiary);
+  color: var(--text-primary);
+}
+
+.ui-info-row__badge--success {
+  background: rgba(0, 255, 136, 0.15);
+  color: var(--status-success);
+}
+
+.ui-info-row__badge--warning {
+  background: rgba(255, 204, 0, 0.15);
+  color: var(--status-warning);
+}
+
+.ui-info-row__badge--error {
+  background: rgba(255, 68, 102, 0.15);
+  color: var(--status-error);
+}
+
+.ui-info-row__badge--info {
+  background: rgba(0, 212, 255, 0.15);
+  color: var(--status-info);
+}
+
+.ui-info-row__badge--pending {
+  background: rgba(255, 136, 0, 0.15);
+  color: var(--status-pending);
+}
+
+.ui-info-row__badge--processing {
+  background: rgba(136, 85, 255, 0.15);
+  color: var(--status-processing);
+}
+
+/* Actions */
+.ui-info-row__actions {
+  display: flex;
+  align-items: center;
+  gap: 0.125rem;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.ui-info-row:hover .ui-info-row__actions {
+  opacity: 1;
+}
+
+.ui-info-row__copy--success {
+  color: var(--status-success) !important;
+}
+
+/* Size variants */
+.ui-info-row--sm .ui-info-row__label {
+  font-size: 0.75rem;
+}
+
+.ui-info-row--sm .ui-info-row__value {
+  font-size: 0.75rem;
+}
+
+.ui-info-row--lg .ui-info-row__label {
+  font-size: 0.875rem;
+}
+
+.ui-info-row--lg .ui-info-row__value {
+  font-size: 0.875rem;
+}
+
+/* =============================================================================
+   InfoList
+   ============================================================================= */
+
+.ui-info-list {
+  display: flex;
+  flex-direction: column;
+}
+
+.ui-info-list--gap-sm {
+  gap: 0.375rem;
+}
+
+.ui-info-list--gap-md {
+  gap: 0.5rem;
+}
+
+.ui-info-list--gap-lg {
+  gap: 0.75rem;
+}
+
+.ui-info-list--dividers > *:not(:last-child) {
+  padding-bottom: 0.5rem;
+  border-bottom: 1px solid var(--border-color);
+}
+
+/* =============================================================================
+   KeyValue (inline variant)
+   ============================================================================= */
+
+.ui-key-value {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  font-size: 0.8125rem;
+}
+
+.ui-key-value__label {
+  color: var(--text-muted);
+}
+
+.ui-key-value__value {
+  color: var(--text-primary);
+}
+
+.ui-key-value__value--mono {
+  font-family: var(--font-mono);
+}

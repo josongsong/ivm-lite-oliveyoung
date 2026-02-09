@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.slices
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
@@ -42,8 +43,8 @@ class RangeQueryTest : StringSpec({
         // PRODUCT 프리픽스로 조회
         val result = repo.findByKeyPrefix(tenantId, "PRODUCT#", null, 100, null)
         
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
-        val queryResult = (result as SliceRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
+        val queryResult = (result as Result.Ok).value
         queryResult.items.size shouldBe 3
         queryResult.hasMore shouldBe false
     }
@@ -57,8 +58,8 @@ class RangeQueryTest : StringSpec({
         
         val result = repo.findByKeyPrefix(tenantId, "PRODUCT#", null, 3, null)
         
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
-        val queryResult = (result as SliceRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
+        val queryResult = (result as Result.Ok).value
         queryResult.items.size shouldBe 3
         queryResult.hasMore shouldBe true
         queryResult.nextCursor shouldBe "PRODUCT#test-tenant#SKU-003|1"
@@ -73,22 +74,22 @@ class RangeQueryTest : StringSpec({
         
         // 첫 페이지
         val page1 = repo.findByKeyPrefix(tenantId, "PRODUCT#", null, 2, null)
-        page1.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
-        val result1 = (page1 as SliceRepositoryPort.Result.Ok).value
+        page1.shouldBeInstanceOf<Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
+        val result1 = (page1 as Result.Ok).value
         result1.items.size shouldBe 2
         result1.hasMore shouldBe true
         
         // 두 번째 페이지
         val page2 = repo.findByKeyPrefix(tenantId, "PRODUCT#", null, 2, result1.nextCursor)
-        page2.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
-        val result2 = (page2 as SliceRepositoryPort.Result.Ok).value
+        page2.shouldBeInstanceOf<Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
+        val result2 = (page2 as Result.Ok).value
         result2.items.size shouldBe 2
         result2.hasMore shouldBe true
         
         // 세 번째 페이지 (마지막)
         val page3 = repo.findByKeyPrefix(tenantId, "PRODUCT#", null, 2, result2.nextCursor)
-        page3.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
-        val result3 = (page3 as SliceRepositoryPort.Result.Ok).value
+        page3.shouldBeInstanceOf<Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
+        val result3 = (page3 as Result.Ok).value
         result3.items.size shouldBe 1
         result3.hasMore shouldBe false
     }
@@ -104,8 +105,8 @@ class RangeQueryTest : StringSpec({
         
         val result = repo.findByKeyPrefix(tenantId, "PRODUCT#", SliceType.CORE, 100, null)
         
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
-        val queryResult = (result as SliceRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<SliceRepositoryPort.RangeQueryResult>>()
+        val queryResult = (result as Result.Ok).value
         queryResult.items.size shouldBe 2
         queryResult.items.all { it.sliceType == SliceType.CORE } shouldBe true
     }
@@ -121,13 +122,13 @@ class RangeQueryTest : StringSpec({
         
         // 전체 카운트
         val totalResult = repo.count(tenantId, null, null)
-        totalResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<Long>>()
-        (totalResult as SliceRepositoryPort.Result.Ok).value shouldBe 3
+        totalResult.shouldBeInstanceOf<Result.Ok<Long>>()
+        (totalResult as Result.Ok).value shouldBe 3
         
         // 프리픽스 필터 카운트
         val productResult = repo.count(tenantId, "PRODUCT#", null)
-        productResult.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<Long>>()
-        (productResult as SliceRepositoryPort.Result.Ok).value shouldBe 2
+        productResult.shouldBeInstanceOf<Result.Ok<Long>>()
+        (productResult as Result.Ok).value shouldBe 2
     }
     
     "getLatestVersion: returns latest version slices" {
@@ -145,8 +146,8 @@ class RangeQueryTest : StringSpec({
         
         val result = repo.getLatestVersion(tenantId, entityKey, null)
         
-        result.shouldBeInstanceOf<SliceRepositoryPort.Result.Ok<List<SliceRecord>>>()
-        val slices = (result as SliceRepositoryPort.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<List<SliceRecord>>>()
+        val slices = (result as Result.Ok).value
         slices.size shouldBe 1
         slices[0].version shouldBe 3
     }

@@ -1,8 +1,8 @@
 package com.oliveyoung.ivmlite.pkg.rawdata.ports
 
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import java.util.UUID
 
 /**
@@ -183,12 +183,6 @@ interface OutboxRepositoryPort {
      */
     suspend fun claimWithOrdering(limit: Int, workerId: String?): Result<List<OutboxEntry>>
 
-    // ==================== Result 타입 ====================
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-    }
 }
 
 /**

@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.shared.domain.deploy.DeployPlan
 import com.oliveyoung.ivmlite.shared.domain.deploy.DependencyGraph
 import com.oliveyoung.ivmlite.shared.domain.deploy.ExecutionStep
 import com.oliveyoung.ivmlite.shared.domain.deploy.GraphNode
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import java.time.Instant
 import java.util.concurrent.ConcurrentHashMap
@@ -15,11 +16,6 @@ interface DeployPlanRepositoryPort {
     suspend fun save(plan: DeployPlanRecord): Result<DeployPlanRecord>
     suspend fun get(deployId: String): Result<DeployPlanRecord?>
     suspend fun getByEntityKey(entityKey: String): Result<List<DeployPlanRecord>>
-    
-    sealed interface Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>
-        data class Err(val error: String) : Result<Nothing>
-    }
 }
 
 /**
@@ -64,19 +60,19 @@ class InMemoryDeployPlanRepository : DeployPlanRepositoryPort, HealthCheckable {
     
     private val storage = ConcurrentHashMap<String, DeployPlanRecord>()
     
-    override suspend fun save(plan: DeployPlanRecord): DeployPlanRepositoryPort.Result<DeployPlanRecord> {
+    override suspend fun save(plan: DeployPlanRecord): Result<DeployPlanRecord> {
         storage[plan.deployId] = plan
-        return DeployPlanRepositoryPort.Result.Ok(plan)
+        return Result.Ok(plan)
     }
     
-    override suspend fun get(deployId: String): DeployPlanRepositoryPort.Result<DeployPlanRecord?> {
-        return DeployPlanRepositoryPort.Result.Ok(storage[deployId])
+    override suspend fun get(deployId: String): Result<DeployPlanRecord?> {
+        return Result.Ok(storage[deployId])
     }
     
-    override suspend fun getByEntityKey(entityKey: String): DeployPlanRepositoryPort.Result<List<DeployPlanRecord>> {
+    override suspend fun getByEntityKey(entityKey: String): Result<List<DeployPlanRecord>> {
         val plans = storage.values.filter { it.entityKey == entityKey }
             .sortedByDescending { it.createdAt }
-        return DeployPlanRepositoryPort.Result.Ok(plans)
+        return Result.Ok(plans)
     }
     
     override suspend fun healthCheck(): Boolean = true

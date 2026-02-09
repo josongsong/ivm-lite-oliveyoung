@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.sinks.adapters
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
@@ -58,7 +59,7 @@ class OpenSearchSinkAdapter(
         entityKey: EntityKey,
         version: Long,
         payload: String
-    ): SinkPort.Result<SinkPort.ShipResult> = withContext(Dispatchers.IO) {
+    ): Result<SinkPort.ShipResult> = withContext(Dispatchers.IO) {
         val startTime = Instant.now()
         
         try {
@@ -81,7 +82,7 @@ class OpenSearchSinkAdapter(
                 logger.info("OpenSearch ship success: index={}, id={}, latency={}ms", 
                     indexName, documentId, latencyMs)
                     
-                SinkPort.Result.Ok(SinkPort.ShipResult(
+                Result.Ok(SinkPort.ShipResult(
                     entityKey = entityKey.value,
                     version = version,
                     sinkId = "$indexName/$documentId",
@@ -90,25 +91,25 @@ class OpenSearchSinkAdapter(
             } else {
                 val errorBody = response.bodyAsText()
                 logger.error("OpenSearch ship failed: status={}, body={}", response.status, errorBody)
-                SinkPort.Result.Err(DomainError.ExternalServiceError(
+                Result.Err(DomainError.ExternalServiceError(
                     "opensearch",
                     "Index failed: ${response.status} - $errorBody"
                 ))
             }
         } catch (e: Exception) {
             logger.error("OpenSearch ship exception: {}", e.message, e)
-            SinkPort.Result.Err(DomainError.ExternalServiceError("opensearch", e.message ?: "Unknown error"))
+            Result.Err(DomainError.ExternalServiceError("opensearch", e.message ?: "Unknown error"))
         }
     }
     
     override suspend fun shipBatch(
         tenantId: TenantId,
         items: List<SinkPort.ShipItem>
-    ): SinkPort.Result<SinkPort.BatchShipResult> = withContext(Dispatchers.IO) {
+    ): Result<SinkPort.BatchShipResult> = withContext(Dispatchers.IO) {
         val startTime = Instant.now()
         
         if (items.isEmpty()) {
-            return@withContext SinkPort.Result.Ok(SinkPort.BatchShipResult(0, 0, emptyList(), 0))
+            return@withContext Result.Ok(SinkPort.BatchShipResult(0, 0, emptyList(), 0))
         }
         
         try {
@@ -145,7 +146,7 @@ class OpenSearchSinkAdapter(
                 if (hasErrors) {
                     // 실패 항목 추출 (단순 처리)
                     logger.warn("OpenSearch bulk has errors: {}", responseBody)
-                    SinkPort.Result.Ok(SinkPort.BatchShipResult(
+                    Result.Ok(SinkPort.BatchShipResult(
                         successCount = items.size - 1, // 대략적인 추정
                         failedCount = 1,
                         failedKeys = emptyList(), // 상세 파싱은 생략
@@ -153,7 +154,7 @@ class OpenSearchSinkAdapter(
                     ))
                 } else {
                     logger.info("OpenSearch bulk success: count={}, latency={}ms", items.size, latencyMs)
-                    SinkPort.Result.Ok(SinkPort.BatchShipResult(
+                    Result.Ok(SinkPort.BatchShipResult(
                         successCount = items.size,
                         failedCount = 0,
                         failedKeys = emptyList(),
@@ -163,21 +164,21 @@ class OpenSearchSinkAdapter(
             } else {
                 val errorBody = response.bodyAsText()
                 logger.error("OpenSearch bulk failed: status={}, body={}", response.status, errorBody)
-                SinkPort.Result.Err(DomainError.ExternalServiceError(
+                Result.Err(DomainError.ExternalServiceError(
                     "opensearch",
                     "Bulk failed: ${response.status}"
                 ))
             }
         } catch (e: Exception) {
             logger.error("OpenSearch bulk exception: {}", e.message, e)
-            SinkPort.Result.Err(DomainError.ExternalServiceError("opensearch", e.message ?: "Unknown error"))
+            Result.Err(DomainError.ExternalServiceError("opensearch", e.message ?: "Unknown error"))
         }
     }
     
     override suspend fun delete(
         tenantId: TenantId,
         entityKey: EntityKey
-    ): SinkPort.Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         try {
             val documentId = buildDocumentId(tenantId, entityKey)
             val indexName = buildIndexName(tenantId)
@@ -193,18 +194,18 @@ class OpenSearchSinkAdapter(
             // 404는 이미 삭제된 경우 - 멱등성 보장
             if (response.status.isSuccess() || response.status == HttpStatusCode.NotFound) {
                 logger.info("OpenSearch delete success: index={}, id={}", indexName, documentId)
-                SinkPort.Result.Ok(Unit)
+                Result.Ok(Unit)
             } else {
                 val errorBody = response.bodyAsText()
                 logger.error("OpenSearch delete failed: status={}", response.status)
-                SinkPort.Result.Err(DomainError.ExternalServiceError(
+                Result.Err(DomainError.ExternalServiceError(
                     "opensearch",
                     "Delete failed: ${response.status} - $errorBody"
                 ))
             }
         } catch (e: Exception) {
             logger.error("OpenSearch delete exception: {}", e.message, e)
-            SinkPort.Result.Err(DomainError.ExternalServiceError("opensearch", e.message ?: "Unknown error"))
+            Result.Err(DomainError.ExternalServiceError("opensearch", e.message ?: "Unknown error"))
         }
     }
     

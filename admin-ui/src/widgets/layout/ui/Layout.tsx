@@ -10,16 +10,15 @@ import {
   HeartPulse,
   Inbox,
   LayoutDashboard,
+  Palette,
   Play,
-  RefreshCw,
   RotateCcw,
   Search,
   Settings,
   Zap
 } from 'lucide-react'
-import { useQueryClient } from '@tanstack/react-query'
 import { APP_INFO } from '@/shared/config'
-import { EnvironmentSelector } from '@/shared/ui'
+import { EnvironmentSelector, ThemeCycleButton } from '@/shared/ui'
 import './Layout.css'
 
 interface LayoutProps {
@@ -34,6 +33,7 @@ const navItems = [
   { path: '/workflow', label: 'Workflow', icon: GitMerge },
   { path: '/outbox', label: 'Outbox', icon: Inbox },
   { path: '/playground', label: 'Playground', icon: Play },
+  { path: '/design-system', label: 'Design System', icon: Palette },
 ]
 
 const opsNavItems = [
@@ -48,11 +48,6 @@ const opsNavItems = [
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
-  const queryClient = useQueryClient()
-
-  const handleRefresh = () => {
-    queryClient.invalidateQueries()
-  }
 
   return (
     <div className="layout">
@@ -133,10 +128,7 @@ export function Layout({ children }: LayoutProps) {
         </nav>
 
         <div className="sidebar-footer">
-          <button className="refresh-btn" onClick={handleRefresh}>
-            <RefreshCw size={16} />
-            <span>새로고침</span>
-          </button>
+          <ThemeCycleButton />
           <div className="version-info">
             <span className="version-label">Version</span>
             <span className="version-value">{APP_INFO.VERSION}</span>

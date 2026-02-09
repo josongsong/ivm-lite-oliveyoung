@@ -2,8 +2,8 @@ package com.oliveyoung.ivmlite.pkg.changeset.ports
 
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSet
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeType
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 
 /**
@@ -56,11 +56,4 @@ interface ChangeSetRepositoryPort {
         changeType: ChangeType,
         limit: Int,
     ): Result<List<ChangeSet>>
-
-    // ==================== Result 타입 ====================
-
-    sealed class Result<out T> {
-        data class Ok<T>(val value: T) : Result<T>()
-        data class Err(val error: DomainError) : Result<Nothing>()
-    }
 }

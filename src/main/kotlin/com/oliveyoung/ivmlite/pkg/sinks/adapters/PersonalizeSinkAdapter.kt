@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.sinks.adapters
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
@@ -37,7 +38,7 @@ class PersonalizeSinkAdapter(
         entityKey: EntityKey,
         version: Long,
         payload: String
-    ): SinkPort.Result<SinkPort.ShipResult> = withContext(Dispatchers.IO) {
+    ): Result<SinkPort.ShipResult> = withContext(Dispatchers.IO) {
         val startTime = Instant.now()
         
         try {
@@ -50,7 +51,7 @@ class PersonalizeSinkAdapter(
             
             val latencyMs = Instant.now().toEpochMilli() - startTime.toEpochMilli()
             
-            SinkPort.Result.Ok(SinkPort.ShipResult(
+            Result.Ok(SinkPort.ShipResult(
                 entityKey = entityKey.value,
                 version = version,
                 sinkId = "${config.datasetArn}/$itemId",
@@ -58,18 +59,18 @@ class PersonalizeSinkAdapter(
             ))
         } catch (e: Exception) {
             logger.error("Personalize ship exception: {}", e.message, e)
-            SinkPort.Result.Err(DomainError.ExternalServiceError("personalize", e.message ?: "Unknown error"))
+            Result.Err(DomainError.ExternalServiceError("personalize", e.message ?: "Unknown error"))
         }
     }
     
     override suspend fun shipBatch(
         tenantId: TenantId,
         items: List<SinkPort.ShipItem>
-    ): SinkPort.Result<SinkPort.BatchShipResult> = withContext(Dispatchers.IO) {
+    ): Result<SinkPort.BatchShipResult> = withContext(Dispatchers.IO) {
         val startTime = Instant.now()
         
         if (items.isEmpty()) {
-            return@withContext SinkPort.Result.Ok(SinkPort.BatchShipResult(0, 0, emptyList(), 0))
+            return@withContext Result.Ok(SinkPort.BatchShipResult(0, 0, emptyList(), 0))
         }
         
         try {
@@ -83,7 +84,7 @@ class PersonalizeSinkAdapter(
             
             logger.info("Personalize batch complete (stub): count={}, latency={}ms", items.size, latencyMs)
             
-            SinkPort.Result.Ok(SinkPort.BatchShipResult(
+            Result.Ok(SinkPort.BatchShipResult(
                 successCount = items.size,
                 failedCount = 0,
                 failedKeys = emptyList(),
@@ -91,18 +92,18 @@ class PersonalizeSinkAdapter(
             ))
         } catch (e: Exception) {
             logger.error("Personalize batch exception: {}", e.message, e)
-            SinkPort.Result.Err(DomainError.ExternalServiceError("personalize", e.message ?: "Unknown error"))
+            Result.Err(DomainError.ExternalServiceError("personalize", e.message ?: "Unknown error"))
         }
     }
     
     override suspend fun delete(
         tenantId: TenantId,
         entityKey: EntityKey
-    ): SinkPort.Result<Unit> = withContext(Dispatchers.IO) {
+    ): Result<Unit> = withContext(Dispatchers.IO) {
         val itemId = buildItemId(tenantId, entityKey)
         storage.remove(itemId)
         logger.debug("Personalize delete (stub): itemId={}", itemId)
-        SinkPort.Result.Ok(Unit)
+        Result.Ok(Unit)
     }
     
     override suspend fun healthCheck(): Boolean = true

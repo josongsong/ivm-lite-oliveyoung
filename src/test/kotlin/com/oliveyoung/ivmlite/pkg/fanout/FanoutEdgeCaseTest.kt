@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.fanout
 
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
@@ -57,8 +58,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Err>()
-        val error = (result as FanoutWorkflow.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.ValidationError>()
         error.toString() shouldContain "upstreamEntityType"
     }
@@ -73,7 +74,7 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Err>()
+        result.shouldBeInstanceOf<Result.Err>()
     }
 
     "빈 entityKey - 에러 반환" {
@@ -86,8 +87,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Err>()
-        val error = (result as FanoutWorkflow.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.toString() shouldContain "upstreamEntityKey"
     }
 
@@ -101,8 +102,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = -1L,  // 음수
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Err>()
-        val error = (result as FanoutWorkflow.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.toString() shouldContain "upstreamVersion"
     }
 
@@ -117,7 +118,7 @@ class FanoutEdgeCaseTest : StringSpec({
         )
 
         // 의존성이 없으므로 empty 반환
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     // ==================== 2. 특수 문자 처리 ====================
@@ -134,7 +135,7 @@ class FanoutEdgeCaseTest : StringSpec({
         ))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -149,7 +150,7 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     "유니코드가 포함된 entityKey (한글)" {
@@ -163,7 +164,7 @@ class FanoutEdgeCaseTest : StringSpec({
         ))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -178,8 +179,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        (result as FanoutWorkflow.Result.Ok).value.processedCount shouldBe 1
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        (result as Result.Ok).value.processedCount shouldBe 1
     }
 
     // ==================== 3. 대소문자 처리 (Case Sensitivity) ====================
@@ -196,7 +197,7 @@ class FanoutEdgeCaseTest : StringSpec({
         ))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -212,7 +213,7 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
     }
 
     // ==================== 4. 동시성 Edge Cases ====================
@@ -232,7 +233,7 @@ class FanoutEdgeCaseTest : StringSpec({
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } coAnswers {
             kotlinx.coroutines.delay(50)  // 약간의 지연
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
         }
 
         val config = FanoutConfig(
@@ -262,7 +263,7 @@ class FanoutEdgeCaseTest : StringSpec({
 
             // 모두 성공해야 함 (Semaphore가 순차 처리)
             results.forEach { result ->
-                result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
+                result.shouldBeInstanceOf<Result.Ok<*>>()
             }
         }
     }
@@ -283,7 +284,7 @@ class FanoutEdgeCaseTest : StringSpec({
         // 슬라이싱이 오래 걸림
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } coAnswers {
             kotlinx.coroutines.delay(500)  // 500ms 지연
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
         }
 
         val config = FanoutConfig(
@@ -305,8 +306,8 @@ class FanoutEdgeCaseTest : StringSpec({
         )
 
         // 타임아웃으로 인한 부분 실패
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         // 타임아웃 시 일부가 실패로 처리됨
         (fanoutResult.failedCount >= 0) shouldBe true
     }
@@ -324,7 +325,7 @@ class FanoutEdgeCaseTest : StringSpec({
         ))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val config = FanoutConfig(
             deduplicationWindow = 0.milliseconds,  // 0ms = 중복 허용
@@ -353,12 +354,12 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 2L,
         )
 
-        result1.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        result2.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
+        result1.shouldBeInstanceOf<Result.Ok<*>>()
+        result2.shouldBeInstanceOf<Result.Ok<*>>()
         
         // 둘 다 처리됨 (SKIPPED 아님)
-        (result1 as FanoutWorkflow.Result.Ok).value.status shouldBe FanoutResultStatus.SUCCESS
-        (result2 as FanoutWorkflow.Result.Ok).value.status shouldBe FanoutResultStatus.SUCCESS
+        (result1 as Result.Ok).value.status shouldBe FanoutResultStatus.SUCCESS
+        (result2 as Result.Ok).value.status shouldBe FanoutResultStatus.SUCCESS
 
         // 2번 호출됨
         coVerify(exactly = 2) { slicingWorkflow.execute(any(), any(), any(), any()) }
@@ -369,7 +370,7 @@ class FanoutEdgeCaseTest : StringSpec({
     "RuleSet 로드 실패 - 에러 전파" {
         val contractRegistry = mockk<ContractRegistryPort>()
         coEvery { contractRegistry.loadRuleSetContract(any()) } returns
-            ContractRegistryPort.Result.Err(DomainError.NotFoundError("RuleSet", "ruleset.core.v1"))
+            Result.Err(DomainError.NotFoundError("RuleSet", "ruleset.core.v1"))
 
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
         val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
@@ -387,8 +388,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Err>()
-        val error = (result as FanoutWorkflow.Result.Err).error
+        result.shouldBeInstanceOf<Result.Err>()
+        val error = (result as Result.Err).error
         error.shouldBeInstanceOf<DomainError.NotFoundError>()
     }
 
@@ -410,7 +411,7 @@ class FanoutEdgeCaseTest : StringSpec({
             indexes = emptyList(),
         )
         coEvery { contractRegistry.loadRuleSetContract(any()) } returns
-            ContractRegistryPort.Result.Ok(emptyRuleSet)
+            Result.Ok(emptyRuleSet)
 
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
         val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
@@ -428,8 +429,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.totalAffected shouldBe 0
         fanoutResult.message shouldBe "No downstream dependencies"
     }
@@ -449,7 +450,7 @@ class FanoutEdgeCaseTest : StringSpec({
         setupInvertedIndex(invertedIndexRepo, tenantId, "product_by_brand", brandKey.value, products)
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val config = FanoutConfig(
             maxFanout = 100,  // 정확히 100개까지 허용
@@ -471,8 +472,8 @@ class FanoutEdgeCaseTest : StringSpec({
         )
 
         // Circuit breaker 안 터짐
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.processedCount shouldBe 100
     }
 
@@ -507,8 +508,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         fanoutResult.failedCount shouldBe 101  // Circuit breaker로 실패
         fanoutResult.processedCount shouldBe 0
     }
@@ -555,7 +556,7 @@ class FanoutEdgeCaseTest : StringSpec({
         invertedIndexRepo.putAllIdempotent(listOf(normalEntry, tombstoneEntry))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -570,8 +571,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         // tombstone은 제외되어 1개만 처리
         fanoutResult.processedCount shouldBe 1
 
@@ -593,7 +594,7 @@ class FanoutEdgeCaseTest : StringSpec({
         ))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
-            SlicingWorkflow.Result.Ok(emptyList())
+            Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
@@ -648,8 +649,8 @@ class FanoutEdgeCaseTest : StringSpec({
             upstreamVersion = 1L,
         )
 
-        result.shouldBeInstanceOf<FanoutWorkflow.Result.Ok<*>>()
-        val fanoutResult = (result as FanoutWorkflow.Result.Ok).value
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val fanoutResult = (result as Result.Ok).value
         // 다른 테넌트 데이터는 조회되지 않음
         fanoutResult.processedCount shouldBe 0
 
@@ -715,7 +716,7 @@ private fun createMockContractRegistry(): ContractRegistryPort {
     )
 
     coEvery { registry.loadRuleSetContract(any()) } returns
-        ContractRegistryPort.Result.Ok(ruleSet)
+        Result.Ok(ruleSet)
 
     return registry
 }
