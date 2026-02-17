@@ -28,7 +28,7 @@ const NODE_COLORS: Record<string, { bg: string; border: string; text: string }> 
   ENTITY_SCHEMA: { bg: 'rgba(0, 212, 255, 0.15)', border: '#00d4ff', text: '#00d4ff' },
   RULESET: { bg: 'rgba(136, 85, 255, 0.15)', border: '#8855ff', text: '#8855ff' },
   VIEW_DEFINITION: { bg: 'rgba(0, 255, 136, 0.15)', border: '#00ff88', text: '#00ff88' },
-  SINKRULE: { bg: 'rgba(255, 170, 0, 0.15)', border: '#ffaa00', text: '#ffaa00' },
+  SINK_RULE: { bg: 'rgba(255, 170, 0, 0.15)', border: '#ffaa00', text: '#ffaa00' },
   SLICE: { bg: 'rgba(255, 136, 136, 0.15)', border: '#ff8888', text: '#ff8888' },
 }
 

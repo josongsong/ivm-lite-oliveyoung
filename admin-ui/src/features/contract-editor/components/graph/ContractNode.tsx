@@ -39,7 +39,7 @@ function formatKind(kind: string): string {
     ENTITY_SCHEMA: 'Schema',
     RULESET: 'RuleSet',
     VIEW_DEFINITION: 'View',
-    SINKRULE: 'Sink',
+    SINK_RULE: 'Sink',
     JOIN_SPEC: 'Join',
     CHANGESET: 'ChangeSet',
   }

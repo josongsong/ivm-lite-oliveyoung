@@ -18,7 +18,7 @@ const contractTabs = [
   { key: 'ENTITY_SCHEMA', label: 'Schema', icon: Database },
   { key: 'RULESET', label: 'RuleSet', icon: Layers },
   { key: 'VIEW_DEFINITION', label: 'View', icon: Eye },
-  { key: 'SINKRULE', label: 'Sink', icon: ArrowRight },
+  { key: 'SINK_RULE', label: 'Sink', icon: ArrowRight },
 ]
 
 interface ContractFilterBarProps {

@@ -1,7 +1,7 @@
 import { Page, Locator, expect } from '@playwright/test';
 import { BasePage } from './base.page';
 
-export type ContractKind = 'ENTITY_SCHEMA' | 'RULESET' | 'VIEW_DEFINITION' | 'SINKRULE' | 'ALL';
+export type ContractKind = 'ENTITY_SCHEMA' | 'RULESET' | 'VIEW_DEFINITION' | 'SINK_RULE' | 'ALL';
 
 export class ContractsPage extends BasePage {
   readonly path = '/contracts';

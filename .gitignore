@@ -113,6 +113,13 @@ secrets/
 *.p12
 *.jks
 
+# Terraform
+*.tfstate
+*.tfstate.backup
+*.tfvars
+.terraform/
+.terraform.lock.hcl
+
 # Local configuration
 application-local.yml
 application-local.properties

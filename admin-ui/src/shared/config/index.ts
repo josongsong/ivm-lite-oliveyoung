@@ -40,7 +40,7 @@ export const APP_INFO = {
 } as const
 
 /** Contract 종류별 정보 */
-export type ContractKind = 'ENTITY_SCHEMA' | 'RULESET' | 'VIEW_DEFINITION' | 'SINKRULE'
+export type ContractKind = 'ENTITY_SCHEMA' | 'RULESET' | 'VIEW_DEFINITION' | 'SINK_RULE'
 
 export interface ContractKindInfo {
   label: string
@@ -68,7 +68,7 @@ const CONTRACT_KIND_INFO: Record<ContractKind, ContractKindInfo> = {
     color: '#00ff88',
     icon: 'Eye',
   },
-  SINKRULE: {
+  SINK_RULE: {
     label: 'Sink Rule',
     description: '외부 전송 규칙',
     color: '#ffaa00',

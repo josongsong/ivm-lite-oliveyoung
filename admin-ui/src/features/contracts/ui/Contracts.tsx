@@ -36,7 +36,7 @@ const contractKindInfo: Record<string, { label: string; color: string; descripti
     color: 'green',
     description: '여러 슬라이스를 조합하여 뷰를 정의합니다. 조인 조건, 필터링 규칙을 포함합니다.'
   },
-  'SINKRULE': {
+  'SINK_RULE': {
     label: 'Sink Rule',
     color: 'orange',
     description: '외부 시스템으로 데이터를 전송하는 규칙을 정의합니다. Kafka, OpenSearch 등의 대상을 설정합니다.'
@@ -59,7 +59,7 @@ const contractTabs = [
   { key: 'ENTITY_SCHEMA', label: 'Schema', icon: Database },
   { key: 'RULESET', label: 'RuleSet', icon: Layers },
   { key: 'VIEW_DEFINITION', label: 'View', icon: Eye },
-  { key: 'SINKRULE', label: 'Sink', icon: ArrowRight },
+  { key: 'SINK_RULE', label: 'Sink', icon: ArrowRight },
 ]
 
 export function Contracts() {

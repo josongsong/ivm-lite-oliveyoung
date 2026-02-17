@@ -1,4 +1,3 @@
-import org.jooq.meta.jaxb.Logging
 import java.time.Duration
 
 buildscript {
@@ -19,7 +18,7 @@ plugins {
     application
     id("io.gitlab.arturbosch.detekt") version "1.23.1"
     id("org.flywaydb.flyway") version "10.10.0"
-    id("org.jooq.jooq-codegen-gradle") version "3.19.6"
+    id("com.github.johnrengelman.shadow") version "8.1.1"  // Lambda JAR 빌드용
     `maven-publish`  // 내부 배포용
 }
 
@@ -42,14 +41,35 @@ val testcontainersVersion = "1.21.3"
 
 // ============================================
 // Database Configuration (remote-only)
-// - Flyway/jOOQ 태스크 실행 시에만 필요합니다.
+// - Flyway 태스크 실행 시에만 필요합니다.
 // - 로컬 기본값(localhost) 제거: 실수로 로컬에 붙는 것을 방지합니다.
 // ============================================
 val dbUrl = System.getenv("DB_URL") ?: ""
 val dbUser = System.getenv("DB_USER") ?: ""
 val dbPassword = System.getenv("DB_PASSWORD") ?: ""
 
+// ============================================
+// Dependency Version Alignment
+// Exposed 0.56.0이 coroutines 1.9.0을 transitively 가져오지만,
+// Ktor 2.3.9는 coroutines 1.8.x internal API에 의존하므로 강제 고정
+// ============================================
+configurations.all {
+    resolutionStrategy {
+        force("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.8.1")
+        force("org.jetbrains.kotlinx:kotlinx-coroutines-core-jvm:1.8.1")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-json:1.6.3")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-json-jvm:1.6.3")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-core:1.6.3")
+        force("org.jetbrains.kotlinx:kotlinx-serialization-core-jvm:1.6.3")
+    }
+}
+
 dependencies {
+    // ============================================
+    // Sink Plugin Contract (RFC-017)
+    // ============================================
+    implementation(project(":sinks-contract"))
+
     // ============================================
     // Kotlin Core
     // ============================================
@@ -130,23 +150,32 @@ dependencies {
     implementation("io.github.resilience4j:resilience4j-micrometer:$resilience4jVersion")
 
     // ============================================
-    // Database (PostgreSQL + jOOQ + HikariCP)
+    // Database (PostgreSQL + Exposed + HikariCP)
     // ============================================
     implementation("org.postgresql:postgresql:42.7.3")
     implementation("com.zaxxer:HikariCP:5.1.0")
-    implementation("org.jooq:jooq:3.19.6")
-    implementation("org.jooq:jooq-kotlin:3.19.6")
-    implementation("org.jooq:jooq-kotlin-coroutines:3.19.6")
 
-    // jOOQ codegen (빌드 시에만 사용)
-    jooqCodegen("org.postgresql:postgresql:42.7.3")
+    // JetBrains Exposed (Type-safe SQL DSL)
+    val exposedVersion = "0.56.0"
+    implementation("org.jetbrains.exposed:exposed-core:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-jdbc:$exposedVersion")
+    implementation("org.jetbrains.exposed:exposed-java-time:$exposedVersion")
 
     // ============================================
-    // AWS SDK v2 (DynamoDB - Schema Registry)
+    // AWS SDK v2 (DynamoDB, SQS, Personalize - Sink Plugin)
     // ============================================
     implementation(platform("software.amazon.awssdk:bom:2.25.67"))
     implementation("software.amazon.awssdk:dynamodb")
+    implementation("software.amazon.awssdk:sqs")  // RFC-017: Sink Plugin (레거시, 향후 제거)
+    implementation("software.amazon.awssdk:s3")  // RFC-017: S3 Sink Plugin
+    implementation("software.amazon.awssdk:personalizeevents")  // RFC-017: Personalize Sink Plugin
     implementation("software.amazon.awssdk:netty-nio-client")
+
+    // ============================================
+    // AWS Lambda Runtime (Lambda Handler용)
+    // ============================================
+    implementation("com.amazonaws:aws-lambda-java-core:1.2.3")
+    implementation("com.amazonaws:aws-lambda-java-events:3.11.4")
 
     // ============================================
     // YAML for contract registry (v1 local mode)
@@ -211,69 +240,8 @@ flyway {
 }
 
 // ============================================
-// jOOQ Code Generation (SOTA Configuration)
-//
-// 🎯 전략: 생성 코드를 src에 저장하여 git 관리
-// - DB 없이 빌드 가능
-// - CI/CD에서 DB 연결 불필요
-// - 코드 리뷰 가능 (스키마 변경 추적)
-//
-// 사용법:
-//   ./gradlew regenerateJooq  # DB 연결 후 재생성
-//   ./gradlew build           # DB 없이 빌드 가능
+// Exposed: 코드 생성 불필요 (Tables.kt에 스키마 직접 정의)
 // ============================================
-
-// JOOQ 생성 코드 경로 (src에 저장)
-val jooqOutputDir = "src/main/kotlin"
-val jooqPackagePath = "com/oliveyoung/ivmlite/generated/jooq"
-val jooqGeneratedDir = file("$jooqOutputDir/$jooqPackagePath")
-
-jooq {
-    configuration {
-        logging = Logging.WARN
-        jdbc {
-            driver = "org.postgresql.Driver"
-            url = dbUrl
-            user = dbUser
-            password = dbPassword
-        }
-        generator {
-            name = "org.jooq.codegen.KotlinGenerator"
-            database {
-                name = "org.jooq.meta.postgres.PostgresDatabase"
-                inputSchema = "public"
-                excludes = "flyway_schema_history"
-                // Enum 타입 매핑
-                forcedTypes {
-                    forcedType {
-                        name = "varchar"
-                        includeExpression = ".*\\.status"
-                        includeTypes = ".*"
-                    }
-                }
-            }
-            generate {
-                isDeprecated = false
-                isRecords = true
-                isPojos = true
-                isDaos = true  // SOTA: DAO 생성으로 CRUD 보일러플레이트 감소
-                isPojosAsKotlinDataClasses = true
-                isKotlinNotNullPojoAttributes = true
-                isKotlinNotNullRecordAttributes = true
-                isKotlinNotNullInterfaceAttributes = true
-                isRoutines = true  // stored procedures 지원
-                isSequences = true  // sequences 지원
-                // Kotlin 최적화
-                isKotlinSetterJvmNameAnnotationsOnIsPrefix = true
-                isJavaTimeTypes = true  // java.time 사용
-            }
-            target {
-                packageName = "com.oliveyoung.ivmlite.generated.jooq"
-                directory = jooqOutputDir  // src에 직접 저장
-            }
-        }
-    }
-}
 
 // Generated 코드를 소스셋에 추가 (ViewCodeGen만 build에서 가져옴)
 sourceSets {
@@ -332,86 +300,8 @@ tasks.register("generateSchema") {
 }
 
 // ============================================
-// Task Dependencies (SOTA jOOQ Integration)
-//
-// 🎯 전략: 조건부 의존성
-// - 생성 코드가 src에 있으면 → jooqCodegen 스킵
-// - 생성 코드가 없으면 → 에러 메시지 출력
+// Task Dependencies
 // ============================================
-
-tasks.named("jooqCodegen") {
-    group = "codegen"
-    description = "Generate jOOQ classes from database schema (requires DB connection)"
-
-    inputs.files(fileTree("src/main/resources/db/migration"))
-    outputs.dir(jooqGeneratedDir)
-
-    doFirst {
-        if (dbUrl.isBlank()) {
-            throw GradleException("""
-                |
-                |❌ jOOQ 코드 생성에 DB 연결이 필요합니다.
-                |
-                |환경 변수 설정 후 실행하세요:
-                |  export DB_URL=jdbc:postgresql://localhost:5433/ivmlite
-                |  export DB_USER=ivm
-                |  export DB_PASSWORD=ivm
-                |
-                |또는 Docker로 로컬 DB 실행:
-                |  docker-compose up -d postgres
-                |
-            """.trimMargin())
-        }
-    }
-}
-
-// 명시적 재생성 태스크 (Flyway 마이그레이션 후 사용)
-tasks.register("regenerateJooq") {
-    group = "codegen"
-    description = "Regenerate jOOQ classes after schema changes (requires DB)"
-
-    dependsOn("flywayMigrate", "jooqCodegen")
-
-    doLast {
-        println("""
-            |
-            |✅ jOOQ 코드 재생성 완료!
-            |
-            |변경 사항 확인:
-            |  git diff src/main/kotlin/com/oliveyoung/ivmlite/generated/jooq/
-            |
-            |커밋:
-            |  git add src/main/kotlin/com/oliveyoung/ivmlite/generated/jooq/
-            |  git commit -m "chore: regenerate jOOQ after schema change"
-            |
-        """.trimMargin())
-    }
-}
-
-// compileKotlin: 생성 코드가 있으면 jooqCodegen 스킵
-// NOTE: Configuration cache 호환을 위해 경로를 미리 계산
-tasks.named("compileKotlin") {
-    // jooqCodegen 의존성 제거 - src에 생성 코드가 있으므로 불필요
-    // 생성 코드가 없으면 컴파일 에러로 자연스럽게 알 수 있음
-
-    // Configuration cache 호환: 경로를 configuration phase에서 계산
-    val generatedDirPath = layout.projectDirectory.dir("src/main/kotlin/com/oliveyoung/ivmlite/generated/jooq")
-    
-    doFirst {
-        val generatedDir = generatedDirPath.asFile
-        if (!generatedDir.exists() || generatedDir.listFiles()?.isEmpty() == true) {
-            logger.warn("""
-                |
-                |⚠️  jOOQ 생성 코드가 없습니다!
-                |
-                |해결 방법:
-                |  1. DB 연결 후: ./gradlew regenerateJooq
-                |  2. 또는 git에서 복원: git checkout -- src/main/kotlin/com/oliveyoung/ivmlite/generated/
-                |
-            """.trimMargin())
-        }
-    }
-}
 
 // ============================================
 // 🧪 SOTA 테스트 UX 설정
@@ -684,6 +574,7 @@ tasks.register<JavaExec>("runApi") {
     description = "Run RuntimeAPI (Ktor server on port 8080)"
     mainClass.set("com.oliveyoung.ivmlite.apps.runtimeapi.ApplicationKt")
     classpath = sourceSets.main.get().runtimeClasspath
+    environment.putAll(System.getenv())
 }
 
 // Detekt configuration (Kotlin 특화 린트)
@@ -939,4 +830,28 @@ tasks.register<JavaExec>("runApiDev") {
         "-XX:+UseParallelGC",
         "-Xverify:none"
     )
+}
+
+// ============================================
+// Shadow JAR (Lambda 배포용)
+// ============================================
+tasks.shadowJar {
+    archiveBaseName.set("ivm-ingest-lambda")
+    archiveClassifier.set("")
+    archiveVersion.set("1.0.0")
+
+    // Lambda Runtime 포함
+    mergeServiceFiles()
+
+    // 불필요한 파일 제외 (서명 파일)
+    exclude("META-INF/*.SF")
+    exclude("META-INF/*.DSA")
+    exclude("META-INF/*.RSA")
+
+    // Manifest 설정
+    manifest {
+        attributes(
+            "Main-Class" to "com.oliveyoung.ivmlite.apps.lambda.IngestLambdaHandler"
+        )
+    }
 }
