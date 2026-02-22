@@ -1,5 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.workflow.canvas
 
+import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.LocalYamlSinkRuleRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.observability.domain.QueueDepthMetrics
 import com.oliveyoung.ivmlite.pkg.observability.domain.ThroughputMetrics
 import com.oliveyoung.ivmlite.pkg.observability.ports.MetricsCollectorPort
@@ -24,7 +26,9 @@ import io.mockk.mockk
  */
 class NodeStatusCalculationTest : StringSpec({
 
-    val graphBuilder = WorkflowGraphBuilder()
+    val contractRegistry = LocalYamlContractRegistryAdapter("/contracts/v1")
+    val sinkRuleRegistry = LocalYamlSinkRuleRegistryAdapter("/contracts/v1")
+    val graphBuilder = WorkflowGraphBuilder(contractRegistry, sinkRuleRegistry)
 
     "상태 계산 - ERROR: errorCount > 0" {
         val metricsCollector = mockk<MetricsCollectorPort>()
@@ -112,7 +116,7 @@ class NodeStatusCalculationTest : StringSpec({
         coEvery { metricsCollector.collectThroughput(any()) } returns ThroughputMetrics(
             recordsPerSecond = 100.0,
             recordsPerMinute = 6000.0,
-            recordsPerHour = 360000.0,
+            recordsPerHour = 360_000.0,
             recentMinuteCount = 6000L,
             measurementPeriodSeconds = 60L
         )

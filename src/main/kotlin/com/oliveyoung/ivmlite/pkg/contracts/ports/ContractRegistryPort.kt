@@ -1,6 +1,7 @@
 package com.oliveyoung.ivmlite.pkg.contracts.ports
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ChangeSetContract
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.InvertedIndexContract
@@ -38,7 +39,7 @@ interface ContractRegistryPort {
      * @param status 상태 필터 (null이면 전체)
      * @return Contract 메타데이터 목록
      */
-    suspend fun listContractRefs(kind: String, status: ContractStatus? = null): Result<List<ContractRef>> {
+    suspend fun listContractRefs(kind: ContractKind, status: ContractStatus? = null): Result<List<ContractRef>> {
         // 기본 구현: 빈 목록 (하위 호환성)
         return Result.Ok(emptyList())
     }

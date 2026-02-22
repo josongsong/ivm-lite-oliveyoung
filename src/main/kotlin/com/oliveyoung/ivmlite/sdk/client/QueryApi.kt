@@ -12,16 +12,16 @@ import java.time.Duration
 
 /**
  * Query API - DX 끝판왕
- * 
+ *
  * DB 중립적 기본 API + 고급 옵션 지원
- * 
+ *
  * @example 가장 간단한 사용법 (99% 케이스)
  * ```kotlin
  * val view = Ivm.query("product.pdp")
  *     .key("SKU-001")
  *     .get()
  * ```
- * 
+ *
  * @example 명시적 테넌트/버전
  * ```kotlin
  * val view = Ivm.query("product.pdp")
@@ -30,7 +30,7 @@ import java.time.Duration
  *     .version(5L)
  *     .get()
  * ```
- * 
+ *
  * @example 고급 옵션 (DynamoDB 최적화 등)
  * ```kotlin
  * val view = Ivm.query("product.pdp")
@@ -42,7 +42,7 @@ import java.time.Duration
  *     }
  *     .get()
  * ```
- * 
+ *
  * @example 범위 검색
  * ```kotlin
  * val results = Ivm.query("product.pdp")
@@ -70,7 +70,7 @@ class QueryApi internal constructor(
 
 /**
  * Query Builder - Fluent DSL
- * 
+ *
  * 단일 조회 + 범위 검색 모두 지원
  */
 @IvmDslMarker
@@ -82,7 +82,7 @@ class QueryBuilder internal constructor(
     private var entityKey: String? = null
     private var version: Long? = null
     private var options: QueryOptions = QueryOptions.DEFAULT
-    
+
     // 범위 검색용
     private var rangeSpec: RangeSpec? = null
     private var limit: Int? = null
@@ -101,8 +101,8 @@ class QueryBuilder internal constructor(
 
     /**
      * 엔티티 키 설정 (단일 조회용, 필수)
-     * 
-     * @example 
+     *
+     * @example
      * ```kotlin
      * .key("SKU-001")           // 단순 키
      * .key("PRODUCT#t1#SKU-001") // Full 키
@@ -135,7 +135,7 @@ class QueryBuilder internal constructor(
 
     /**
      * 범위 검색 조건 설정
-     * 
+     *
      * @example
      * ```kotlin
      * Ivm.query("product.pdp")
@@ -155,7 +155,7 @@ class QueryBuilder internal constructor(
 
     /**
      * 결과 개수 제한
-     * 
+     *
      * @param maxResults 최대 결과 개수 (기본: 100, 최대: 1000)
      */
     fun limit(maxResults: Int): QueryBuilder {
@@ -166,7 +166,7 @@ class QueryBuilder internal constructor(
 
     /**
      * 페이지네이션 커서 (다음 페이지 조회용)
-     * 
+     *
      * @example
      * ```kotlin
      * val page1 = Ivm.query("product.pdp").tenant("t1").range { all() }.limit(100).list()
@@ -213,9 +213,9 @@ class QueryBuilder internal constructor(
      * @return ViewResult (성공 시 데이터, 실패 시 에러)
      */
     fun get(): ViewResult {
-        val finalTenantId = tenantId ?: config.tenantId 
+        val finalTenantId = tenantId ?: config.tenantId
             ?: throw IllegalArgumentException("tenantId is required. Set via .tenant() or Ivm.configure { tenantId = ... }")
-        val finalEntityKey = entityKey 
+        val finalEntityKey = entityKey
             ?: throw IllegalArgumentException("entityKey is required. Use .key()")
 
         return executeQuery(finalTenantId, finalEntityKey, version, options)
@@ -225,9 +225,9 @@ class QueryBuilder internal constructor(
      * 단일 엔티티 비동기 조회 (suspend)
      */
     suspend fun getAsync(): ViewResult {
-        val finalTenantId = tenantId ?: config.tenantId 
+        val finalTenantId = tenantId ?: config.tenantId
             ?: throw IllegalArgumentException("tenantId is required")
-        val finalEntityKey = entityKey 
+        val finalEntityKey = entityKey
             ?: throw IllegalArgumentException("entityKey is required")
 
         return executeQueryAsync(finalTenantId, finalEntityKey, version, options)
@@ -237,23 +237,14 @@ class QueryBuilder internal constructor(
      * 존재 여부만 확인 (데이터 로드 안함)
      */
     fun exists(): Boolean {
-        return try {
-            get().success
-        } catch (e: Exception) {
-            false
-        }
+        return runCatching { get().success }.getOrDefault(false)
     }
 
     /**
      * 조회 또는 null 반환 (에러 시 예외 안 던짐)
      */
     fun getOrNull(): ViewResult? {
-        return try {
-            val result = get()
-            if (result.success) result else null
-        } catch (e: Exception) {
-            null
-        }
+        return runCatching { get() }.getOrNull()?.takeIf { it.success }
     }
 
     /**
@@ -263,13 +254,20 @@ class QueryBuilder internal constructor(
         return getOrNull() ?: ViewResult.empty(viewId, default)
     }
 
+    /**
+     * 성공 시 JsonObject 반환, 실패 시 예외 (RFC-021)
+     */
+    fun getOrThrow(): JsonObject {
+        return get().getOrThrow()
+    }
+
     // ===== 범위 검색 실행 =====
 
     /**
      * 범위 검색 실행 (동기)
-     * 
+     *
      * @return QueryResultPage (결과 목록 + 페이지네이션 정보)
-     * 
+     *
      * @example
      * ```kotlin
      * val results = Ivm.query("product.pdp")
@@ -277,7 +275,7 @@ class QueryBuilder internal constructor(
      *     .range { keyPrefix("SKU-") }
      *     .limit(100)
      *     .list()
-     * 
+     *
      * results.items.forEach { println(it.entityKey) }
      * if (results.hasMore) {
      *     val nextPage = Ivm.query("product.pdp")
@@ -289,9 +287,9 @@ class QueryBuilder internal constructor(
      * ```
      */
     fun list(): QueryResultPage {
-        val finalTenantId = tenantId ?: config.tenantId 
+        val finalTenantId = tenantId ?: config.tenantId
             ?: throw IllegalArgumentException("tenantId is required for range query")
-        
+
         return executeRangeQuery(finalTenantId, rangeSpec, limit ?: 100, cursor, sortOrder, options)
     }
 
@@ -299,15 +297,15 @@ class QueryBuilder internal constructor(
      * 범위 검색 실행 (비동기)
      */
     suspend fun listAsync(): QueryResultPage {
-        val finalTenantId = tenantId ?: config.tenantId 
+        val finalTenantId = tenantId ?: config.tenantId
             ?: throw IllegalArgumentException("tenantId is required for range query")
-        
+
         return executeRangeQueryAsync(finalTenantId, rangeSpec, limit ?: 100, cursor, sortOrder, options)
     }
 
     /**
      * 전체 결과를 Sequence로 반환 (자동 페이지네이션)
-     * 
+     *
      * @example
      * ```kotlin
      * Ivm.query("product.pdp")
@@ -319,22 +317,24 @@ class QueryBuilder internal constructor(
      * ```
      */
     fun stream(): Sequence<ViewResult> = sequence {
+        val savedCursor = cursor
         var currentCursor: String? = cursor
         do {
+            cursor = currentCursor
             val page = list()
             yieldAll(page.items)
             currentCursor = page.nextCursor
-            cursor = currentCursor
         } while (page.hasMore && currentCursor != null)
+        cursor = savedCursor
     }
 
     /**
      * 결과 개수만 반환 (데이터 로드 안함)
      */
     fun count(): Long {
-        val finalTenantId = tenantId ?: config.tenantId 
+        val finalTenantId = tenantId ?: config.tenantId
             ?: throw IllegalArgumentException("tenantId is required")
-        
+
         return executeCount(finalTenantId, rangeSpec, options)
     }
 
@@ -362,31 +362,16 @@ class QueryBuilder internal constructor(
     ): ViewResult {
         // QueryViewWorkflow를 통해 PostgreSQL 직접 조회
         val workflow = com.oliveyoung.ivmlite.sdk.Ivm.getQueryWorkflow()
-        
-        return if (workflow != null) {
-            // 실제 Workflow 호출 (suspend를 runBlocking으로 래핑)
-            kotlinx.coroutines.runBlocking {
-                executeQueryViaWorkflow(workflow, tenantId, entityKey, version, options)
-            }
-        } else {
-            // Workflow 미설정 시 스텁 반환 (개발/테스트용)
-            ViewResult(
-                success = true,
-                viewId = viewId,
-                tenantId = tenantId,
-                entityKey = entityKey,
-                version = version ?: 0L,
-                data = buildJsonObject { },
-                meta = ViewResult.Meta(
-                    slicesUsed = listOf("CORE", "PRICING"),
-                    queryTimeMs = 5L,
-                    fromCache = false,
-                    consistency = options.consistency.name
-                )
-            )
+
+        if (workflow == null) {
+            throw IllegalStateException("QueryViewWorkflow not configured. Call Ivm.initialize() first.")
+        }
+
+        return kotlinx.coroutines.runBlocking {
+            executeQueryViaWorkflow(workflow, tenantId, entityKey, version, options)
         }
     }
-    
+
     private suspend fun executeQueryViaWorkflow(
         workflow: com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow,
         tenantId: String,
@@ -395,26 +380,24 @@ class QueryBuilder internal constructor(
         options: QueryOptions
     ): ViewResult {
         val startTime = System.currentTimeMillis()
-        
+
         val result = workflow.execute(
             tenantId = com.oliveyoung.ivmlite.shared.domain.types.TenantId(tenantId),
             viewId = viewId,
             entityKey = com.oliveyoung.ivmlite.shared.domain.types.EntityKey(entityKey),
             version = version ?: 1L
         )
-        
+
         val queryTimeMs = System.currentTimeMillis() - startTime
-        
+
         return when (result) {
             is Result.Ok -> {
                 val response = result.value
                 // ViewResponse.data는 JSON 문자열, 파싱 필요
-                val dataJson = try {
+                val dataJson = runCatching {
                     kotlinx.serialization.json.Json.parseToJsonElement(response.data).jsonObject
-                } catch (e: Exception) {
-                    buildJsonObject { }
-                }
-                
+                }.getOrDefault(buildJsonObject { })
+
                 ViewResult(
                     success = true,
                     viewId = viewId,
@@ -458,7 +441,7 @@ class QueryBuilder internal constructor(
         options: QueryOptions
     ): ViewResult {
         val workflow = com.oliveyoung.ivmlite.sdk.Ivm.getQueryWorkflow()
-        
+
         return if (workflow != null) {
             executeQueryViaWorkflow(workflow, tenantId, entityKey, version, options)
         } else {
@@ -489,7 +472,7 @@ class QueryBuilder internal constructor(
         options: QueryOptions
     ): QueryResultPage {
         val startTime = System.currentTimeMillis()
-        
+
         val workflow = com.oliveyoung.ivmlite.sdk.Ivm.getQueryWorkflow()
         if (workflow == null) {
             // Workflow 없으면 빈 결과 반환
@@ -501,16 +484,12 @@ class QueryBuilder internal constructor(
                 queryTimeMs = System.currentTimeMillis() - startTime
             )
         }
-        
+
         val keyPrefix = rangeSpec?.keyPrefix ?: ""
-        val sliceType = options.projections.firstOrNull()?.let { 
-            try { 
-                com.oliveyoung.ivmlite.shared.domain.types.SliceType.fromDbValue(it) 
-            } catch (e: Exception) { 
-                null 
-            }
+        val sliceType = options.projections.firstOrNull()?.let {
+            runCatching { com.oliveyoung.ivmlite.shared.domain.types.SliceType.fromDbValue(it) }.getOrNull()
         }
-        
+
         val result = workflow.executeRange(
             tenantId = com.oliveyoung.ivmlite.shared.domain.types.TenantId(tenantId),
             keyPrefix = keyPrefix,
@@ -518,7 +497,7 @@ class QueryBuilder internal constructor(
             limit = limit,
             cursor = cursor
         )
-        
+
         return when (result) {
             is Result.Ok -> {
                 val rangeResult = result.value
@@ -530,11 +509,9 @@ class QueryBuilder internal constructor(
                             tenantId = tenantId,
                             entityKey = item.entityKey,
                             version = item.version,
-                            data = try {
+                            data = runCatching {
                                 kotlinx.serialization.json.Json.parseToJsonElement(item.data).jsonObject
-                            } catch (e: Exception) {
-                                buildJsonObject { }
-                            }
+                            }.getOrDefault(buildJsonObject { })
                         )
                     },
                     totalCount = rangeResult.totalCount,
@@ -564,7 +541,7 @@ class QueryBuilder internal constructor(
             executeCountAsync(tenantId, rangeSpec, options)
         }
     }
-    
+
     private suspend fun executeCountAsync(
         tenantId: String,
         rangeSpec: RangeSpec?,
@@ -572,22 +549,18 @@ class QueryBuilder internal constructor(
     ): Long {
         val workflow = com.oliveyoung.ivmlite.sdk.Ivm.getQueryWorkflow()
             ?: return 0L
-        
+
         val keyPrefix = rangeSpec?.keyPrefix
         val sliceType = options.projections.firstOrNull()?.let {
-            try {
-                com.oliveyoung.ivmlite.shared.domain.types.SliceType.fromDbValue(it)
-            } catch (e: Exception) {
-                null
-            }
+            runCatching { com.oliveyoung.ivmlite.shared.domain.types.SliceType.fromDbValue(it) }.getOrNull()
         }
-        
+
         val result = workflow.executeCount(
             tenantId = com.oliveyoung.ivmlite.shared.domain.types.TenantId(tenantId),
             keyPrefix = keyPrefix,
             sliceType = sliceType
         )
-        
+
         return when (result) {
             is Result.Ok -> result.value
             is Result.Err -> 0L
@@ -661,7 +634,7 @@ class RangeBuilder internal constructor() {
 
     /**
      * Key Prefix 검색 (DynamoDB begins_with)
-     * 
+     *
      * @example
      * ```kotlin
      * .keyPrefix("SKU-")      // SKU-로 시작하는 모든 키
@@ -674,7 +647,7 @@ class RangeBuilder internal constructor() {
 
     /**
      * Key 범위 검색
-     * 
+     *
      * @example
      * ```kotlin
      * .keyBetween("SKU-001", "SKU-100")  // SKU-001 ~ SKU-100
@@ -703,7 +676,7 @@ class RangeBuilder internal constructor() {
 
     /**
      * 버전 범위 검색
-     * 
+     *
      * @example
      * ```kotlin
      * .versionBetween(1L, 10L)  // v1 ~ v10
@@ -729,18 +702,11 @@ class RangeBuilder internal constructor() {
         this.versionTo = to
     }
 
-    /**
-     * 최신 버전만
-     */
-    fun latestOnly() {
-        // TODO: 최신 버전만 필터링하는 플래그 추가
-    }
-
     // ===== 필터 조건 =====
 
     /**
      * 필터 조건 추가 (= 연산)
-     * 
+     *
      * @example
      * ```kotlin
      * .where("category", "스킨케어")
@@ -753,7 +719,7 @@ class RangeBuilder internal constructor() {
 
     /**
      * 필터 조건 추가 (커스텀 연산자)
-     * 
+     *
      * @example
      * ```kotlin
      * .where("price", FilterOperator.GTE, 10000)
@@ -808,28 +774,28 @@ class RangeBuilder internal constructor() {
 data class QueryResultPage(
     /** 결과 목록 */
     val items: List<ViewResult>,
-    
+
     /** 전체 결과 개수 (추정치, 정확하지 않을 수 있음) */
     val totalCount: Long,
-    
+
     /** 다음 페이지 존재 여부 */
     val hasMore: Boolean,
-    
+
     /** 다음 페이지 커서 */
     val nextCursor: String?,
-    
+
     /** 쿼리 소요 시간 (ms) */
     val queryTimeMs: Long
 ) {
     /** 결과가 비어있는지 */
     val isEmpty: Boolean get() = items.isEmpty()
-    
+
     /** 결과 개수 */
     val size: Int get() = items.size
-    
+
     /** 첫 번째 결과 */
     val first: ViewResult? get() = items.firstOrNull()
-    
+
     /** 마지막 결과 */
     val last: ViewResult? get() = items.lastOrNull()
 }
@@ -894,19 +860,11 @@ class QueryOptionsBuilder internal constructor() {
         this.cacheEnabled = false
     }
 
-    /**
-     * 캐시만 조회 (DB 안 감)
-     */
-    fun cacheOnly() {
-        this.cacheEnabled = true
-        // TODO: cacheOnly 플래그 추가
-    }
-
     // ===== 프로젝션 (부분 조회) =====
 
     /**
      * 특정 Slice만 조회 (프로젝션)
-     * 
+     *
      * @example
      * ```kotlin
      * .projection("core", "pricing")  // CORE, PRICING만 조회

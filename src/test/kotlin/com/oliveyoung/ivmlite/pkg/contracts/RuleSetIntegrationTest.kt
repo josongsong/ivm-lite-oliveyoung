@@ -1,11 +1,11 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.GatedContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.adapters.InMemoryContractCache
 import com.oliveyoung.ivmlite.shared.config.CacheConfig
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
@@ -67,7 +67,7 @@ class RuleSetIntegrationTest : StringSpec({
                 "id": "ruleset.core.v1",
                 "version": "1.0.0"
             }
-        }"""
+        }""".trimIndent()
 
         val ruleSetDataJson = """{
             "entityType": "PRODUCT",
@@ -80,7 +80,7 @@ class RuleSetIntegrationTest : StringSpec({
                 {"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}},
                 {"type": "PRICE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}
             ]
-        }"""
+        }""".trimIndent()
 
         val mockClient = mockk<DynamoDbAsyncClient>()
 
@@ -149,7 +149,7 @@ class RuleSetIntegrationTest : StringSpec({
                 "id": "ruleset.nonexistent.v1",
                 "version": "1.0.0"
             }
-        }"""
+        }""".trimIndent()
 
         val mockClient = mockk<DynamoDbAsyncClient>()
 
@@ -196,7 +196,7 @@ class RuleSetIntegrationTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -225,7 +225,7 @@ class RuleSetIntegrationTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -268,7 +268,7 @@ class RuleSetIntegrationTest : StringSpec({
             "impactMap": {"CORE": ["/title"]},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -327,27 +327,24 @@ class RuleSetIntegrationTest : StringSpec({
         localResult.shouldBeInstanceOf<Result.Ok<*>>()
         val localContract = (localResult as Result.Ok).value
 
-        // DynamoDB (동일한 YAML 내용을 JSON으로 변환)
+        // DynamoDB (ruleset-core.v1.yaml과 동일한 구조)
         val ruleSetDataJson = """{
             "entityType": "PRODUCT",
             "impactMap": {
-                "CORE": ["/title", "/brand", "/price"],
-                "PRICE": ["/price", "/salePrice", "/discount"],
-                "INVENTORY": ["/stock", "/availability"],
-                "MEDIA": ["/images", "/videos"],
-                "CATEGORY": ["/categoryId", "/categoryPath"],
-                "PROMOTION": ["/promotionIds", "/couponIds"],
-                "REVIEW": ["/reviewCount", "/averageRating"]
+                "CORE": ["/title", "/brand", "/price", "/categoryId", "/tags"],
+                "CATEGORY": ["/categoryId"]
             },
             "joins": [],
             "slices": [
                 {"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}},
-                {"type": "PRICE", "buildRules": {"type": "PassThrough", "fields": ["price", "salePrice", "discount"]}},
-                {"type": "INVENTORY", "buildRules": {"type": "PassThrough", "fields": ["stock", "availability"]}},
-                {"type": "MEDIA", "buildRules": {"type": "PassThrough", "fields": ["images", "videos"]}},
-                {"type": "CATEGORY", "buildRules": {"type": "PassThrough", "fields": ["categoryId", "categoryPath"]}}
+                {"type": "CATEGORY", "buildRules": {"type": "PassThrough", "fields": ["categoryId"]}}
+            ],
+            "indexes": [
+                {"type": "brand", "selector": "$.brand", "references": "BRAND", "maxFanout": 10_000},
+                {"type": "category", "selector": "$.categoryId", "references": "CATEGORY", "maxFanout": 50000},
+                {"type": "tag", "selector": "$.tags[*]"}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.core.v1"),
@@ -424,7 +421,7 @@ class RuleSetIntegrationTest : StringSpec({
                 {"type": "brand", "selector": "$.brand"},
                 {"type": "category", "selector": "$.categoryId"}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -452,7 +449,7 @@ class RuleSetIntegrationTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -481,7 +478,7 @@ class RuleSetIntegrationTest : StringSpec({
             "indexes": [
                 {"selector": "$.brand"}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -509,7 +506,7 @@ class RuleSetIntegrationTest : StringSpec({
             "indexes": [
                 {"type": "brand"}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -537,7 +534,7 @@ class RuleSetIntegrationTest : StringSpec({
             "indexes": [
                 {"type": "brand", "selector": "brand"}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -563,7 +560,7 @@ class RuleSetIntegrationTest : StringSpec({
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
             "indexes": "not-an-array"
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),

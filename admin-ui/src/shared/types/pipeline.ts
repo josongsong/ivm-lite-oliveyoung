@@ -2,7 +2,7 @@ export interface PipelineOverviewResponse {
   stages: PipelineStage[]
   rawData: RawDataStats
   slices: SliceStats
-  outbox: OutboxPipelineStats
+  sinkEvent: SinkEventPipelineStats
   timestamp: string
 }
 
@@ -25,7 +25,7 @@ export interface SliceStats {
   byType: Record<string, number>
 }
 
-export interface OutboxPipelineStats {
+export interface SinkEventPipelineStats {
   pending: number
   processing: number
   shipped: number
@@ -65,7 +65,7 @@ export interface EntityFlowResponse {
   entityKey: string
   rawData: RawDataItem[]
   slices: SliceItem[]
-  outbox: {
+  sinkEvent: {
     id: string
     aggregateType: string
     eventType: string

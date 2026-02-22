@@ -32,17 +32,24 @@ data class ContractDescriptor(
 /**
  * Contract 종류
  */
-enum class ContractKind(val yamlValue: String) {
+enum class ContractKind(val wireValue: String) {
     ENTITY_SCHEMA("ENTITY_SCHEMA"),
     RULESET("RULESET"),
     VIEW_DEFINITION("VIEW_DEFINITION"),
-    SINK_RULE("SINKRULE"),
+    SINK_RULE("SINK_RULE"),
     JOIN_SPEC("JOIN_SPEC"),
-    CHANGESET("CHANGESET");
+    CHANGESET("CHANGESET"),
+
+    @Deprecated("Use IndexSpec.references in RuleSet instead")
+    INVERTED_INDEX("INVERTED_INDEX");
 
     companion object {
-        fun fromString(value: String): ContractKind? =
-            entries.find { it.yamlValue.equals(value, ignoreCase = true) }
+        private val byWire = values().associateBy { it.wireValue.lowercase() }
+        private val byWireNormalized = values().associateBy { it.wireValue.replace("_", "").lowercase() }
+
+        fun fromWireValue(value: String): ContractKind? =
+            byWire[value.lowercase()]
+                ?: byWireNormalized[value.replace("_", "").lowercase()]
     }
 }
 

@@ -6,6 +6,7 @@
 
 import { Link, useParams } from 'react-router-dom'
 import {
+  Activity,
   Bell,
   ChevronRight,
   Construction,
@@ -14,7 +15,6 @@ import {
   GitBranch,
   Globe,
   Heart,
-  Activity,
   Inbox,
   LayoutDashboard,
   Network,

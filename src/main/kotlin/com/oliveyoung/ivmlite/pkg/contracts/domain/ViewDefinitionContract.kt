@@ -16,6 +16,12 @@ import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 data class ViewDefinitionContract(
     val meta: ContractMeta,
 
+    /** 뷰 이름 (예: BRAND_DETAIL, PRODUCT_SEARCH) */
+    val viewName: String? = null,
+
+    /** 엔티티 타입 (예: BRAND, PRODUCT) */
+    val entityType: String? = null,
+
     /** 필수 슬라이스 목록 */
     val requiredSlices: List<SliceType>,
 

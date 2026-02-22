@@ -1,5 +1,4 @@
 package com.oliveyoung.ivmlite.pkg.contracts
-import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.AllowAllStatusGate
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
@@ -74,7 +73,7 @@ class ContractStatusGateTest : StringSpec({
         }
 
         // 합집합 = 전체 enum
-        (allowedStatuses + blockedStatuses) shouldBe ContractStatus.entries.toSet()
+        allowedStatuses + blockedStatuses shouldBe ContractStatus.entries.toSet()
     }
 
     // ==================== ContractStatusError 속성 테스트 ====================

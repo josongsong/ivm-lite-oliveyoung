@@ -10,12 +10,12 @@ import com.oliveyoung.ivmlite.sdk.schema.EntityRef
 
 /**
  * Ingest Context - 쓰기 진입점
- * 
+ *
  * @example 레거시 패턴
  * ```kotlin
  * Ivm.client().ingest().product { ... }.deploy()
  * ```
- * 
+ *
  * @example 코드젠 패턴 (추천)
  * ```kotlin
  * Ivm.client().ingest(Entities.Product) { ... }.deploy()
@@ -28,7 +28,7 @@ class IngestContext internal constructor(
 ) {
     /**
      * 코드젠 엔티티로 Ingest (추천)
-     * 
+     *
      * @example
      * ```kotlin
      * Ivm.client().ingest(Entities.Product) {
@@ -45,7 +45,7 @@ class IngestContext internal constructor(
         val builder = entityRef.builderFactory()
         builder.block()
         val data = builder.build()
-        
+
         // tenantId 추가
         val tenantId = config.tenantId ?: throw IllegalArgumentException("tenantId is required")
         val input = GenericEntityInput(
@@ -53,7 +53,7 @@ class IngestContext internal constructor(
             entityType = entityRef.entityType,
             data = data
         )
-        
+
         return DeployableContext(input, config, executor)
     }
 }

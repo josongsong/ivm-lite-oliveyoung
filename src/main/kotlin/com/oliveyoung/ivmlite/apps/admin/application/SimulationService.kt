@@ -4,7 +4,6 @@ import arrow.core.Either
 import arrow.core.raise.either
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
@@ -236,9 +235,9 @@ class SimulationService {
 
             SimulationSliceDefinition(
                 type = SliceType.valueOf(typeStr),
-                passThrough = (buildRulesMap?.get("passThrough") as? List<String>) ?: emptyList(),
-                fieldMappings = (buildRulesMap?.get("fieldMappings") as? Map<String, String>) ?: emptyMap(),
-                computedFields = (buildRulesMap?.get("computedFields") as? Map<String, String>) ?: emptyMap(),
+                passThrough = buildRulesMap?.get("passThrough") as? List<String> ?: emptyList(),
+                fieldMappings = buildRulesMap?.get("fieldMappings") as? Map<String, String> ?: emptyMap(),
+                computedFields = buildRulesMap?.get("computedFields") as? Map<String, String> ?: emptyMap(),
                 condition = sliceMap["condition"] as? String
             )
         } ?: emptyList()

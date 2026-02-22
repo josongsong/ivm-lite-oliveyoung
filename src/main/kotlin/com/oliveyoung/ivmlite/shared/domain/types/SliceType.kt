@@ -25,6 +25,8 @@ enum class SliceType {
     INVENTORY,
     MEDIA,
     CATEGORY,
+    NOTICE,    // 상세고지 (PRODUCT_DISCLOSURE)
+    ASSOCIATED, // 연관상품
     PROMOTION,
     REVIEW,
     CUSTOM;

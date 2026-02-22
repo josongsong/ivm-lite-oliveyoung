@@ -11,7 +11,7 @@ sealed interface EntityInput {
 
 /**
  * Generic Entity Input (코드젠 엔티티용)
- * 
+ *
  * 코드젠으로 생성된 EntityBuilder의 결과를 담는 범용 입력 타입
  */
 data class GenericEntityInput(

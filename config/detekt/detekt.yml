@@ -3,7 +3,7 @@
 # 헥사고날 아키텍처 + 도메인 슬라이싱 최적화
 
 build:
-  maxIssues: 50  # 점진적으로 줄여나가기
+  maxIssues: 50  # 점진적으로 줄여나가기 (baseline으로 기존 이슈 무시)
   weights:
     complexity: 2
     style: 1
@@ -464,11 +464,7 @@ style:
     active: true  # 멀티라인 람다에서 it 명시
   
   MultilineRawStringIndentation:
-    active: true
-    indentSize: 4
-    trimmingMethods:
-      - 'trimIndent'
-      - 'trimMargin'
+    active: false  # 테스트 YAML/JSON 리터럴 형식과 충돌, 점진적 적용
   
   NestedClassesVisibility:
     active: true  # 중첩 클래스 가시성 최소화

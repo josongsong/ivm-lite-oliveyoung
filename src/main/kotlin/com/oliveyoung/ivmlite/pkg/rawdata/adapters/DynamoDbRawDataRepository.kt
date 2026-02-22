@@ -13,11 +13,11 @@ import software.amazon.awssdk.services.dynamodb.model.*
 
 /**
  * DynamoDB 기반 RawData Repository
- * 
+ *
  * Single Table Design:
  * - PK: TENANT#{tenantId}#ENTITY#{entityKey}
  * - SK: RAWDATA#v{version}
- * 
+ *
  * Attributes:
  * - payload_json (String)
  * - payload_hash (String)

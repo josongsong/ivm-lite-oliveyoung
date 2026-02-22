@@ -5,10 +5,10 @@ import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 /**
  * SinkRule - Slice를 어떤 Sink로 라우팅할지 정의 (RFC-007, RFC-IMPL-013)
  *
- * Contract YAML에서 로드되어 Slice 생성 시 자동으로 ShipRequested outbox 생성에 사용됨.
+ * Contract YAML에서 로드되어 Slice 생성 시 자동으로 SinkEvent 생성에 사용됨.
  *
  * 핵심 원칙:
- * - Slice 생성 → SinkRule 매칭 → ShipRequested outbox 자동 생성
+ * - Slice 생성 → SinkRule 매칭 → SinkEvent 자동 생성 (DynamoDB Streams)
  * - SDK에서 별도로 ship.to { } 호출 불필요
  * - 최소한의 라우팅 정보만 (Minimal Coupling, RFC-IMPL-012)
  */

@@ -1,7 +1,5 @@
 package com.oliveyoung.ivmlite.sdk.dsl.entity
 
-import com.oliveyoung.ivmlite.sdk.client.Ivm
-import com.oliveyoung.ivmlite.sdk.dsl.deploy.DeployableContext
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -90,48 +88,4 @@ class CategoryBuilderTest : StringSpec({
         input.entityType shouldBe "category"
     }
 
-    "IngestContext.category - 확장 함수로 DeployableContext 반환" {
-        val context = Ivm.client().ingest().category {
-            tenantId("tenant-1")
-            categoryId("CAT-001")
-            name("스킨케어")
-        }
-
-        context.shouldBeInstanceOf<DeployableContext>()
-    }
-
-    "IngestContext.category - DSL 체이닝 (3단계 계층)" {
-        // 루트 카테고리
-        val root = Ivm.client().ingest().category {
-            tenantId("tenant-1")
-            categoryId("CAT-ROOT")
-            name("뷰티")
-            depth(0)
-            displayOrder(1)
-        }
-        root.shouldBeInstanceOf<DeployableContext>()
-
-        // 중간 카테고리
-        val mid = Ivm.client().ingest().category {
-            tenantId("tenant-1")
-            categoryId("CAT-001")
-            name("스킨케어")
-            parentId("CAT-ROOT")
-            depth(1)
-            displayOrder(1)
-        }
-        mid.shouldBeInstanceOf<DeployableContext>()
-
-        // 말단 카테고리
-        val leaf = Ivm.client().ingest().category {
-            tenantId("tenant-1")
-            categoryId("CAT-001-001")
-            name("토너")
-            parentId("CAT-001")
-            depth(2)
-            displayOrder(1)
-            attribute("leaf", true)
-        }
-        leaf.shouldBeInstanceOf<DeployableContext>()
-    }
 })

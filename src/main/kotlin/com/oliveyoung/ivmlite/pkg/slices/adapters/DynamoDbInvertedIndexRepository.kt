@@ -15,11 +15,11 @@ import software.amazon.awssdk.services.dynamodb.model.Select
 
 /**
  * DynamoDB 기반 Inverted Index Repository
- * 
+ *
  * Single Table Design:
  * - PK: TENANT#{tenantId}#INDEX#{indexType}#{indexValue}
  * - SK: ENTITY#{refEntityKey}#SLICE#{refSliceType}
- * 
+ *
  * GSI (선택사항):
  * - GSI1-PK: TENANT#{tenantId}#ENTITY#{refEntityKey}
  * - GSI1-SK: INDEX#{indexType}#{indexValue}
@@ -140,7 +140,7 @@ class DynamoDbInvertedIndexRepository(
     ): Result<com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult> {
         return try {
             val pk = buildPK(tenantId, indexType, indexValue)
-            
+
             val queryBuilder = dynamoClient.query {
                 it.tableName(tableName)
                 it.keyConditionExpression("PK = :pk")
@@ -152,7 +152,7 @@ class DynamoDbInvertedIndexRepository(
                     )
                 )
                 it.limit(limit)
-                
+
                 // 커서 기반 페이지네이션
                 if (cursor != null) {
                     it.exclusiveStartKey(
@@ -163,9 +163,9 @@ class DynamoDbInvertedIndexRepository(
                     )
                 }
             }
-            
+
             val response = queryBuilder.await()
-            
+
             // RFC-IMPL-013: targetEntityKey(참조하는 엔티티)를 반환해야 함
             // refEntityKey는 참조되는 엔티티(예: BRAND), targetEntityKey는 참조하는 엔티티(예: PRODUCT)
             val entries = response.items().mapNotNull { item ->
@@ -179,9 +179,9 @@ class DynamoDbInvertedIndexRepository(
                     null  // 파싱 실패 시 스킵
                 }
             }.distinctBy { it.entityKey.value }
-            
+
             val nextCursor = response.lastEvaluatedKey()?.get("SK")?.s()
-            
+
             Result.Ok(
                 com.oliveyoung.ivmlite.pkg.slices.ports.FanoutQueryResult(entries, nextCursor)
             )
@@ -202,7 +202,7 @@ class DynamoDbInvertedIndexRepository(
     ): Result<Long> {
         return try {
             val pk = buildPK(tenantId, indexType, indexValue)
-            
+
             val response = dynamoClient.query {
                 it.tableName(tableName)
                 it.keyConditionExpression("PK = :pk")
@@ -215,7 +215,7 @@ class DynamoDbInvertedIndexRepository(
                 )
                 it.select(Select.COUNT)
             }.await()
-            
+
             Result.Ok(response.count().toLong())
         } catch (e: Exception) {
             Result.Err(

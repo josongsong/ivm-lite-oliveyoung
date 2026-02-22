@@ -1,6 +1,9 @@
 package com.oliveyoung.ivmlite.pkg.workflow.canvas
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
+import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.LocalYamlSinkRuleRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.observability.domain.*
 import com.oliveyoung.ivmlite.pkg.observability.ports.MetricsCollectorPort
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.adapters.WorkflowGraphBuilder
@@ -14,15 +17,15 @@ import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.coEvery
 import io.mockk.mockk
-import java.time.Duration
-import java.time.Instant
 
 /**
  * WorkflowCanvasService 단위 테스트 (RFC-IMPL-015)
  */
 class WorkflowCanvasServiceTest : StringSpec({
 
-    val graphBuilder = WorkflowGraphBuilder()
+    val contractRegistry = LocalYamlContractRegistryAdapter("/contracts/v1")
+    val sinkRuleRegistry = LocalYamlSinkRuleRegistryAdapter("/contracts/v1")
+    val graphBuilder = WorkflowGraphBuilder(contractRegistry, sinkRuleRegistry)
 
     "그래프 조회 - MetricsCollector 없이" {
         val service = WorkflowCanvasService(

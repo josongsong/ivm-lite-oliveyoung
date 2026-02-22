@@ -202,7 +202,7 @@ class GitOutputService(
             }
 
             // 충분한 컨텍스트가 모이면 hunk 생성
-            if (currentHunkLines.size > 20 || (beforeIdx >= before.size && afterIdx >= after.size)) {
+            if (currentHunkLines.size > 20 || beforeIdx >= before.size && afterIdx >= after.size) {
                 if (currentHunkLines.any { it.startsWith("+") || it.startsWith("-") }) {
                     hunks.add(
                         DiffHunk(

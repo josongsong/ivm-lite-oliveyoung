@@ -1,9 +1,9 @@
 package com.oliveyoung.ivmlite.pkg.sinks
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkRuleRegistry
 import com.oliveyoung.ivmlite.pkg.sinks.domain.*
-import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -25,10 +25,10 @@ class SinkRuleRegistryTest : StringSpec({
 
     "기본 OpenSearch SinkRule이 등록되어 있음" {
         val result = registry.findAllActive()
-        
+
         result.shouldBeInstanceOf<Result.Ok<List<SinkRule>>>()
         val rules = (result as Result.Ok).value
-        
+
         rules shouldHaveSize 1
         rules[0].id shouldBe "sinkrule.opensearch.default"
         rules[0].target.type shouldBe SinkTargetType.OPENSEARCH
@@ -36,38 +36,38 @@ class SinkRuleRegistryTest : StringSpec({
 
     "PRODUCT entityType으로 SinkRule 조회" {
         val result = registry.findByEntityType("PRODUCT")
-        
+
         result.shouldBeInstanceOf<Result.Ok<List<SinkRule>>>()
         val rules = (result as Result.Ok).value
-        
+
         rules shouldHaveSize 1
         rules[0].input.entityTypes shouldContain "PRODUCT"
     }
 
     "PRODUCT + CORE sliceType으로 SinkRule 조회" {
         val result = registry.findByEntityAndSliceType("PRODUCT", SliceType.CORE)
-        
+
         result.shouldBeInstanceOf<Result.Ok<List<SinkRule>>>()
         val rules = (result as Result.Ok).value
-        
+
         rules shouldHaveSize 1
     }
 
     "존재하지 않는 entityType → 빈 리스트" {
         val result = registry.findByEntityType("UNKNOWN")
-        
+
         result.shouldBeInstanceOf<Result.Ok<List<SinkRule>>>()
         val rules = (result as Result.Ok).value
-        
+
         rules.shouldBeEmpty()
     }
 
     "DERIVED sliceType → 빈 리스트 (기본 rule은 CORE만)" {
         val result = registry.findByEntityAndSliceType("PRODUCT", SliceType.DERIVED)
-        
+
         result.shouldBeInstanceOf<Result.Ok<List<SinkRule>>>()
         val rules = (result as Result.Ok).value
-        
+
         rules.shouldBeEmpty()
     }
 
@@ -86,12 +86,12 @@ class SinkRuleRegistryTest : StringSpec({
             ),
             docId = DocIdSpec("{tenantId}__{entityKey}")
         )
-        
+
         registry.register(customRule)
-        
+
         val result = registry.findByEntityAndSliceType("PRODUCT", SliceType.DERIVED)
         val rules = (result as Result.Ok).value
-        
+
         rules shouldHaveSize 1
         rules[0].target.type shouldBe SinkTargetType.PERSONALIZE
     }
@@ -108,31 +108,31 @@ class SinkRuleRegistryTest : StringSpec({
             ),
             docId = DocIdSpec("{entityKey}")
         )
-        
+
         registry.register(inactiveRule)
-        
+
         val result = registry.findByEntityType("PRODUCT")
         val rules = (result as Result.Ok).value
-        
+
         // INACTIVE rule은 포함되지 않음 (기본 opensearch rule만)
         rules.none { it.id == "sinkrule.inactive" } shouldBe true
     }
 
     "ID로 SinkRule 조회" {
         val result = registry.findById("sinkrule.opensearch.default")
-        
+
         result.shouldBeInstanceOf<Result.Ok<SinkRule?>>()
         val rule = (result as Result.Ok).value
-        
+
         rule?.id shouldBe "sinkrule.opensearch.default"
     }
 
     "clear 후 빈 상태" {
         registry.clear()
-        
+
         val result = registry.findAllActive()
         val rules = (result as Result.Ok).value
-        
+
         rules.shouldBeEmpty()
     }
 
@@ -152,12 +152,12 @@ class SinkRuleRegistryTest : StringSpec({
             ),
             docId = DocIdSpec("{entityKey}")
         )
-        
+
         registry.register(personalizeRule)
-        
+
         val result = registry.findByEntityAndSliceType("PRODUCT", SliceType.CORE)
         val rules = (result as Result.Ok).value
-        
+
         // OpenSearch + Personalize
         rules shouldHaveSize 2
         rules.map { it.target.type }.toSet() shouldBe setOf(

@@ -14,7 +14,7 @@ import java.util.concurrent.atomic.AtomicBoolean
 object MetricsConfig {
     private val initialized = AtomicBoolean(false)
     private var registry: MeterRegistry? = null
-    
+
     fun init(config: ObservabilityConfig): MeterRegistry {
         if (!config.metricsEnabled) {
             return io.micrometer.core.instrument.Metrics.globalRegistry
@@ -26,14 +26,14 @@ object MetricsConfig {
         }
 
         val prometheusRegistry = PrometheusMeterRegistry(PrometheusConfig.DEFAULT)
-        
+
         // Global registry에 등록 (Micrometer 표준)
         io.micrometer.core.instrument.Metrics.addRegistry(prometheusRegistry)
-        
+
         registry = prometheusRegistry
         return prometheusRegistry
     }
-    
+
     /**
      * Prometheus 포맷으로 메트릭 내보내기
      */

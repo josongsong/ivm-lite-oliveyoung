@@ -6,24 +6,18 @@ import com.oliveyoung.ivmlite.shared.domain.types.Result
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import io.mockk.mockk
-import org.jooq.DSLContext
 
 /**
  * AdminPipelineService 단위 테스트
  *
- * SOTA TDD:
- * - Validation 로직 검증
- * - DSL 의존 메서드는 통합 테스트에서 검증
+ * DynamoDB 기반 (ExplorerRepositoryPort, SinkEventRepositoryPort)
  */
 class AdminPipelineServiceTest : DescribeSpec({
 
-    lateinit var dsl: DSLContext
     lateinit var service: AdminPipelineService
 
     beforeEach {
-        dsl = mockk(relaxed = true)
-        service = AdminPipelineService(dsl)
+        service = AdminPipelineService(contractRegistry = null, explorerRepo = null, sinkEventRepo = null)
     }
 
     describe("getEntityFlow") {

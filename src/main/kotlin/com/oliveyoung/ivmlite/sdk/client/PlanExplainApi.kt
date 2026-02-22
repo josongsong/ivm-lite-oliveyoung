@@ -1,8 +1,8 @@
 package com.oliveyoung.ivmlite.sdk.client
 
 import com.oliveyoung.ivmlite.pkg.orchestration.adapters.DeployPlanRepositoryPort
-import com.oliveyoung.ivmlite.sdk.model.DeployPlan
-import com.oliveyoung.ivmlite.sdk.model.DependencyGraph
+import com.oliveyoung.ivmlite.shared.domain.deploy.DeployPlan
+import com.oliveyoung.ivmlite.shared.domain.deploy.DependencyGraph
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 import kotlinx.coroutines.runBlocking
 
@@ -11,7 +11,7 @@ import kotlinx.coroutines.runBlocking
  * RFC-IMPL-011 Wave 5-K, Wave 6
  */
 class PlanExplainApi internal constructor(
-    private val config: IvmClientConfig,
+    @Suppress("UnusedPrivateProperty") private val config: IvmClientConfig,
     private val repository: DeployPlanRepositoryPort? = null
 ) {
     /**
@@ -36,16 +36,16 @@ class PlanExplainApi internal constructor(
                 }
             }
         }
-        
+
         return defaultPlan(deployId)
     }
-    
+
     /**
      * 엔티티의 모든 Deploy Plan 조회
      */
     fun explainByEntityKey(entityKey: String): List<DeployPlan> {
         require(entityKey.isNotBlank()) { "entityKey must not be blank" }
-        
+
         if (repository != null) {
             return runBlocking {
                 when (val result = repository.getByEntityKey(entityKey)) {
@@ -58,14 +58,14 @@ class PlanExplainApi internal constructor(
                 }
             }
         }
-        
+
         return emptyList()
     }
-    
+
     private fun defaultPlan(deployId: String) = DeployPlan(
         deployId = deployId,
         graph = DependencyGraph(emptyMap()),
-        activatedRules = listOf("product-to-search-doc", "product-to-reco-feed"),
+        activatedRules = emptyList(),
         executionSteps = emptyList()
     )
 }

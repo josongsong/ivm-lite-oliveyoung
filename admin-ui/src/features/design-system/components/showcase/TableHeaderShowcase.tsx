@@ -1,7 +1,7 @@
 /**
  * TableHeader Showcase - TableHeader 컴포넌트 전시
  */
-import { TableHeader, Button } from '@/shared/ui'
+import { Button, TableHeader } from '@/shared/ui'
 import { Database, Plus } from 'lucide-react'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'

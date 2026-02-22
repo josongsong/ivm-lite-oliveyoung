@@ -1,10 +1,9 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
-import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.adapters.InMemoryContractCache
 import com.oliveyoung.ivmlite.shared.config.CacheConfig
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
@@ -14,7 +13,6 @@ import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
 import io.mockk.mockk
-import io.mockk.verify
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import software.amazon.awssdk.services.dynamodb.model.AttributeValue
 import software.amazon.awssdk.services.dynamodb.model.GetItemRequest
@@ -59,7 +57,7 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
             "identity": {"entityKeyFormat": "{ENTITY_TYPE}#{tenantId}#{entityId}"},
             "payload": {"externalizationPolicy": {"thresholdBytes": 50000}},
             "fanout": {"enabled": true}
-        }"""
+        }""".trimIndent()
         return mapOf(
             "id" to attr("changeset.v1"),
             "version" to attr("1.0.0"),
@@ -230,7 +228,7 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
                     "contractRef": {"id": "inverted-index.v1", "version": "1.0.0"}
                 }
             }
-        }"""
+        }""".trimIndent()
         val joinSpecItem = mapOf(
             "id" to attr("join-spec.v1"),
             "version" to attr("1.0.0"),
@@ -299,7 +297,7 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
                     "contractRef": {"id": "inverted-index.v1", "version": "1.0.0"}
                 }
             }
-        }"""
+        }""".trimIndent()
         val responseItem = mapOf(
             "id" to attr("join-spec.v1"),
             "version" to attr("1.0.0"),
@@ -331,7 +329,7 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
                 "pkPattern": "INV#{ref_type}#{ref_value}",
                 "skPattern": "TARGET#{target_type}#{target_id}"
             }
-        }"""
+        }""".trimIndent()
         val responseItem = mapOf(
             "id" to attr("inverted-index.v1"),
             "version" to attr("1.0.0"),

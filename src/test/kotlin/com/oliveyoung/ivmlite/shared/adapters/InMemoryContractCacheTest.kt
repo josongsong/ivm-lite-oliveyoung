@@ -3,8 +3,6 @@ package com.oliveyoung.ivmlite.shared.adapters
 import com.oliveyoung.ivmlite.shared.config.CacheConfig
 import com.oliveyoung.ivmlite.shared.ports.ContractCachePort
 import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.doubles.shouldBeGreaterThan
-import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll

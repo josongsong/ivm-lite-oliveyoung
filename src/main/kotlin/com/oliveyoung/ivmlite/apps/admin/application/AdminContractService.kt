@@ -1,29 +1,31 @@
 package com.oliveyoung.ivmlite.apps.admin.application
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
+import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.Result
-import org.yaml.snakeyaml.Yaml
-import java.io.BufferedReader
-import java.io.InputStreamReader
-import java.net.URI
-import java.nio.file.FileSystems
-import java.nio.file.Files
-import java.nio.file.Paths
+import kotlinx.coroutines.runBlocking
+import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
+import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonPrimitive
 
 /**
- * Admin Contract Service
+ * Admin Contract Service (RFC-022)
  *
- * Contract YAML 파일 로딩 및 조회 서비스.
- * 동적으로 contracts/v1 디렉토리를 스캔하여 하드코딩 제거.
+ * ContractRegistryPort + SinkRuleRegistryPort 기반 Contract 조회.
+ * DynamoDB/LocalYaml 모두 지원.
  */
-class AdminContractService {
+class AdminContractService(
+    private val contractRegistry: ContractRegistryPort,
+    private val sinkRuleRegistry: SinkRuleRegistryPort,
+) {
 
     // ==================== Public API ====================
 
-    /**
-     * 전체 Contract 목록 조회
-     */
     fun getAllContracts(): Result<List<ContractInfo>> {
         return try {
             Result.Ok(loadAllContractsInternal())
@@ -32,39 +34,30 @@ class AdminContractService {
         }
     }
 
-    /**
-     * Kind별 Contract 목록 조회
-     */
     fun getByKind(kind: ContractKind): Result<List<ContractInfo>> {
         return try {
-            val contracts = loadAllContractsInternal().filter { it.kind == kind.yamlValue }
+            val contracts = loadAllContractsInternal().filter { it.kind == kind.wireValue }
             Result.Ok(contracts)
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to load contracts by kind: ${e.message}"))
         }
     }
 
-    /**
-     * 특정 Contract 상세 조회
-     */
     fun getById(kind: ContractKind, id: String): Result<ContractInfo> {
         return try {
             val contract = loadAllContractsInternal().find {
-                it.kind.equals(kind.yamlValue, ignoreCase = true) && it.id == id
+                it.kind.equals(kind.wireValue, ignoreCase = true) && it.id == id
             }
             if (contract != null) {
                 Result.Ok(contract)
             } else {
-                Result.Err(DomainError.NotFoundError("Contract", "${kind.yamlValue}/$id"))
+                Result.Err(DomainError.NotFoundError("Contract", "${kind.wireValue}/$id"))
             }
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to load contract: ${e.message}"))
         }
     }
 
-    /**
-     * Contract 통계 조회
-     */
     fun getStats(): Result<ContractStats> {
         return try {
             val contracts = loadAllContractsInternal()
@@ -83,102 +76,205 @@ class AdminContractService {
         }
     }
 
-    // ==================== Private Helpers ====================
+    // ==================== Private: ContractRegistryPort + SinkRuleRegistryPort 기반 ====================
 
-    /**
-     * 동적으로 contracts/v1 디렉토리 스캔
-     *
-     * JAR 내부와 개발 환경 모두 지원
-     */
-    private fun loadAllContractsInternal(): List<ContractInfo> {
+    private fun loadAllContractsInternal(): List<ContractInfo> = runBlocking {
         val contracts = mutableListOf<ContractInfo>()
-        val yaml = Yaml()
-        val resourcePath = "/contracts/v1"
 
-        try {
-            val resourceUrl = javaClass.getResource(resourcePath)
-            if (resourceUrl == null) {
-                return contracts
-            }
-
-            val uri = resourceUrl.toURI()
-
-            if (uri.scheme == "jar") {
-                // JAR 내부 (프로덕션)
-                loadFromJar(uri, yaml, contracts)
-            } else {
-                // 파일 시스템 (개발 환경)
-                loadFromFileSystem(uri, yaml, contracts)
-            }
-        } catch (e: Exception) {
-            // 로딩 실패 시 빈 목록 반환 (fail-safe)
-        }
-
-        return contracts
-    }
-
-    private fun loadFromJar(uri: URI, yaml: Yaml, contracts: MutableList<ContractInfo>) {
-        val jarUri = URI.create(uri.toString().substringBefore("!"))
-        FileSystems.newFileSystem(jarUri, emptyMap<String, Any>()).use { fs ->
-            val contractsPath = fs.getPath("/contracts/v1")
-            if (Files.exists(contractsPath)) {
-                Files.list(contractsPath)
-                    .filter { it.toString().endsWith(".yaml") }
-                    .forEach { path ->
-                        try {
-                            val content = Files.readString(path)
-                            parseContract(yaml, content, path.fileName.toString())?.let {
-                                contracts.add(it)
-                            }
-                        } catch (e: Exception) {
-                            // Skip invalid files
+        // RuleSet
+        when (val r = contractRegistry.listContractRefs(ContractKind.RULESET, ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.forEach { ref ->
+                when (val load = contractRegistry.loadRuleSetContract(ref)) {
+                    is Result.Ok -> {
+                        val rs = load.value
+                        val parsed = buildMap<String, Any?> {
+                            put("kind", "RULESET")
+                            put("id", rs.meta.id)
+                            put("version", rs.meta.version.toString())
+                            put("status", rs.meta.status.name)
+                            put("entityType", rs.entityType)
+                            put("slices", rs.slices.map { mapOf("type" to it.type.name) })
+                            put("impactMap", rs.impactMap.mapKeys { it.key.name }.mapValues { it.value })
                         }
+                        contracts.add(ContractInfo(
+                            kind = ContractKind.RULESET.wireValue,
+                            id = rs.meta.id,
+                            version = rs.meta.version.toString(),
+                            status = rs.meta.status.name,
+                            fileName = "registry:${rs.meta.id}",
+                            content = parsed.toJsonObject().toString(),
+                            parsed = parsed
+                        ))
                     }
-            }
-        }
-    }
-
-    private fun loadFromFileSystem(uri: URI, yaml: Yaml, contracts: MutableList<ContractInfo>) {
-        val path = Paths.get(uri)
-        if (Files.exists(path) && Files.isDirectory(path)) {
-            Files.list(path)
-                .filter { it.toString().endsWith(".yaml") }
-                .forEach { filePath ->
-                    try {
-                        val content = Files.readString(filePath)
-                        parseContract(yaml, content, filePath.fileName.toString())?.let {
-                            contracts.add(it)
-                        }
-                    } catch (e: Exception) {
-                        // Skip invalid files
-                    }
+                    is Result.Err -> {}
                 }
+            }
+            is Result.Err -> {}
         }
+
+        // ViewDefinition
+        when (val r = contractRegistry.listViewDefinitions(ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.forEach { vd ->
+                val parsed = buildMap<String, Any?> {
+                    put("kind", "VIEW_DEFINITION")
+                    put("id", vd.meta.id)
+                    put("version", vd.meta.version.toString())
+                    put("status", vd.meta.status.name)
+                    put("entityType", vd.entityType)
+                    put("viewName", vd.viewName)
+                    put("requiredSlices", vd.requiredSlices.map { it.name })
+                    put("optionalSlices", vd.optionalSlices.map { it.name })
+                }
+                contracts.add(ContractInfo(
+                    kind = ContractKind.VIEW_DEFINITION.wireValue,
+                    id = vd.meta.id,
+                    version = vd.meta.version.toString(),
+                    status = vd.meta.status.name,
+                    fileName = "registry:${vd.meta.id}",
+                    content = parsed.toJsonObject().toString(),
+                    parsed = parsed
+                ))
+            }
+            is Result.Err -> {}
+        }
+
+        // ENTITY_SCHEMA (RuleSet에서 entityType 추출, 중복 제거)
+        val entityTypesSeen = mutableSetOf<String>()
+        when (val r = contractRegistry.listContractRefs(ContractKind.RULESET, ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.forEach { ref ->
+                when (val load = contractRegistry.loadRuleSetContract(ref)) {
+                    is Result.Ok -> {
+                        val rs = load.value
+                        if (entityTypesSeen.add(rs.entityType)) {
+                            val parsed = buildMap<String, Any?> {
+                                put("kind", "ENTITY_SCHEMA")
+                                put("id", "entity-${rs.entityType}.v1")
+                                put("version", "1.0.0")
+                                put("status", "ACTIVE")
+                                put("entityType", rs.entityType)
+                                put("fields", emptyList<Map<String, Any?>>())
+                            }
+                            contracts.add(ContractInfo(
+                                kind = ContractKind.ENTITY_SCHEMA.wireValue,
+                                id = "entity-${rs.entityType}.v1",
+                                version = "1.0.0",
+                                status = "ACTIVE",
+                                fileName = "registry:entity-${rs.entityType}",
+                                content = parsed.toJsonObject().toString(),
+                                parsed = parsed
+                            ))
+                        }
+                    }
+                    is Result.Err -> {}
+                }
+            }
+            is Result.Err -> {}
+        }
+
+        // CHANGESET
+        when (val r = contractRegistry.listContractRefs(ContractKind.CHANGESET, ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.forEach { ref ->
+                when (val load = contractRegistry.loadChangeSetContract(ref)) {
+                    is Result.Ok -> {
+                        val c = load.value
+                        val parsed = buildMap<String, Any?> {
+                            put("kind", "CHANGESET")
+                            put("id", c.meta.id)
+                            put("version", c.meta.version.toString())
+                            put("status", c.meta.status.name)
+                        }
+                        contracts.add(ContractInfo(
+                            kind = ContractKind.CHANGESET.wireValue,
+                            id = c.meta.id,
+                            version = c.meta.version.toString(),
+                            status = c.meta.status.name,
+                            fileName = "registry:${c.meta.id}",
+                            content = parsed.toJsonObject().toString(),
+                            parsed = parsed
+                        ))
+                    }
+                    is Result.Err -> {}
+                }
+            }
+            is Result.Err -> {}
+        }
+
+        // JOIN_SPEC
+        when (val r = contractRegistry.listContractRefs(ContractKind.JOIN_SPEC, ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.forEach { ref ->
+                when (val load = contractRegistry.loadJoinSpecContract(ref)) {
+                    is Result.Ok -> {
+                        val j = load.value
+                        val parsed = buildMap<String, Any?> {
+                            put("kind", "JOIN_SPEC")
+                            put("id", j.meta.id)
+                            put("version", j.meta.version.toString())
+                            put("status", j.meta.status.name)
+                        }
+                        contracts.add(ContractInfo(
+                            kind = ContractKind.JOIN_SPEC.wireValue,
+                            id = j.meta.id,
+                            version = j.meta.version.toString(),
+                            status = j.meta.status.name,
+                            fileName = "registry:${j.meta.id}",
+                            content = parsed.toJsonObject().toString(),
+                            parsed = parsed
+                        ))
+                    }
+                    is Result.Err -> {}
+                }
+            }
+            is Result.Err -> {}
+        }
+
+        // SINK_RULE
+        when (val r = sinkRuleRegistry.findAllActive()) {
+            is Result.Ok -> r.value.forEach { sr ->
+                val parsed = buildMap<String, Any?> {
+                    put("kind", "SINK_RULE")
+                    put("id", sr.id)
+                    put("version", sr.version)
+                    put("status", sr.status.name)
+                    put("input", mapOf(
+                        "entityTypes" to sr.input.entityTypes,
+                        "sliceTypes" to sr.input.sliceTypes.map { it.name }
+                    ))
+                    put("target", mapOf("type" to sr.target.type.name))
+                }
+                contracts.add(ContractInfo(
+                    kind = ContractKind.SINK_RULE.wireValue,
+                    id = sr.id,
+                    version = sr.version,
+                    status = sr.status.name,
+                    fileName = "registry:${sr.id}",
+                    content = parsed.toJsonObject().toString(),
+                    parsed = parsed
+                ))
+            }
+            is Result.Err -> {}
+        }
+
+        contracts
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun parseContract(yaml: Yaml, content: String, fileName: String): ContractInfo? {
-        val map = yaml.load<Map<String, Any?>>(content) as? Map<String, Any?> ?: return null
+    private fun Map<String, Any?>.toJsonObject(): JsonObject = JsonObject(
+        mapValues { (_, v) -> v.toJsonElement() }
+    )
 
-        val kind = map["kind"]?.toString() ?: return null
-        val id = map["id"]?.toString() ?: return null
-        val version = map["version"]?.toString() ?: "1.0.0"
-        val status = map["status"]?.toString() ?: "ACTIVE"
-
-        return ContractInfo(
-            kind = kind,
-            id = id,
-            version = version,
-            status = status,
-            fileName = fileName,
-            content = content,
-            parsed = map
+    private fun Any?.toJsonElement(): JsonElement = when (this) {
+        null -> JsonNull
+        is String -> JsonPrimitive(this)
+        is Number -> JsonPrimitive(this)
+        is Boolean -> JsonPrimitive(this)
+        is Map<*, *> -> JsonObject(
+            (this as Map<String, Any?>).mapValues { (_, v) -> v.toJsonElement() }
         )
+        is List<*> -> JsonArray(map { it.toJsonElement() })
+        else -> JsonPrimitive(toString())
     }
 }
 
 // ==================== Domain Models ====================
-// ContractKind는 com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind 사용
 
 data class ContractInfo(
     val kind: String,

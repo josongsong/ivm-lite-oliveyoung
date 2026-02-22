@@ -83,7 +83,6 @@ data class EntityProcessResult(
     val success: Boolean,
     val message: String? = null,
     val slicesCreated: Int = 0,
-    val outboxEntriesCreated: Int = 0,
     val durationMs: Long = 0
 )
 

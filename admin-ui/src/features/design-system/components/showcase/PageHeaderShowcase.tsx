@@ -1,7 +1,7 @@
 /**
  * PageHeader Showcase - PageHeader 컴포넌트 전시
  */
-import { PageHeader, Button } from '@/shared/ui'
+import { Button, PageHeader } from '@/shared/ui'
 import { Plus } from 'lucide-react'
 import { PageHeader as DSPageHeader } from '../layout'
 import { LivePreview } from './LivePreview'

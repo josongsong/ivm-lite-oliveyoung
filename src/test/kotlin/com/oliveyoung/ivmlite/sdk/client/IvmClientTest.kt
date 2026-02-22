@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.client
 
+import com.oliveyoung.ivmlite.sdk.Ivm
 import com.oliveyoung.ivmlite.sdk.dsl.ingest.IngestContext
 import org.junit.jupiter.api.Test
 import java.time.Duration

@@ -1,14 +1,19 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
+import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceBuildRules
+import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceDefinition
+import com.oliveyoung.ivmlite.pkg.slices.domain.JoinSpec
+import com.oliveyoung.ivmlite.pkg.slices.domain.JoinType
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.GatedContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.AllowAllStatusGate
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ChangeSetContract
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
-import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatusGate
 import com.oliveyoung.ivmlite.pkg.contracts.domain.DefaultContractStatusGate
 import com.oliveyoung.ivmlite.pkg.contracts.domain.FallbackPolicy
 import com.oliveyoung.ivmlite.pkg.contracts.domain.InvertedIndexContract
@@ -26,6 +31,7 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.*
+
 /**
  * GatedContractRegistryAdapter 단위 테스트 (RFC-IMPL-010 Phase D-6)
  *
@@ -36,7 +42,7 @@ import io.mockk.*
 class GatedContractRegistryAdapterTest : StringSpec({
     val ref = ContractRef("test.v1", SemVer.parse("1.0.0"))
     fun createMeta(status: ContractStatus) = ContractMeta(
-        kind = "CHANGESET",
+        kind = ContractKind.CHANGESET,
         id = "test.v1",
         version = SemVer.parse("1.0.0"),
         status = status,
@@ -44,32 +50,59 @@ class GatedContractRegistryAdapterTest : StringSpec({
     fun createChangeSetContract(status: ContractStatus) = ChangeSetContract(
         meta = createMeta(status),
         entityKeyFormat = "{ENTITY_TYPE}#{tenantId}#{entityId}",
-        externalizeThresholdBytes = 100000,
+        externalizeThresholdBytes = 100_000,
         fanoutEnabled = false,
     )
     fun createJoinSpecContract(status: ContractStatus) = JoinSpecContract(
-        meta = createMeta(status).copy(kind = "JOIN_SPEC"),
+        meta = createMeta(status).copy(kind = ContractKind.JOIN_SPEC),
         maxJoinDepth = 1,
-        maxFanout = 10000,
-        invertedIndexRef = ContractRef("inverted-index.v1", SemVer.parse("1.0.0")),
+        maxFanout = 10_000,
     )
     fun createInvertedIndexContract(status: ContractStatus) = InvertedIndexContract(
-        meta = createMeta(status).copy(kind = "INVERTED_INDEX"),
+        meta = createMeta(status).copy(kind = ContractKind.ENTITY_SCHEMA),
         pkPattern = "INV#{ref_type}#{ref_value}",
         skPattern = "TARGET#{target_type}#{target_id}",
         padWidth = 12,
         separator = "#",
-        maxTargetsPerRef = 500000,
+        maxTargetsPerRef = 500_000,
     )
     fun createRuleSetContract(status: ContractStatus) = RuleSetContract(
-        meta = createMeta(status).copy(kind = "RULE_SET"),
+        meta = createMeta(status).copy(kind = ContractKind.RULESET),
         entityType = "PRODUCT",
         impactMap = emptyMap(),
-        joins = emptyList(),
         slices = emptyList(),
     )
+    fun createRuleSetWithCycle(): RuleSetContract {
+        val joinAtoB = JoinSpec(
+            name = "a",
+            type = JoinType.LOOKUP,
+            sourceFieldPath = "x",
+            targetEntityType = "X",
+            targetKeyPattern = "X#{tenantId}#{value}",
+            required = false,
+            targetSliceType = "PRICE",
+        )
+        val joinBtoA = JoinSpec(
+            name = "b",
+            type = JoinType.LOOKUP,
+            sourceFieldPath = "y",
+            targetEntityType = "Y",
+            targetKeyPattern = "Y#{tenantId}#{value}",
+            required = false,
+            targetSliceType = "CORE",
+        )
+        return RuleSetContract(
+            meta = createMeta(ContractStatus.ACTIVE).copy(kind = ContractKind.RULESET),
+            entityType = "PRODUCT",
+            impactMap = emptyMap(),
+            slices = listOf(
+                SliceDefinition(SliceType.CORE, SliceBuildRules.PassThrough(listOf("*")), listOf(joinAtoB)),
+                SliceDefinition(SliceType.PRICE, SliceBuildRules.PassThrough(listOf("*")), listOf(joinBtoA)),
+            ),
+        )
+    }
     fun createViewDefinitionContract(status: ContractStatus) = ViewDefinitionContract(
-        meta = createMeta(status).copy(kind = "VIEW_DEFINITION"),
+        meta = createMeta(status).copy(kind = ContractKind.VIEW_DEFINITION),
         requiredSlices = listOf(SliceType.CORE),
         optionalSlices = listOf(SliceType.PRICE),
         missingPolicy = MissingPolicy.FAIL_CLOSED,
@@ -182,6 +215,16 @@ class GatedContractRegistryAdapterTest : StringSpec({
         val adapter = GatedContractRegistryAdapter(delegate, gate)
         val result = adapter.loadRuleSetContract(ref)
         result.shouldBeInstanceOf<Result.Err>()
+    }
+    "loadRuleSetContract - RFC-018 slice 의존성 cycle → Err" {
+        val delegate = mockk<ContractRegistryPort>()
+        val gate = DefaultContractStatusGate
+        val cycleRuleSet = createRuleSetWithCycle()
+        coEvery { delegate.loadRuleSetContract(ref) } returns Result.Ok(cycleRuleSet)
+        val adapter = GatedContractRegistryAdapter(delegate, gate)
+        val result = adapter.loadRuleSetContract(ref)
+        result.shouldBeInstanceOf<Result.Err>()
+        (result as Result.Err).error.shouldBeInstanceOf<DomainError.InvariantViolation>()
     }
     // ==================== loadViewDefinitionContract 테스트 ====================
     "loadViewDefinitionContract - ACTIVE → Ok" {

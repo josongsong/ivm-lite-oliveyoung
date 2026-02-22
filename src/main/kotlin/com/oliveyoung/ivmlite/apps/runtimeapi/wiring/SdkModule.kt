@@ -1,44 +1,42 @@
 package com.oliveyoung.ivmlite.apps.runtimeapi.wiring
 
-import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
+import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.sdk.Ivm
 import com.oliveyoung.ivmlite.sdk.IvmContext
 import com.oliveyoung.ivmlite.sdk.execution.DeployExecutor
-import com.oliveyoung.ivmlite.shared.config.AppConfig
+import com.oliveyoung.ivmlite.sdk.execution.EntityContractResolver
 import org.koin.dsl.module
 
 /**
- * SDK Module (RFC-IMPL-011 Wave 5-L)
+ * SDK Module (SOTA - IngestionOrchestrator 기반 + Contract is Law)
  *
- * SDK Layer DI 바인딩
- * - DeployExecutor: Deploy 실행 엔진
- * - IvmContext: SDK 의존성 컨테이너 (단일 객체로 통합)
+ * SDK Layer DI 바인딩 (DynamoDB Streams 아키텍처)
+ * - EntityContractResolver: EntityType별 RuleSet/ViewDef 동적 해석
+ * - DeployExecutor: IngestionOrchestrator + EntityContractResolver 기반 Deploy 실행
+ * - IvmContext: Executor + QueryWorkflow 주입
  */
 val sdkModule = module {
-    // DeployExecutor (RFC-IMPL-011 Wave 5-L)
+    // EntityContractResolver (Contract is Law - ContractRegistryPort 기반 동적 해석)
+    single {
+        EntityContractResolver(contractRegistry = get())
+    }
+
+    // DeployExecutor (SOTA - IngestionOrchestrator + EntityContractResolver 기반)
     single {
         DeployExecutor(
-            ingestWorkflow = get(),
-            slicingWorkflow = get(),
-            shipWorkflow = get(),
-            outboxRepository = get()
+            orchestrator = get(),
+            contractResolver = get()
         )
     }
 
-    // IvmContext 빌드 및 SDK 초기화 (신규 방식)
+    // IvmContext 빌드 및 SDK 초기화
     single<Unit>(createdAtStart = true) {
         val executor = get<DeployExecutor>()
-        val worker = get<com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker>()
-        val outboxRepo = get<OutboxRepositoryPort>()
-        val appConfig = get<AppConfig>()
+        val queryWorkflow = get<QueryViewWorkflow>()
 
-        // IvmContext로 모든 의존성 통합
         val context = IvmContext.builder()
             .executor(executor)
-            .worker(worker)
-            .outboxRepository(outboxRepo)
-            .kafkaConfig(appConfig.kafka)
-            .workerConfig(appConfig.worker)
+            .queryWorkflow(queryWorkflow)
             .build()
 
         // SDK 초기화

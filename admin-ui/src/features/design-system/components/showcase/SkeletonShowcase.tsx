@@ -1,7 +1,7 @@
 /**
  * Skeleton Showcase - Skeleton 컴포넌트 전시
  */
-import { Skeleton, SkeletonCard, SkeletonList, SkeletonAvatar } from '@/shared/ui'
+import { Skeleton, SkeletonAvatar, SkeletonCard, SkeletonList } from '@/shared/ui'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

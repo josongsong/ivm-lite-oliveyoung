@@ -1,17 +1,25 @@
 package com.oliveyoung.ivmlite.pkg.workflow.canvas.adapters
 
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
+import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.domain.*
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.ports.WorkflowGraphBuilderPort
-import org.yaml.snakeyaml.Yaml
+import com.oliveyoung.ivmlite.shared.domain.types.Result
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 
 /**
- * 워크플로우 그래프 빌더
+ * 워크플로우 그래프 빌더 (RFC-022)
  *
- * Contract YAML 파일들을 분석하여 노드-엣지 그래프를 생성.
- * 자동 레이아웃 알고리즘을 사용하여 캔버스 좌표 계산.
+ * ContractRegistryPort + SinkRuleRegistryPort를 통해 Contract를 로드하여
+ * 노드-엣지 그래프를 생성. DynamoDB/LocalYaml 모두 지원.
  */
-class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
+class WorkflowGraphBuilder(
+    private val contractRegistry: ContractRegistryPort,
+    private val sinkRuleRegistry: SinkRuleRegistryPort,
+) : WorkflowGraphBuilderPort {
 
     companion object {
         // 레이아웃 상수
@@ -33,11 +41,11 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
         val edges = mutableListOf<WorkflowEdge>()
 
         // Contract 종류별 분리
-        val entitySchemas = contracts.filter { it.kind == "ENTITY_SCHEMA" }
+        val entitySchemas = contracts.filter { it.kind == ContractKind.ENTITY_SCHEMA.wireValue }
             .filter { entityTypeFilter == null || it.entityType == entityTypeFilter }
-        val ruleSets = contracts.filter { it.kind == "RULESET" }
-        val viewDefinitions = contracts.filter { it.kind == "VIEW_DEFINITION" }
-        val sinkRules = contracts.filter { it.kind == "SINKRULE" }
+        val ruleSets = contracts.filter { it.kind == ContractKind.RULESET.wireValue }
+        val viewDefinitions = contracts.filter { it.kind == ContractKind.VIEW_DEFINITION.wireValue }
+        val sinkRules = contracts.filter { it.kind == ContractKind.SINK_RULE.wireValue }
 
         // 엔티티별로 그래프 구성
         val entityTypes = mutableSetOf<String>()
@@ -256,46 +264,78 @@ class WorkflowGraphBuilder : WorkflowGraphBuilderPort {
         )
     }
 
-    // ==================== Contract 로딩 ====================
+    // ==================== Contract 로딩 (RFC-022: ContractRegistryPort 기반) ====================
 
     /**
-     * 모든 Contract YAML 파일 로드
-     * (ContractRoutes.kt의 loadAllContracts()와 유사)
+     * ContractRegistryPort + SinkRuleRegistryPort에서 Contract 로드
      */
-    private fun loadAllContracts(): List<ContractInfo> {
+    private fun loadAllContracts(): List<ContractInfo> = runBlocking {
         val contracts = mutableListOf<ContractInfo>()
-        val yaml = Yaml()
 
-        val contractFiles = listOf(
-            "entity-product.v1.yaml",
-            "entity-brand.v1.yaml",
-            "entity-category.v1.yaml",
-            "ruleset.v1.yaml",
-            "ruleset-product-doc001.v1.yaml",
-            "view-definition.v1.yaml",
-            "view-product-core.v1.yaml",
-            "view-product-detail.v1.yaml",
-            "view-product-search.v1.yaml",
-            "view-product-cart.v1.yaml",
-            "view-brand-detail.v1.yaml",
-            "sinkrule-opensearch-product.v1.yaml"
-        )
-
-        for (fileName in contractFiles) {
-            try {
-                val stream = javaClass.getResourceAsStream("/contracts/v1/$fileName")
-                if (stream != null) {
-                    val content = stream.bufferedReader().use { it.readText() }
-                    @Suppress("UNCHECKED_CAST")
-                    val map = yaml.load<Map<String, Any?>>(content) as? Map<String, Any?> ?: continue
-                    contracts.add(ContractInfo.from(map))
+        // RuleSet → entityType 추출 (ENTITY_SCHEMA 대체) + RuleSet 노드
+        val ruleSetRefs = when (val r = contractRegistry.listContractRefs(ContractKind.RULESET, ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.sortedBy { it.id }
+            is Result.Err -> emptyList()
+        }
+        for (ref in ruleSetRefs) {
+            when (val r = contractRegistry.loadRuleSetContract(ref)) {
+                is Result.Ok -> {
+                    val rs = r.value
+                    // EntitySchema 대체: entityType만 있는 가상 스키마
+                    contracts.add(ContractInfo(
+                        kind = ContractKind.ENTITY_SCHEMA.wireValue,
+                        id = "entity-${rs.entityType}.v1",
+                        version = rs.meta.version.toString(),
+                        status = rs.meta.status.name,
+                        entityType = rs.entityType,
+                        slices = rs.slices.map { it.type.name },
+                        fields = null
+                    ))
+                    contracts.add(ContractInfo(
+                        kind = ContractKind.RULESET.wireValue,
+                        id = rs.meta.id,
+                        version = rs.meta.version.toString(),
+                        status = rs.meta.status.name,
+                        entityType = rs.entityType,
+                        slices = rs.slices.map { it.type.name }
+                    ))
                 }
-            } catch (e: Exception) {
-                // Skip invalid files
+                is Result.Err -> {}
             }
         }
 
-        return contracts
+        // ViewDefinition
+        when (val r = contractRegistry.listViewDefinitions(ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.forEach { vd ->
+                contracts.add(ContractInfo(
+                    kind = ContractKind.VIEW_DEFINITION.wireValue,
+                    id = vd.meta.id,
+                    version = vd.meta.version.toString(),
+                    status = vd.meta.status.name,
+                    entityType = vd.entityType,
+                    viewName = vd.viewName ?: vd.meta.id,
+                    requiredSlices = vd.requiredSlices.map { it.name }
+                ))
+            }
+            is Result.Err -> {}
+        }
+
+        // SinkRule
+        when (val r = sinkRuleRegistry.findAllActive()) {
+            is Result.Ok -> r.value.forEach { sr ->
+                contracts.add(ContractInfo(
+                    kind = ContractKind.SINK_RULE.wireValue,
+                    id = sr.id,
+                    version = sr.version,
+                    status = sr.status.name,
+                    inputEntityTypes = sr.input.entityTypes,
+                    targetType = sr.target.type.name
+                ))
+            }
+            is Result.Err -> {}
+        }
+
+        contracts
     }
 }
 

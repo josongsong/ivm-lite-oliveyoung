@@ -25,7 +25,7 @@ import java.time.Instant
  */
 fun Route.observabilityRoutes() {
     val observabilityService by inject<ObservabilityService>()
-    
+
     /**
      * GET /observability/dashboard
      * 파이프라인 대시보드
@@ -42,7 +42,7 @@ fun Route.observabilityRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /observability/lag
      * 현재 Lag 정보
@@ -58,7 +58,7 @@ fun Route.observabilityRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /observability/throughput
      * 현재 처리량
@@ -75,7 +75,7 @@ fun Route.observabilityRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /observability/latency
      * 지연 시간
@@ -92,7 +92,7 @@ fun Route.observabilityRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /observability/queues
      * 큐 상태
@@ -108,7 +108,7 @@ fun Route.observabilityRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /observability/timeseries/{metric}
      * 시계열 데이터
@@ -119,21 +119,21 @@ fun Route.observabilityRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "MISSING_METRIC", message = "Metric name required"))
                 return@get
             }
-            
+
             val fromParam = call.request.queryParameters["from"]
             val toParam = call.request.queryParameters["to"]
             val resolutionMinutes = call.request.queryParameters["resolution"]?.toLongOrNull() ?: 1
-            
+
             val to = if (toParam != null) Instant.parse(toParam) else Instant.now()
             val from = if (fromParam != null) Instant.parse(fromParam) else to.minusSeconds(3600) // 기본 1시간
-            
+
             val timeSeries = observabilityService.getTimeSeries(
                 metricName = metricName,
                 from = from,
                 to = to,
                 resolution = Duration.ofMinutes(resolutionMinutes)
             )
-            
+
             call.respond(HttpStatusCode.OK, timeSeries.toDto())
         } catch (e: Exception) {
             call.respond(

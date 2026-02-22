@@ -68,26 +68,26 @@ class ImpactCalculator : ImpactCalculatorPort {
     }
 
     /**
-     * JSON Pointer 경로 매칭 (RFC 6901)
-     *
-     * BUG FIX: trailing slash 처리
-     * - impactPath: "/brand/" → normalize → "/brand"
-     * - changedPath: "/brand/name" → matches!
-     *
-     * @param changedPath 변경된 경로
-     * @param impactPath 영향 범위 경로 (RuleSet.impactMap에서)
-     * @return 매칭 여부
+     * JSON Pointer 경로 매칭 (RFC 6901).
+     * 정확 일치, prefix 매칭, 와일드카드(끝에 슬래시별) 지원.
+     * 배열은 index 기반 경로만 사용: /options/0/price
      */
     private fun matchesPath(changedPath: String, impactPath: String): Boolean {
-        // trailing slash 제거 (normalize)
         val normalizedImpact = impactPath.trimEnd('/')
+        // 와일드카드: impactPath 끝 "슬래시별" 시 하위 경로 모두 매칭
+        val basePath = if (normalizedImpact.endsWith("/*")) {
+            normalizedImpact.dropLast(2)
+        } else {
+            normalizedImpact
+        }
 
         // 1. 정확히 일치
-        if (changedPath == normalizedImpact) return true
+        if (changedPath == basePath) return true
 
         // 2. prefix 매칭 (하위 경로)
         //    /brand/name은 /brand에 매칭
+        //    /options/0/price는 /options에 매칭 (배열 index 기반 경로)
         //    /brandnew는 /brand에 매칭 안 됨 (슬래시 필수)
-        return changedPath.startsWith("$normalizedImpact/")
+        return changedPath.startsWith("$basePath/")
     }
 }

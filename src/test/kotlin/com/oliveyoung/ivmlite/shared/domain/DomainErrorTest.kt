@@ -85,7 +85,7 @@ class DomainErrorTest {
 
     @Test
     fun `NotFoundError - 다양한 엔티티 타입`() {
-        listOf("SliceRecord", "Contract", "OutboxEntry").forEach { entityType ->
+        listOf("SliceRecord", "Contract", "SinkEvent").forEach { entityType ->
             val error = DomainError.NotFoundError(entity = entityType, key = "key")
             assertEquals(entityType, error.entity)
         }

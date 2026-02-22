@@ -5,7 +5,6 @@ import arrow.core.raise.either
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.error.Mark
 
 /**
  * Contract Cursor Service (Phase 1: DX Platform)
@@ -62,7 +61,7 @@ class ContractCursorService(
         val currentKey = keyMatch?.groupValues?.get(1)
 
         // 위로 올라가며 부모 키들 수집
-        for (i in (line - 2) downTo 0) {
+        for (i in line - 2 downTo 0) {
             val prevLine = lines[i]
             val prevIndent = prevLine.takeWhile { it == ' ' }.length
 
@@ -81,7 +80,7 @@ class ContractCursorService(
         if (currentLine.trimStart().startsWith("-")) {
             // 배열 요소인 경우 인덱스 계산
             var arrayIndex = 0
-            for (i in (line - 2) downTo 0) {
+            for (i in line - 2 downTo 0) {
                 val prevLine = lines[i]
                 val prevIndent = prevLine.takeWhile { it == ' ' }.length
                 if (prevIndent < currentIndent && !prevLine.trimStart().startsWith("-")) {
@@ -108,7 +107,7 @@ class ContractCursorService(
 
         return try {
             val parsed = yaml.load<Map<String, Any?>>(yamlContent) as? Map<String, Any?> ?: return null
-            val kind = ContractKind.fromString(parsed["kind"]?.toString() ?: "") ?: return null
+            val kind = ContractKind.fromWireValue(parsed["kind"]?.toString() ?: "") ?: return null
             val contractId = parsed["id"]?.toString() ?: return null
 
             when {

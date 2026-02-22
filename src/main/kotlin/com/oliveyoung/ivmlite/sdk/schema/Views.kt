@@ -2,168 +2,129 @@ package com.oliveyoung.ivmlite.sdk.schema
 
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.long
 import kotlinx.serialization.json.jsonObject
 
 /**
  * 타입 세이프한 View 레지스트리
- * 
+ *
  * Contract에서 정의된 모든 View들의 참조를 제공합니다.
  * 이 파일은 코드젠으로 자동 생성되거나 수동으로 정의할 수 있습니다.
- * 
+ *
  * 모든 View는 **대문자로 시작**하며 **타입 세이프한 결과**를 반환합니다.
- * 
+ *
  * @example 사용 예시
  * ```kotlin
  * // 타입 세이프 조회 (IDE 자동완성 지원)
  * val product: ProductPdpData = Ivm.query(Views.Product.Pdp)
  *     .key("SKU-001")
  *     .get()
- * 
+ *
  * println(product.name)   // String
  * println(product.price)  // Long
- * 
+ *
  * // 범위 검색
  * val results = Ivm.query(Views.Product.Search)
  *     .tenant("oliveyoung")
  *     .range { keyPrefix("SKU-") }
  *     .list()
- * 
+ *
  * results.items.forEach { product: ProductSearchData ->
  *     println("${product.name}: ${product.price}원")
  * }
  * ```
  */
 object Views {
-    
+
     // ===== Product 도메인 =====
-    
+
     object Product {
         /**
+         * Core View - 상품 기본 정보
+         *
+         * Contract: view.product.core.v1
+         * - requiredSlices: CORE
+         */
+        object Core : ViewRef<ProductCoreData>(
+            viewId = "view.product.core.v1",
+            slices = listOf("CORE"),
+            description = "상품 기본 정보 View",
+            resultParser = { json -> ProductCoreData.fromJson(json) }
+        )
+
+        /**
          * PDP (Product Detail Page) View
-         * 
-         * 상품 상세 페이지에 필요한 모든 정보
-         * - Slices: CORE, PRICING, INVENTORY, PROMOTION
-         * 
-         * @example
-         * ```kotlin
-         * val product: ProductPdpData = Ivm.query(Views.Product.Pdp)
-         *     .key("SKU-001")
-         *     .get()
-         * 
-         * println(product.name)
-         * println(product.price)
-         * ```
+         *
+         * Contract: view.product.pdp.v1
+         * - requiredSlices: CORE, PRICE, MEDIA, NOTICE, ASSOCIATED
+         * - optionalSlices: INVENTORY, CATEGORY, INDEX, ENRICHED
          */
         object Pdp : ViewRef<ProductPdpData>(
-            viewId = "product.pdp",
-            slices = listOf("CORE", "PRICING", "INVENTORY", "PROMOTION"),
+            viewId = "view.product.pdp.v1",
+            slices = listOf("CORE", "PRICE", "MEDIA", "NOTICE", "ASSOCIATED", "INVENTORY", "CATEGORY", "INDEX", "ENRICHED"),
             description = "상품 상세 페이지 View",
             resultParser = { json -> ProductPdpData.fromJson(json) }
         )
-        
+
         /**
          * 검색 View
-         * 
-         * 검색 결과 리스트에 필요한 최소 정보
-         * - Slices: CORE, PRICING
+         *
+         * Contract: view.product.search.v1
+         * - requiredSlices: CORE, PRICE, CATEGORY, INDEX
+         * - optionalSlices: MEDIA, INVENTORY, ENRICHED
          */
         object Search : ViewRef<ProductSearchData>(
-            viewId = "product.search",
-            slices = listOf("CORE", "PRICING"),
+            viewId = "view.product.search.v1",
+            slices = listOf("CORE", "PRICE", "CATEGORY", "INDEX", "MEDIA", "INVENTORY", "ENRICHED"),
             description = "상품 검색 결과 View",
             resultParser = { json -> ProductSearchData.fromJson(json) }
         )
-        
+
         /**
-         * 장바구니 View
-         * 
-         * 장바구니에 필요한 정보
-         * - Slices: CORE, PRICING, INVENTORY
+         * 스토어프론트 View
+         *
+         * Contract: view.product.storefront.v1
+         * - requiredSlices: CORE, PRICE, MEDIA, CATEGORY, INDEX
+         * - optionalSlices: ENRICHED
          */
-        object Cart : ViewRef<ProductCartData>(
-            viewId = "product.cart",
-            slices = listOf("CORE", "PRICING", "INVENTORY"),
-            description = "장바구니 View",
-            resultParser = { json -> ProductCartData.fromJson(json) }
-        )
-        
-        /**
-         * 관리자용 View (모든 정보)
-         * 
-         * - Slices: ALL
-         */
-        object Admin : ViewRef<ProductAdminData>(
-            viewId = "product.admin",
-            slices = listOf("CORE", "PRICING", "INVENTORY", "PROMOTION", "METADATA"),
-            description = "관리자용 전체 View",
-            resultParser = { json -> ProductAdminData.fromJson(json) }
+        object Storefront : ViewRef<ProductSearchData>(
+            viewId = "view.product.storefront.v1",
+            slices = listOf("CORE", "PRICE", "MEDIA", "CATEGORY", "INDEX", "ENRICHED"),
+            description = "스토어프론트 전시 View",
+            resultParser = { json -> ProductSearchData.fromJson(json) }
         )
     }
-    
+
     // ===== Brand 도메인 =====
-    
+
     object Brand {
         /**
          * 브랜드 상세 View
+         *
+         * Contract: view.brand.detail.v1
+         * - requiredSlices: CORE, SUMMARY
          */
         object Detail : ViewRef<BrandDetailData>(
-            viewId = "brand.detail",
-            slices = listOf("CORE", "METADATA"),
+            viewId = "view.brand.detail.v1",
+            slices = listOf("CORE", "SUMMARY"),
             description = "브랜드 상세 View",
             resultParser = { json -> BrandDetailData.fromJson(json) }
         )
-        
-        /**
-         * 브랜드 리스트 View
-         */
-        object List : ViewRef<BrandListData>(
-            viewId = "brand.list",
-            slices = listOf("CORE"),
-            description = "브랜드 리스트 View",
-            resultParser = { json -> BrandListData.fromJson(json) }
-        )
     }
-    
-    // ===== Category 도메인 =====
-    
-    object Category {
-        /**
-         * 카테고리 트리 View
-         */
-        object Tree : ViewRef<CategoryTreeData>(
-            viewId = "category.tree",
-            slices = listOf("HIERARCHY"),
-            description = "카테고리 트리 View",
-            resultParser = { json -> CategoryTreeData.fromJson(json) }
-        )
-        
-        /**
-         * 카테고리 상세 View
-         */
-        object Detail : ViewRef<CategoryDetailData>(
-            viewId = "category.detail",
-            slices = listOf("CORE", "HIERARCHY", "METADATA"),
-            description = "카테고리 상세 View",
-            resultParser = { json -> CategoryDetailData.fromJson(json) }
-        )
-    }
-    
+
     /**
      * 모든 등록된 View 목록
      */
     val all: List<ViewRef<*>> = listOf(
+        Product.Core,
         Product.Pdp,
         Product.Search,
-        Product.Cart,
-        Product.Admin,
-        Brand.Detail,
-        Brand.List,
-        Category.Tree,
-        Category.Detail
+        Product.Storefront,
+        Brand.Detail
     )
-    
+
     /**
      * View ID로 찾기
      */
@@ -171,6 +132,32 @@ object Views {
 }
 
 // ===== 타입 세이프 결과 데이터 클래스들 =====
+
+/**
+ * Product Core View 결과 데이터 (CORE 슬라이스만)
+ */
+@Serializable
+data class ProductCoreData(
+    val name: String,
+    val price: Long?,
+    val category: String?,
+    val brand: String?
+) {
+    companion object {
+        fun fromJson(json: JsonObject): ProductCoreData {
+            // QueryViewWorkflow는 slices를 JsonArray로 반환
+            val coreSlice = runCatching { json["slices"]?.jsonArray?.firstOrNull()?.jsonObject }.getOrNull()
+            val core = coreSlice ?: json["core"]?.jsonObject ?: json
+
+            return ProductCoreData(
+                name = core["name"]?.jsonPrimitive?.content ?: "",
+                price = core["price"]?.jsonPrimitive?.long,
+                category = core["category"]?.jsonPrimitive?.content,
+                brand = core["brand"]?.jsonPrimitive?.content
+            )
+        }
+    }
+}
 
 /**
  * PDP View 결과 데이터 (코드젠으로 생성 가능)
@@ -188,13 +175,12 @@ data class ProductPdpData(
     val promotions: List<String>
 ) {
     companion object {
-        @Suppress("UNUSED_VARIABLE")
         fun fromJson(json: JsonObject): ProductPdpData {
             val core = json["core"]?.jsonObject ?: json
             val pricing = json["pricing"]?.jsonObject ?: json
             val inventory = json["inventory"]?.jsonObject ?: json
-            val promotion = json["promotion"]?.jsonObject // TODO: parse promotions array
-            
+            val promotion = json["promotion"]?.jsonObject
+
             val productId = core["productId"]?.jsonPrimitive?.content
                 ?: throw IllegalArgumentException("Missing required field 'productId' in ProductPdpData")
             val name = core["name"]?.jsonPrimitive?.content
@@ -205,7 +191,12 @@ data class ProductPdpData(
                 ?: throw IllegalArgumentException("Missing or invalid required field 'stock' in ProductPdpData")
             val isAvailable = inventory["isAvailable"]?.jsonPrimitive?.content?.toBoolean()
                 ?: throw IllegalArgumentException("Missing required field 'isAvailable' in ProductPdpData")
-            
+
+            val promotionIds = promotion?.get("promotionIds")?.jsonArray
+            val promotions = promotionIds
+                ?.map { element -> element.jsonPrimitive.content }
+                ?: emptyList()
+
             return ProductPdpData(
                 productId = productId,
                 name = name,
@@ -215,7 +206,7 @@ data class ProductPdpData(
                 salePrice = pricing["salePrice"]?.jsonPrimitive?.long,
                 stock = stock,
                 isAvailable = isAvailable,
-                promotions = emptyList() // TODO: parse from promotion slice
+                promotions = promotions
             )
         }
     }
@@ -237,7 +228,7 @@ data class ProductSearchData(
         fun fromJson(json: JsonObject): ProductSearchData {
             val core = json["core"]?.jsonObject ?: json
             val pricing = json["pricing"]?.jsonObject ?: json
-            
+
             return ProductSearchData(
                 productId = core["productId"]?.jsonPrimitive?.content ?: "",
                 name = core["name"]?.jsonPrimitive?.content ?: "",
@@ -268,7 +259,7 @@ data class ProductCartData(
             val core = json["core"]?.jsonObject ?: json
             val pricing = json["pricing"]?.jsonObject ?: json
             val inventory = json["inventory"]?.jsonObject ?: json
-            
+
             return ProductCartData(
                 productId = core["productId"]?.jsonPrimitive?.content ?: "",
                 name = core["name"]?.jsonPrimitive?.content ?: "",
@@ -303,8 +294,14 @@ data class ProductAdminData(
             val core = json["core"]?.jsonObject ?: json
             val pricing = json["pricing"]?.jsonObject ?: json
             val inventory = json["inventory"]?.jsonObject ?: json
+            val promotion = json["promotion"]?.jsonObject
             val metadata = json["metadata"]?.jsonObject
-            
+
+            val promotionIds = promotion?.get("promotionIds")?.jsonArray
+            val promotions = promotionIds
+                ?.map { element -> element.jsonPrimitive.content }
+                ?: emptyList()
+
             return ProductAdminData(
                 productId = core["productId"]?.jsonPrimitive?.content ?: "",
                 name = core["name"]?.jsonPrimitive?.content ?: "",
@@ -314,7 +311,7 @@ data class ProductAdminData(
                 salePrice = pricing["salePrice"]?.jsonPrimitive?.long,
                 stock = inventory["stock"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
                 isAvailable = inventory["isAvailable"]?.jsonPrimitive?.content?.toBoolean() ?: false,
-                promotions = emptyList(),
+                promotions = promotions,
                 metadata = metadata
             )
         }
@@ -338,7 +335,7 @@ data class BrandDetailData(
         fun fromJson(json: JsonObject): BrandDetailData {
             val core = json["core"]?.jsonObject ?: json
             val metadata = json["metadata"]?.jsonObject
-            
+
             return BrandDetailData(
                 brandId = core["brandId"]?.jsonPrimitive?.content ?: "",
                 name = core["name"]?.jsonPrimitive?.content ?: "",
@@ -350,85 +347,28 @@ data class BrandDetailData(
     }
 }
 
-/**
- * Brand List View 결과 데이터
- */
-@Serializable
-data class BrandListData(
-    val brandId: String,
-    val name: String,
-    val logoUrl: String?
-) {
-    companion object {
-        fun fromJson(json: JsonObject): BrandListData {
-            val core = json["core"]?.jsonObject ?: json
-            
-            return BrandListData(
-                brandId = core["brandId"]?.jsonPrimitive?.content ?: "",
-                name = core["name"]?.jsonPrimitive?.content ?: "",
-                logoUrl = core["logoUrl"]?.jsonPrimitive?.content
-            )
-        }
-    }
-}
-
 // ===== Category 데이터 클래스 =====
 
 /**
- * Category Tree View 결과 데이터
+ * Category Core View 결과 데이터
  */
 @Serializable
-data class CategoryTreeData(
+data class CategoryCoreData(
     val categoryId: String,
     val name: String,
     val parentId: String?,
-    val depth: Int,
-    val path: String?
+    val depth: Int
 ) {
     companion object {
-        fun fromJson(json: JsonObject): CategoryTreeData {
-            val hierarchy = json["hierarchy"]?.jsonObject ?: json
-            
-            return CategoryTreeData(
-                categoryId = hierarchy["categoryId"]?.jsonPrimitive?.content ?: "",
-                name = hierarchy["name"]?.jsonPrimitive?.content ?: "",
-                parentId = hierarchy["parentId"]?.jsonPrimitive?.content,
-                depth = hierarchy["depth"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-                path = hierarchy["path"]?.jsonPrimitive?.content
-            )
-        }
-    }
-}
+        fun fromJson(json: JsonObject): CategoryCoreData {
+            val coreSlice = runCatching { json["slices"]?.jsonArray?.firstOrNull()?.jsonObject }.getOrNull()
+            val core = coreSlice ?: json["core"]?.jsonObject ?: json
 
-/**
- * Category Detail View 결과 데이터
- */
-@Serializable
-data class CategoryDetailData(
-    val categoryId: String,
-    val name: String,
-    val parentId: String?,
-    val depth: Int,
-    val path: String?,
-    val description: String?,
-    val metadata: JsonObject?
-) {
-    companion object {
-        fun fromJson(json: JsonObject): CategoryDetailData {
-            val core = json["core"]?.jsonObject ?: json
-            val hierarchy = json["hierarchy"]?.jsonObject ?: json
-            val metadata = json["metadata"]?.jsonObject
-            
-            return CategoryDetailData(
-                categoryId = core["categoryId"]?.jsonPrimitive?.content 
-                    ?: hierarchy["categoryId"]?.jsonPrimitive?.content ?: "",
-                name = core["name"]?.jsonPrimitive?.content 
-                    ?: hierarchy["name"]?.jsonPrimitive?.content ?: "",
-                parentId = hierarchy["parentId"]?.jsonPrimitive?.content,
-                depth = hierarchy["depth"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0,
-                path = hierarchy["path"]?.jsonPrimitive?.content,
-                description = core["description"]?.jsonPrimitive?.content,
-                metadata = metadata
+            return CategoryCoreData(
+                categoryId = core["categoryId"]?.jsonPrimitive?.content ?: "",
+                name = core["name"]?.jsonPrimitive?.content ?: "",
+                parentId = core["parentId"]?.jsonPrimitive?.content,
+                depth = core["depth"]?.jsonPrimitive?.content?.toIntOrNull() ?: 0
             )
         }
     }

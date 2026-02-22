@@ -549,7 +549,7 @@ class InvertedIndexBuilderTest {
         // canonicalizeIndexValue가 먼저 적용되어 lowercase됨
         assertEquals(EntityKey("brand#tenant1#br001"), reverseIndex.refEntityKey)  // 전체 EntityKey (lowercase)
         assertEquals("br001", reverseIndex.indexValue)  // entityId만 (lowercase)
-        
+
         // 정방향 인덱스는 전체 값 저장
         val forwardIndex = indexes.find { it.indexType == "brand" }!!
         assertEquals("brand#tenant1#br001", forwardIndex.indexValue)  // 전체 값 (lowercase)
@@ -583,7 +583,7 @@ class InvertedIndexBuilderTest {
         // Then: 빈 값은 isNullOrBlank() 체크로 인해 인덱스 생성 안 됨
         assertEquals(0, indexes.size, "빈 값은 인덱스 생성 안 됨")
     }
-    
+
     @Test
     fun `엣지 케이스 - EntityKey 형식에서 빈 entityId는 역방향 인덱스 생성 안 함`() {
         // Given: EntityKey 형식이지만 entityId가 빈 문자열인 경우
@@ -615,7 +615,7 @@ class InvertedIndexBuilderTest {
         // parts[2]가 빈 문자열이므로 역방향 인덱스 생성 안 됨
         val forwardIndexes = indexes.filter { it.indexType == "brand" }
         val reverseIndexes = indexes.filter { it.indexType == "product_by_brand" }
-        
+
         // 정방향 인덱스는 전체 값 저장
         assertEquals(1, forwardIndexes.size, "정방향 인덱스는 생성되어야 함")
         assertEquals(0, reverseIndexes.size, "역방향 인덱스는 빈 entityId로 인해 생성 안 됨")
@@ -797,7 +797,7 @@ class InvertedIndexBuilderTest {
         // Then: 역방향 인덱스는 생성되지만 tenantId 불일치 (경고 로그는 실제로는 남음)
         val reverseIndexes = indexes.filter { it.indexType == "product_by_brand" }
         assertEquals(1, reverseIndexes.size, "역방향 인덱스는 생성되어야 함 (cross-tenant 참조 허용)")
-        
+
         // refEntityKey는 원본 EntityKey 사용 (tenant2 포함)
         assertEquals(EntityKey("brand#tenant2#br001"), reverseIndexes[0].refEntityKey)
         // 하지만 InvertedIndexEntry의 tenantId는 slice.tenantId 사용

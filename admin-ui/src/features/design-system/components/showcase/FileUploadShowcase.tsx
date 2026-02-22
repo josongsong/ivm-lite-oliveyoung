@@ -2,7 +2,7 @@
  * FileUpload Showcase - FileUpload 컴포넌트 전시
  */
 import { useState } from 'react'
-import { FileUpload, Alert } from '@/shared/ui'
+import { Alert, FileUpload } from '@/shared/ui'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

@@ -4,9 +4,9 @@
  * 스키마 선택 드롭다운 컴포넌트
  */
 
-import { useState, useRef, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { FileCode2, ChevronDown } from 'lucide-react'
+import { ChevronDown, FileCode2 } from 'lucide-react'
 import './SchemaSelector.css'
 
 export interface SchemaOption {

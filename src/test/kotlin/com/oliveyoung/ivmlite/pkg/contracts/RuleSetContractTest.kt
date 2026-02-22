@@ -1,14 +1,15 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -58,7 +59,10 @@ class RuleSetContractTest : StringSpec({
 
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
-        contract.impactMap[SliceType.CORE] shouldBe listOf("/title", "/brand", "/price")
+        // ruleset-core.v1.yaml: CORE impactMap (테스트/폴백용)
+        contract.impactMap[SliceType.CORE]!!.shouldContain("/title")
+        contract.impactMap[SliceType.CORE]!!.shouldContain("/brand")
+        contract.impactMap[SliceType.CORE]!!.shouldContain("/price")
     }
 
     "LocalYaml - slices 파싱 검증 (PassThrough)" {
@@ -108,7 +112,7 @@ class RuleSetContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.core.v1"),
@@ -147,7 +151,7 @@ class RuleSetContractTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": []
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -172,7 +176,7 @@ class RuleSetContractTest : StringSpec({
             "entityType": "PRODUCT",
             "impactMap": {},
             "joins": []
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -201,7 +205,7 @@ class RuleSetContractTest : StringSpec({
             },
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -223,44 +227,6 @@ class RuleSetContractTest : StringSpec({
         contract.impactMap[SliceType.PRICE] shouldBe listOf("/price")
     }
 
-    "DynamoDB - joins 파싱 검증" {
-        val dataJson = """{
-            "entityType": "PRODUCT",
-            "impactMap": {},
-            "joins": [
-                {
-                    "sourceSlice": "CORE",
-                    "targetEntity": "CATEGORY",
-                    "joinPath": "/categoryId",
-                    "cardinality": "MANY_TO_ONE"
-                }
-            ],
-            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
-
-        val responseItem = mapOf(
-            "id" to attr("ruleset.v1"),
-            "version" to attr("1.0.0"),
-            "kind" to attr("RULESET"),
-            "status" to attr("ACTIVE"),
-            "data" to attr(dataJson),
-        )
-
-        val mockClient = createMockClient(responseItem)
-        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
-        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
-
-        val result = adapter.loadRuleSetContract(ref)
-
-        result.shouldBeInstanceOf<Result.Ok<*>>()
-        val contract = (result as Result.Ok).value
-        contract.joins.size shouldBe 1
-        contract.joins[0].sourceSlice shouldBe SliceType.CORE
-        contract.joins[0].targetEntity shouldBe "CATEGORY"
-        contract.joins[0].joinPath shouldBe "/categoryId"
-        contract.joins[0].cardinality shouldBe JoinCardinality.MANY_TO_ONE
-    }
-
     "DynamoDB - sliceBuildRules MapFields 타입 파싱" {
         val dataJson = """{
             "entityType": "PRODUCT",
@@ -278,7 +244,7 @@ class RuleSetContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -317,7 +283,7 @@ class RuleSetContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -346,7 +312,7 @@ class RuleSetContractTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -372,7 +338,7 @@ class RuleSetContractTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -444,7 +410,7 @@ class RuleSetContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -470,7 +436,7 @@ class RuleSetContractTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": []
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -497,7 +463,7 @@ class RuleSetContractTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -530,7 +496,7 @@ class RuleSetContractTest : StringSpec({
                 {"type": "brand", "selector": "$.brand"},
                 {"type": "category", "selector": "$.categoryId"}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -565,7 +531,7 @@ class RuleSetContractTest : StringSpec({
                 {"type": "brand", "selector": "$.brand", "references": "BRAND"},
                 {"type": "tag", "selector": "$.tags[*]"}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -584,10 +550,10 @@ class RuleSetContractTest : StringSpec({
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
         contract.indexes.size shouldBe 2
-        
+
         // references가 있는 인덱스 → 역방향 인덱스 자동 생성
         contract.indexes[0].references shouldBe "BRAND"
-        
+
         // references가 없는 인덱스 → 정방향만 생성
         contract.indexes[1].references shouldBe null
     }
@@ -602,7 +568,7 @@ class RuleSetContractTest : StringSpec({
                 {"type": "brand", "selector": "$.brand", "references": "BRAND", "maxFanout": 5000},
                 {"type": "category", "selector": "$.categoryId", "references": "CATEGORY"}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -621,12 +587,12 @@ class RuleSetContractTest : StringSpec({
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
         contract.indexes.size shouldBe 2
-        
+
         // 명시적 maxFanout
         contract.indexes[0].maxFanout shouldBe 5000
-        
+
         // 기본값 (10000)
-        contract.indexes[1].maxFanout shouldBe 10000
+        contract.indexes[1].maxFanout shouldBe 10_000
     }
 
     "DynamoDB - indexes 배열이 잘못된 형식 (객체가 아닌 문자열) → ContractError" {
@@ -636,7 +602,7 @@ class RuleSetContractTest : StringSpec({
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
             "indexes": "invalid"  // 배열이 아닌 문자열
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -665,7 +631,7 @@ class RuleSetContractTest : StringSpec({
             "indexes": [
                 {"selector": "$.brand"}  // type 누락
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -694,7 +660,7 @@ class RuleSetContractTest : StringSpec({
             "indexes": [
                 {"type": "brand"}  // selector 누락
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -723,7 +689,7 @@ class RuleSetContractTest : StringSpec({
             "indexes": [
                 {"type": "brand", "selector": "$.brand", "maxFanout": -1}
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -754,7 +720,7 @@ class RuleSetContractTest : StringSpec({
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}],
             "indexes": []
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -781,7 +747,7 @@ class RuleSetContractTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -810,22 +776,22 @@ class RuleSetContractTest : StringSpec({
 
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
-        
+
         // ruleset.v1.yaml에 정의된 indexes 확인
         contract.indexes.isNotEmpty() shouldBe true
-        
+
         // brand 인덱스: references=BRAND
         val brandIndex = contract.indexes.firstOrNull { it.type == "brand" }
         brandIndex shouldNotBe null
         brandIndex!!.references shouldBe "BRAND"
-        brandIndex.maxFanout shouldBe 10000
-        
+        brandIndex.maxFanout shouldBe 10_000
+
         // category 인덱스: references=CATEGORY
         val categoryIndex = contract.indexes.firstOrNull { it.type == "category" }
         categoryIndex shouldNotBe null
         categoryIndex!!.references shouldBe "CATEGORY"
         categoryIndex.maxFanout shouldBe 50000
-        
+
         // tag 인덱스: references=null (검색용만)
         val tagIndex = contract.indexes.firstOrNull { it.type == "tag" }
         tagIndex shouldNotBe null
@@ -846,7 +812,7 @@ class RuleSetContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),

@@ -4,15 +4,17 @@ import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import kotlinx.serialization.Serializable
 
 /**
- * Outbox에 저장되는 집계 타입
+ * 이벤트 집계 타입 (Kafka/SinkEvent)
  * - RAW_DATA: 원시 데이터 Ingest 이벤트
  * - SLICE: Slice 계산 완료 이벤트
+ * - VIEW: View Composition 완료 이벤트
  * - CHANGESET: ChangeSet 생성 이벤트
  */
 @Serializable
 enum class AggregateType {
     RAW_DATA,
     SLICE,
+    VIEW,
     CHANGESET;
 
     fun toDbValue(): String = name.lowercase()

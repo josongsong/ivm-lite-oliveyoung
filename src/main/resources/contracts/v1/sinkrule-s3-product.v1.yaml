@@ -1,0 +1,25 @@
+# RFC product-schema-dx-proposal: S3 Sink
+# PRODUCT_PDP View 수준 slice set 아카이빙
+
+kind: SINK_RULE
+id: sinkrule.s3.product
+version: 1.0.0
+status: ACTIVE
+
+input:
+  type: SLICE
+  sliceTypes: [CORE, PRICE, MEDIA, NOTICE, ASSOCIATED, INVENTORY, CATEGORY, INDEX, ENRICHED]
+  entityTypes: [PRODUCT]
+
+target:
+  type: S3
+  endpoint: ${S3_BUCKET:-ivm-lite-sink-data-test}
+  auth:
+    type: IAM
+
+docId:
+  pattern: "{tenantId}__{entityKey}"
+
+commit:
+  batchSize: 100
+  timeoutMs: 10000

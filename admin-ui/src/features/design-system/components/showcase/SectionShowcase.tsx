@@ -2,8 +2,8 @@
  * Section Showcase - Section 컴포넌트 전시
  */
 import { useState } from 'react'
-import { SectionHeader, CollapsibleSection, GroupPanel, Divider } from '@/shared/ui'
-import { Info, Database, Settings } from 'lucide-react'
+import { CollapsibleSection, Divider, GroupPanel, SectionHeader } from '@/shared/ui'
+import { Database, Info, Settings } from 'lucide-react'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

@@ -2,7 +2,6 @@ package com.oliveyoung.ivmlite.apps.admin.application
 
 import arrow.core.Either
 import arrow.core.left
-import arrow.core.raise.catch
 import arrow.core.raise.either
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
@@ -35,7 +34,7 @@ import org.yaml.snakeyaml.error.MarkedYAMLException
  * - tryOnRealData: 실제 RawData로 드라이런
  */
 class PlaygroundService(
-    private val contractRegistry: ContractRegistryPort?,
+    @Suppress("UnusedPrivateProperty") private val contractRegistry: ContractRegistryPort?,
     private val contractService: AdminContractService?,
     private val rawDataRepo: RawDataRepositoryPort?,
 ) {
@@ -253,8 +252,8 @@ class PlaygroundService(
         val kind = parsed["kind"]?.toString()
         if (kind == null) {
             errors.add(ValidationError(ValidationLevel.L1_SHAPE, 1, 1, "필수 필드 'kind' 누락", null))
-        } else if (kind != "RULESET" && kind != "VIEW_DEFINITION" && kind != "ENTITY_SCHEMA" && kind != "SINK_RULE") {
-            warnings.add("알 수 없는 kind: $kind (RULESET, VIEW_DEFINITION, ENTITY_SCHEMA, SINK_RULE 중 하나여야 함)")
+        } else if (ContractKind.fromWireValue(kind) == null) {
+            warnings.add("알 수 없는 kind: $kind (${ContractKind.values().joinToString(", ") { it.wireValue }} 중 하나여야 함)")
         }
 
         val id = parsed["id"]?.toString()
@@ -263,7 +262,7 @@ class PlaygroundService(
         }
 
         // RuleSet 특화 검증
-        if (kind == "RULESET") {
+        if (kind == ContractKind.RULESET.wireValue) {
             val entityType = parsed["entityType"]?.toString()
             if (entityType == null) {
                 errors.add(ValidationError(ValidationLevel.L1_SHAPE, 1, 1, "RULESET에 필수 필드 'entityType' 누락", null))
@@ -325,14 +324,13 @@ class PlaygroundService(
 
         return RuleSetContract(
             meta = ContractMeta(
-                kind = "RULESET",
+                kind = ContractKind.RULESET,
                 id = id,
                 version = SemVer.parse(version),
                 status = com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus.ACTIVE
             ),
             entityType = entityType,
             impactMap = emptyMap(),
-            joins = emptyList(),
             slices = slices,
             indexes = emptyList()
         )

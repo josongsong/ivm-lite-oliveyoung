@@ -25,13 +25,13 @@ data class ComponentHealth(
     companion object {
         fun healthy(name: String, latencyMs: Long = 0, details: Map<String, Any> = emptyMap()) =
             ComponentHealth(name, HealthStatus.HEALTHY, latencyMs, details = details)
-        
+
         fun degraded(name: String, message: String, latencyMs: Long = 0) =
             ComponentHealth(name, HealthStatus.DEGRADED, latencyMs, message)
-        
+
         fun unhealthy(name: String, error: String) =
             ComponentHealth(name, HealthStatus.UNHEALTHY, error = error)
-        
+
         fun unknown(name: String) =
             ComponentHealth(name, HealthStatus.UNKNOWN)
     }
@@ -67,12 +67,12 @@ data class SystemHealth(
             return SystemHealth(overall, components, version = version, uptime = uptime)
         }
     }
-    
+
     /**
      * Liveness probe용 (단순 alive 체크)
      */
     fun isAlive(): Boolean = overall != HealthStatus.UNHEALTHY
-    
+
     /**
      * Readiness probe용 (서비스 가능 여부)
      */

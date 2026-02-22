@@ -1,11 +1,9 @@
 package com.oliveyoung.ivmlite.sdk.dsl
 
-import com.oliveyoung.ivmlite.sdk.client.Ivm
 import com.oliveyoung.ivmlite.sdk.dsl.entity.*
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.string.shouldContain
 
 /**
  * DSL Validation Error 테스트
@@ -128,42 +126,6 @@ class ValidationErrorTest : StringSpec({
                 tenantId("tenant-1")
                 categoryId("CAT-001")
             }.build()
-        }
-        ex.message shouldBe "name is required"
-    }
-
-    // ==================== DSL Chain Validation Errors ====================
-
-    "Ivm.client().ingest().product - 필수 필드 누락 시 체이닝에서도 에러" {
-        val ex = shouldThrow<IllegalArgumentException> {
-            Ivm.client().ingest().product {
-                // tenantId 누락
-                sku("SKU-001")
-                name("Test")
-                price(1000)
-            }
-        }
-        ex.message shouldBe "tenantId is required"
-    }
-
-    "Ivm.client().ingest().brand - 필수 필드 누락 시 체이닝에서도 에러" {
-        val ex = shouldThrow<IllegalArgumentException> {
-            Ivm.client().ingest().brand {
-                // brandId 누락
-                tenantId("tenant-1")
-                name("Brand")
-            }
-        }
-        ex.message shouldBe "brandId is required"
-    }
-
-    "Ivm.client().ingest().category - 필수 필드 누락 시 체이닝에서도 에러" {
-        val ex = shouldThrow<IllegalArgumentException> {
-            Ivm.client().ingest().category {
-                // name 누락
-                tenantId("tenant-1")
-                categoryId("CAT-001")
-            }
         }
         ex.message shouldBe "name is required"
     }

@@ -1,8 +1,8 @@
 // Dashboard types
 export type {
   DashboardResponse,
-  OutboxStats,
-  OutboxDetail,
+  SinkEventStats,
+  SinkEventDetail,
   WorkerStatus,
   DatabaseStats,
 } from './dashboard'
@@ -24,7 +24,7 @@ export type {
   PipelineStage,
   RawDataStats,
   SliceStats,
-  OutboxPipelineStats,
+  SinkEventPipelineStats,
   RawDataItem,
   SliceItem,
   SliceDetailResponse,

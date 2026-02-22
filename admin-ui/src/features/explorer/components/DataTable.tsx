@@ -8,7 +8,7 @@ import { useState } from 'react'
 import { Database, Eye, Layers } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { explorerApi } from '@/shared/api'
-import { DataTable as DataTableRecipe, type DataTableItem } from '@/shared/ui/recipes'
+import { type DataTableItem, DataTable as DataTableRecipe } from '@/shared/ui/recipes'
 import type { RawDataListEntry } from '@/shared/types'
 
 export type DataTableType = 'rawdata' | 'slices' | 'views'

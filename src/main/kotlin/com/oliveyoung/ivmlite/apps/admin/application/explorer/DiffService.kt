@@ -1,12 +1,9 @@
 package com.oliveyoung.ivmlite.apps.admin.application.explorer
 
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
-import kotlinx.serialization.json.Json
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
 import org.slf4j.LoggerFactory
 
@@ -18,7 +15,7 @@ import org.slf4j.LoggerFactory
 class DiffService(
     private val rawDataRepo: RawDataRepositoryPort
 ) {
-    private val logger = LoggerFactory.getLogger(DiffService::class.java)
+    @Suppress("UnusedPrivateProperty") private val logger = LoggerFactory.getLogger(DiffService::class.java)
 
     /**
      * 두 버전 간 Diff 비교

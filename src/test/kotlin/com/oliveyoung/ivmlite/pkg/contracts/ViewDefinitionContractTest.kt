@@ -1,14 +1,15 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import io.kotest.core.spec.style.StringSpec
+import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.every
@@ -56,7 +57,9 @@ class ViewDefinitionContractTest : StringSpec({
 
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
-        contract.requiredSlices shouldBe listOf(SliceType.CORE)
+        // view-product-pdp.v1.yaml: CORE, PRICE, MEDIA, NOTICE, ASSOCIATED
+        contract.requiredSlices.shouldContain(SliceType.CORE)
+        contract.requiredSlices.size shouldBe 5
     }
 
     "LocalYaml - optionalSlices 파싱 검증" {
@@ -67,7 +70,9 @@ class ViewDefinitionContractTest : StringSpec({
 
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
-        contract.optionalSlices shouldBe emptyList()
+        // view-product-pdp.v1.yaml: INVENTORY, CATEGORY, INDEX, ENRICHED
+        contract.optionalSlices.shouldContain(SliceType.INVENTORY)
+        contract.optionalSlices.size shouldBe 4
     }
 
     "LocalYaml - missingPolicy 파싱 검증 (FAIL_CLOSED)" {
@@ -89,10 +94,11 @@ class ViewDefinitionContractTest : StringSpec({
 
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
-        contract.partialPolicy.allowed shouldBe false
+        // view-product-pdp.v1.yaml: allowed=true, optionalOnly=true
+        contract.partialPolicy.allowed shouldBe true
         contract.partialPolicy.optionalOnly shouldBe true
         contract.partialPolicy.responseMeta.includeMissingSlices shouldBe true
-        contract.partialPolicy.responseMeta.includeUsedContracts shouldBe false
+        contract.partialPolicy.responseMeta.includeUsedContracts shouldBe true
     }
 
     "LocalYaml - fallbackPolicy 파싱 검증 (NONE)" {
@@ -114,7 +120,8 @@ class ViewDefinitionContractTest : StringSpec({
 
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
-        contract.ruleSetRef.id shouldBe "ruleset.core.v1"
+        // view-product-pdp.v1.yaml: ruleset.product.oliveyoung.v1
+        contract.ruleSetRef.id shouldBe "ruleset.product.oliveyoung.v1"
         contract.ruleSetRef.version shouldBe SemVer.parse("1.0.0")
     }
 
@@ -152,7 +159,7 @@ class ViewDefinitionContractTest : StringSpec({
                 "id": "ruleset.core.v1",
                 "version": "1.0.0"
             }
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.product.pdp.v1"),
@@ -193,7 +200,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -222,7 +229,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": true, "optionalOnly": false, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": true}},
             "fallbackPolicy": "DEFAULT_VALUE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -251,7 +258,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": true, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -287,7 +294,7 @@ class ViewDefinitionContractTest : StringSpec({
             },
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -319,7 +326,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "DEFAULT_VALUE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -348,7 +355,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.product.v2", "version": "2.1.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -377,7 +384,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -404,7 +411,7 @@ class ViewDefinitionContractTest : StringSpec({
             "missingPolicy": "FAIL_CLOSED",
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -431,7 +438,7 @@ class ViewDefinitionContractTest : StringSpec({
             "missingPolicy": "FAIL_CLOSED",
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE"
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -496,7 +503,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -524,7 +531,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -552,7 +559,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "UNKNOWN_FALLBACK",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -580,7 +587,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -608,7 +615,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": true, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -638,7 +645,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -668,7 +675,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -698,7 +705,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -726,7 +733,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -754,7 +761,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -782,7 +789,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -810,7 +817,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -842,7 +849,7 @@ class ViewDefinitionContractTest : StringSpec({
             },
             "fallbackPolicy": "DEFAULT_VALUE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -876,7 +883,7 @@ class ViewDefinitionContractTest : StringSpec({
             "partialPolicy": {"allowed": false, "optionalOnly": true, "responseMeta": {"includeMissingSlices": true, "includeUsedContracts": false}},
             "fallbackPolicy": "NONE",
             "ruleSetRef": {"id": "ruleset.v1", "version": "1.0.0"}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("view.v1"),
@@ -898,7 +905,7 @@ class ViewDefinitionContractTest : StringSpec({
     // ==================== 도메인 모델 불변성 테스트 ====================
 
     "ViewDefinitionContract - data class 불변성 검증" {
-        val meta = ContractMeta("VIEW_DEFINITION", "view.v1", SemVer.parse("1.0.0"), ContractStatus.ACTIVE)
+        val meta = ContractMeta(ContractKind.VIEW_DEFINITION, "view.v1", SemVer.parse("1.0.0"), ContractStatus.ACTIVE)
         val contract = ViewDefinitionContract(
             meta = meta,
             requiredSlices = listOf(SliceType.CORE),

@@ -32,9 +32,11 @@ fun Route.pipelineRoutes() {
     /**
      * GET /pipeline/overview
      * 파이프라인 전체 상태 개요
+     * Query: tenantId (optional, default: "default")
      */
     get("/pipeline/overview") {
-        when (val result = pipelineService.getOverview()) {
+        val tenantId = call.request.queryParameters["tenantId"] ?: "default"
+        when (val result = pipelineService.getOverview(tenantId)) {
             is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
@@ -47,9 +49,11 @@ fun Route.pipelineRoutes() {
     /**
      * GET /pipeline/rawdata
      * RawData 상세 통계
+     * Query: tenantId (optional, default: "default")
      */
     get("/pipeline/rawdata") {
-        when (val result = pipelineService.getRawDataStats()) {
+        val tenantId = call.request.queryParameters["tenantId"] ?: "default"
+        when (val result = pipelineService.getRawDataStats(tenantId)) {
             is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
@@ -62,9 +66,11 @@ fun Route.pipelineRoutes() {
     /**
      * GET /pipeline/slices
      * Slice 상세 통계
+     * Query: tenantId (optional, default: "default")
      */
     get("/pipeline/slices") {
-        when (val result = pipelineService.getSliceStats()) {
+        val tenantId = call.request.queryParameters["tenantId"] ?: "default"
+        when (val result = pipelineService.getSliceStats(tenantId)) {
             is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
@@ -77,12 +83,14 @@ fun Route.pipelineRoutes() {
     /**
      * GET /pipeline/flow/{entityKey}
      * 특정 엔티티의 파이프라인 흐름 추적
+     * Query: tenantId (optional, default: "default")
      */
     get("/pipeline/flow/{entityKey}") {
         val entityKey = call.parameters["entityKey"]
             ?: throw IllegalArgumentException("entityKey is required")
+        val tenantId = call.request.queryParameters["tenantId"] ?: "default"
 
-        when (val result = pipelineService.getEntityFlow(entityKey)) {
+        when (val result = pipelineService.getEntityFlow(entityKey, tenantId)) {
             is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
@@ -115,9 +123,11 @@ fun Route.pipelineRoutes() {
     /**
      * GET /pipeline/indexes
      * Inverted Index 통계
+     * Query: tenantId (optional, default: "default")
      */
     get("/pipeline/indexes") {
-        when (val result = pipelineService.getInvertedIndexStats()) {
+        val tenantId = call.request.queryParameters["tenantId"] ?: "default"
+        when (val result = pipelineService.getInvertedIndexStats(tenantId)) {
             is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
@@ -135,7 +145,7 @@ data class PipelineOverviewResponse(
     val stages: List<PipelineStageResponse>,
     val rawData: RawDataStatsResponse,
     val slices: SliceStatsResponse,
-    val outbox: OutboxPipelineStatsResponse,
+    val sinkEvent: SinkEventPipelineStatsResponse,
     val timestamp: String
 )
 
@@ -167,7 +177,7 @@ data class SliceTypeStatsResponse(
 )
 
 @Serializable
-data class OutboxPipelineStatsResponse(
+data class SinkEventPipelineStatsResponse(
     val pending: Long,
     val processing: Long,
     val shipped: Long,
@@ -211,11 +221,11 @@ data class EntityFlowResponse(
     val entityKey: String,
     val rawData: List<RawDataItemResponse>,
     val slices: List<SliceItemResponse>,
-    val outbox: List<OutboxFlowItemResponse>
+    val sinkEvent: List<SinkEventFlowItemResponse>
 )
 
 @Serializable
-data class OutboxFlowItemResponse(
+data class SinkEventFlowItemResponse(
     val id: String,
     val aggregateType: String,
     val eventType: String,
@@ -254,7 +264,7 @@ private fun PipelineOverview.toResponse() = PipelineOverviewResponse(
     stages = stages.map { PipelineStageResponse(it.name, it.description, it.count, it.status) },
     rawData = rawData.toResponse(),
     slices = slices.toResponse(),
-    outbox = OutboxPipelineStatsResponse(outbox.pending, outbox.processing, outbox.shipped, outbox.failed),
+    sinkEvent = SinkEventPipelineStatsResponse(sinkEvent.pending, sinkEvent.processing, sinkEvent.shipped, sinkEvent.failed),
     timestamp = timestamp.toString()
 )
 
@@ -301,10 +311,10 @@ private fun EntityFlow.toResponse() = EntityFlowResponse(
     entityKey = entityKey,
     rawData = rawData.map { it.toResponse() },
     slices = slices.map { it.toResponse() },
-    outbox = outbox.map { it.toResponse() }
+    sinkEvent = sinkEvent.map { it.toResponse() }
 )
 
-private fun OutboxFlowItem.toResponse() = OutboxFlowItemResponse(
+private fun SinkEventFlowItem.toResponse() = SinkEventFlowItemResponse(
     id = id,
     aggregateType = aggregateType,
     eventType = eventType,

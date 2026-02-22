@@ -1,7 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.slices.adapters
 
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.InvariantViolation
-import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable

@@ -1,0 +1,25 @@
+# RFC product-schema-dx-proposal: Personalize Sink
+# PRODUCT_STOREFRONT View 수준 slice set (AWS 추천 엔진)
+
+kind: SINK_RULE
+id: sinkrule.personalize.product
+version: 1.0.0
+status: ACTIVE
+
+input:
+  type: SLICE
+  sliceTypes: [CORE, PRICE, MEDIA, CATEGORY, INDEX, ENRICHED]
+  entityTypes: [PRODUCT]
+
+target:
+  type: PERSONALIZE
+  datasetGroup: ${PERSONALIZE_DATASET_GROUP:-}
+  auth:
+    type: IAM
+
+docId:
+  pattern: "{tenantId}__{entityKey}"
+
+commit:
+  batchSize: 100
+  timeoutMs: 10000

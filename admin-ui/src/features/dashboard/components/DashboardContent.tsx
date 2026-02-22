@@ -17,7 +17,8 @@ interface DashboardContentProps {
 }
 
 export function DashboardContent({ dashboard, pipeline }: DashboardContentProps) {
-  const outbox = dashboard.outbox?.total ?? { pending: 0, processing: 0, failed: 0, processed: 0 }
+  const sinkEventTotal = dashboard.sinkEvent?.total ?? { pending: 0, processing: 0, failed: 0, completed: 0 }
+  const outbox = { ...sinkEventTotal, processed: sinkEventTotal.completed }
   const worker = dashboard.worker ?? { running: false, processed: 0, failed: 0, polls: 0 }
   const rawDataCount = dashboard.database?.rawDataCount ?? 0
   const sliceCount = pipeline?.slices?.total ?? 0

@@ -2,7 +2,7 @@
  * ActionCard Showcase - ActionCard 컴포넌트 전시
  */
 import { ActionCard } from '@/shared/ui'
-import { Database, Layers, Eye, Rocket } from 'lucide-react'
+import { Database, Eye, Layers, Rocket } from 'lucide-react'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

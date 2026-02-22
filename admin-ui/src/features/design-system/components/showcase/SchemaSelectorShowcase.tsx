@@ -53,7 +53,7 @@ export function SchemaSelectorShowcase() {
               onChange={setSelectedSchema}
               allowManualInput
               onManualInput={(value) => {
-                console.log('Manual input:', value)
+                console.warn('Manual input:', value)
               }}
               placeholder="스키마 선택 또는 입력..."
             />

@@ -1,6 +1,5 @@
 package com.oliveyoung.ivmlite.sdk.model
 
-import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
@@ -10,7 +9,7 @@ import kotlinx.serialization.json.long
 
 /**
  * View 조회 결과
- * 
+ *
  * @example 성공 케이스
  * ```kotlin
  * val result = Ivm.query("product.pdp").key("SKU-001").get()
@@ -20,7 +19,7 @@ import kotlinx.serialization.json.long
  *     println(result.string("name")) // 특정 필드
  * }
  * ```
- * 
+ *
  * @example 에러 케이스
  * ```kotlin
  * val result = Ivm.query("product.pdp").key("INVALID").get()
@@ -33,28 +32,28 @@ import kotlinx.serialization.json.long
 data class ViewResult(
     /** 성공 여부 */
     val success: Boolean,
-    
+
     /** View ID */
     val viewId: String,
-    
+
     /** 테넌트 ID */
     val tenantId: String,
-    
+
     /** 엔티티 키 */
     val entityKey: String,
-    
+
     /** 버전 */
     val version: Long,
-    
+
     /** 조회된 데이터 (성공 시) */
     val data: JsonObject = buildJsonObject { },
-    
+
     /** 에러 메시지 (실패 시) */
     val error: String? = null,
-    
+
     /** 에러 코드 (실패 시) */
     val errorCode: String? = null,
-    
+
     /** 메타데이터 (옵션) */
     val meta: Meta? = null
 ) {
@@ -64,19 +63,19 @@ data class ViewResult(
     data class Meta(
         /** 사용된 Slice 목록 */
         val slicesUsed: List<String> = emptyList(),
-        
+
         /** 누락된 Slice 목록 (partial 응답 시) */
         val missingSlices: List<String> = emptyList(),
-        
+
         /** 사용된 Contract 버전 */
         val contractsUsed: List<String> = emptyList(),
-        
+
         /** 쿼리 소요 시간 (ms) */
         val queryTimeMs: Long = 0,
-        
+
         /** 캐시 히트 여부 */
         val fromCache: Boolean = false,
-        
+
         /** 적용된 일관성 레벨 */
         val consistency: String = "Eventual"
     )
@@ -85,7 +84,7 @@ data class ViewResult(
 
     /**
      * Slice 데이터 접근 (by slice type)
-     * 
+     *
      * @example
      * ```kotlin
      * val core = result["core"]      // CORE slice
@@ -100,7 +99,7 @@ data class ViewResult(
 
     /**
      * 특정 필드 문자열 값 조회
-     * 
+     *
      * @example
      * ```kotlin
      * val name = result.string("name")
@@ -172,6 +171,21 @@ data class ViewResult(
             )
         }
         return transform(data)
+    }
+
+    /**
+     * 성공 시 data 반환, 실패 시 예외 (RFC-021)
+     */
+    fun getOrThrow(): JsonObject {
+        if (!success) {
+            throw ViewQueryException(
+                viewId = viewId,
+                entityKey = entityKey,
+                error = error ?: "Unknown error",
+                errorCode = errorCode
+            )
+        }
+        return data
     }
 
     /**

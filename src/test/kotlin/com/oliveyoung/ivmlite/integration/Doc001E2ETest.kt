@@ -7,11 +7,9 @@ import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
-import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
@@ -27,7 +25,6 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
-import kotlinx.coroutines.runBlocking
 
 /**
  * DOC-001 E2E Test
@@ -45,7 +42,6 @@ class Doc001E2ETest : StringSpec(init@{
     // ==================== 실제 컴포넌트 Setup ====================
 
     val rawDataRepo = InMemoryRawDataRepository()
-    val outboxRepo = InMemoryOutboxRepository()
     val sliceRepo = InMemorySliceRepository()
     val invertedIndexRepo = InMemoryInvertedIndexRepository()
 
@@ -62,7 +58,7 @@ class Doc001E2ETest : StringSpec(init@{
     val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
 
     // 실제 Workflow 구성
-    val ingestWorkflow = IngestWorkflow(rawDataRepo, outboxRepo)
+    val ingestWorkflow = IngestWorkflow(rawDataRepo)
     val slicingWorkflow = SlicingWorkflow(
         rawDataRepo,
         sliceRepo,
@@ -76,7 +72,6 @@ class Doc001E2ETest : StringSpec(init@{
 
     afterEach {
         rawDataRepo.clear()
-        outboxRepo.clear()
         sliceRepo.clear()
         invertedIndexRepo.clear()
     }

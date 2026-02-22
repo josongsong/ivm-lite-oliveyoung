@@ -14,7 +14,7 @@ import java.time.Instant
  * RFC-IMPL-011 Wave 5-K, Wave 6
  */
 class DeployStatusApi internal constructor(
-    private val config: IvmClientConfig,
+    @Suppress("UnusedPrivateProperty") private val config: IvmClientConfig,
     private val repository: DeployJobRepositoryPort? = null
 ) {
     /**
@@ -46,7 +46,7 @@ class DeployStatusApi internal constructor(
                 }
             }
         }
-        
+
         // 기본값 (Repository 없거나 조회 실패)
         return DeployJobStatus(
             jobId = jobId,
@@ -55,7 +55,7 @@ class DeployStatusApi internal constructor(
             updatedAt = Instant.now()
         )
     }
-    
+
     private fun parseState(state: String): DeployState {
         return try {
             DeployState.valueOf(state)

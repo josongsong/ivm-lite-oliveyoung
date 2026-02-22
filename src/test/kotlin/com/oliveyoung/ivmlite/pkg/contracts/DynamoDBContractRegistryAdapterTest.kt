@@ -1,10 +1,10 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
@@ -46,7 +46,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
             "identity": {"entityKeyFormat": "{ENTITY_TYPE}#{tenantId}#{entityId}"},
             "payload": {"externalizationPolicy": {"thresholdBytes": 50000}},
             "fanout": {"enabled": true}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("changeset.v1"),
@@ -80,7 +80,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
                     "contractRef": {"id": "inverted-index.v1", "version": "1.0.0"}
                 }
             }
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("join-spec.v1"),
@@ -101,8 +101,6 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
         contract.meta.id shouldBe "join-spec.v1"
         contract.maxJoinDepth shouldBe 3
         contract.maxFanout shouldBe 5000
-        // invertedIndexRef는 deprecated이므로 nullable 체크
-        contract.invertedIndexRef?.id shouldBe "inverted-index.v1"
     }
 
     "loadInvertedIndexContract - 성공" {
@@ -114,7 +112,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
                 "separator": "#"
             },
             "guards": {"maxTargetsPerRef": 100000}
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("inverted-index.v1"),
@@ -137,7 +135,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
         contract.skPattern shouldBe "TARGET#{target_type}#{target_id}"
         contract.padWidth shouldBe 16
         contract.separator shouldBe "#"
-        contract.maxTargetsPerRef shouldBe 100000
+        contract.maxTargetsPerRef shouldBe 100_000
     }
 
     "loadChangeSetContract - 존재하지 않는 계약 → NotFoundError" {
@@ -230,7 +228,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val contract = (result as Result.Ok).value
         contract.entityKeyFormat shouldBe "{ENTITY_TYPE}#{tenantId}#{entityId}"
-        contract.externalizeThresholdBytes shouldBe 100000
+        contract.externalizeThresholdBytes shouldBe 100_000
         contract.fanoutEnabled shouldBe false
     }
 
@@ -274,7 +272,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
         (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
     }
 
-    "loadJoinSpecContract - fanout.invertedIndex 누락 → ContractError" {
+    "loadJoinSpecContract - fanout.invertedIndex 누락 → 기본값으로 Ok" {
         val dataJson = """{"constraints": {"maxJoinDepth": 3}}"""
 
         val responseItem = mapOf(
@@ -291,19 +289,20 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadJoinSpecContract(ref)
 
-        result.shouldBeInstanceOf<Result.Err>()
-        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
+        contract.maxJoinDepth shouldBe 3
+        contract.maxFanout shouldBe 10_000
     }
 
-    "loadJoinSpecContract - contractRef.id 누락 → ContractError" {
+    "loadJoinSpecContract - contractRef 누락 → maxFanout만 파싱하여 Ok" {
         val dataJson = """{
             "fanout": {
                 "invertedIndex": {
-                    "maxFanout": 1000,
-                    "contractRef": {"version": "1.0.0"}
+                    "maxFanout": 1000
                 }
             }
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("join-spec.v1"),
@@ -319,8 +318,9 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
 
         val result = adapter.loadJoinSpecContract(ref)
 
-        result.shouldBeInstanceOf<Result.Err>()
-        (result as Result.Err).error.shouldBeInstanceOf<DomainError.ContractError>()
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val contract = (result as Result.Ok).value
+        contract.maxFanout shouldBe 1000
     }
 
     "loadInvertedIndexContract - pkPattern 누락 → ContractError" {
@@ -328,7 +328,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
             "keySpec": {
                 "skPattern": "TARGET#{target_type}#{target_id}"
             }
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("inverted-index.v1"),
@@ -353,7 +353,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
             "keySpec": {
                 "pkPattern": "INV#{ref_type}#{ref_value}"
             }
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("inverted-index.v1"),
@@ -403,7 +403,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
                     "contractRef": {"id": "inv.v1", "version": "1.0.0"}
                 }
             }
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("join-spec.v1"),
@@ -431,7 +431,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
                 "pkPattern": "INV#{ref_type}#{ref_value}",
                 "skPattern": "TARGET#{target_type}#{target_id}"
             }
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("inverted-index.v1"),
@@ -452,7 +452,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
         // 기본값 검증
         contract.padWidth shouldBe 12
         contract.separator shouldBe "#"
-        contract.maxTargetsPerRef shouldBe 500000
+        contract.maxTargetsPerRef shouldBe 500_000
     }
 
     // ==================== Phase C-2: checksum 무결성 검증 ====================
@@ -578,7 +578,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
                     "contractRef": {"id": "inverted-index.v1", "version": "1.0.0"}
                 }
             }
-        }"""
+        }""".trimIndent()
         val checksum = Hashing.sha256Tagged(dataJson)
 
         val responseItem = mapOf(
@@ -605,7 +605,7 @@ class DynamoDBContractRegistryAdapterTest : StringSpec({
                 "pkPattern": "INV#{ref_type}#{ref_value}",
                 "skPattern": "TARGET#{target_type}#{target_id}"
             }
-        }"""
+        }""".trimIndent()
         val wrongChecksum = "sha256:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 
         val responseItem = mapOf(

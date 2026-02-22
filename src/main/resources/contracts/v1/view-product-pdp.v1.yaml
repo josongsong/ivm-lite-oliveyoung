@@ -1,0 +1,36 @@
+kind: VIEW_DEFINITION
+id: view.product.pdp.v1
+version: 1.0.0
+status: ACTIVE
+
+viewName: PRODUCT_PDP
+entityType: PRODUCT
+description: "PDP 상세 - SKU 상세정보, 성분, 사용법, 연관상품 포함"
+
+requiredSlices:
+  - CORE
+  - PRICE
+  - MEDIA
+  - NOTICE
+  - ASSOCIATED
+
+optionalSlices:
+  - INVENTORY
+  - CATEGORY
+  - INDEX
+  - ENRICHED
+
+missingPolicy: FAIL_CLOSED
+
+partialPolicy:
+  allowed: true
+  optionalOnly: true
+  responseMeta:
+    includeMissingSlices: true
+    includeUsedContracts: true
+
+fallbackPolicy: NONE
+
+ruleSetRef:
+  id: ruleset.product.oliveyoung.v1
+  version: 1.0.0

@@ -32,7 +32,7 @@ data class DeployPlanRecord(
 ) {
     fun toDeployPlan(): DeployPlan = DeployPlan(
         deployId = deployId,
-        graph = DependencyGraph(graph.map { (k, v) -> 
+        graph = DependencyGraph(graph.map { (k, v) ->
             k to GraphNode(id = k, dependencies = v, provides = emptyList())
         }.toMap()),
         activatedRules = activatedRules,
@@ -55,31 +55,31 @@ data class StepRecord(
  * InMemory DeployPlan Repository (테스트/개발용)
  */
 class InMemoryDeployPlanRepository : DeployPlanRepositoryPort, HealthCheckable {
-    
+
     override val healthName: String = "deploy-plan-repo"
-    
+
     private val storage = ConcurrentHashMap<String, DeployPlanRecord>()
-    
+
     override suspend fun save(plan: DeployPlanRecord): Result<DeployPlanRecord> {
         storage[plan.deployId] = plan
         return Result.Ok(plan)
     }
-    
+
     override suspend fun get(deployId: String): Result<DeployPlanRecord?> {
         return Result.Ok(storage[deployId])
     }
-    
+
     override suspend fun getByEntityKey(entityKey: String): Result<List<DeployPlanRecord>> {
         val plans = storage.values.filter { it.entityKey == entityKey }
             .sortedByDescending { it.createdAt }
         return Result.Ok(plans)
     }
-    
+
     override suspend fun healthCheck(): Boolean = true
-    
+
     // ===== 테스트 헬퍼 =====
-    
+
     fun getAll(): List<DeployPlanRecord> = storage.values.toList()
-    
+
     fun clear() = storage.clear()
 }

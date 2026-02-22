@@ -1,11 +1,11 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.collections.shouldContain
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
@@ -22,7 +22,7 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
 
     "listContractRefs - VIEW_DEFINITION kind로 조회하면 ViewDefinition 계약들 반환" {
         runBlocking {
-            val result = adapter.listContractRefs("VIEW_DEFINITION", null)
+            val result = adapter.listContractRefs(ContractKind.VIEW_DEFINITION, null)
 
             result.shouldBeInstanceOf<Result.Ok<*>>()
             val refs = (result as Result.Ok).value
@@ -36,7 +36,7 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
 
     "listContractRefs - RULESET kind로 조회하면 RuleSet 계약들 반환" {
         runBlocking {
-            val result = adapter.listContractRefs("RULESET", null)
+            val result = adapter.listContractRefs(ContractKind.RULESET, null)
 
             result.shouldBeInstanceOf<Result.Ok<*>>()
             val refs = (result as Result.Ok).value
@@ -46,7 +46,7 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
 
     "listContractRefs - ACTIVE status 필터 적용" {
         runBlocking {
-            val result = adapter.listContractRefs("VIEW_DEFINITION", ContractStatus.ACTIVE)
+            val result = adapter.listContractRefs(ContractKind.VIEW_DEFINITION, ContractStatus.ACTIVE)
 
             result.shouldBeInstanceOf<Result.Ok<*>>()
             val refs = (result as Result.Ok).value
@@ -56,7 +56,7 @@ class LocalYamlContractRegistryAdapterTest : StringSpec({
 
     "listContractRefs - 존재하지 않는 kind는 빈 목록 반환" {
         runBlocking {
-            val result = adapter.listContractRefs("NONEXISTENT_KIND", null)
+            val result = adapter.listContractRefs(ContractKind.CHANGESET, null)
 
             result.shouldBeInstanceOf<Result.Ok<*>>()
             val refs = (result as Result.Ok).value

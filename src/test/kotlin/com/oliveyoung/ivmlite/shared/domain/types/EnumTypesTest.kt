@@ -4,7 +4,6 @@ import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.types.shouldBeInstanceOf
 
 /**
  * Enum Types SOTA 패턴 테스트
@@ -80,37 +79,6 @@ class EnumTypesTest : StringSpec({
         AggregateType.fromDbValueOrNull("invalid") shouldBe null
     }
 
-    // ==================== OutboxStatus ====================
-
-    "OutboxStatus.toDbValue - lowercase 변환" {
-        OutboxStatus.PENDING.toDbValue() shouldBe "pending"
-        OutboxStatus.PROCESSED.toDbValue() shouldBe "processed"
-        OutboxStatus.FAILED.toDbValue() shouldBe "failed"
-    }
-
-    "OutboxStatus.fromDbValue - 정상 변환 (case insensitive)" {
-        OutboxStatus.fromDbValue("pending") shouldBe OutboxStatus.PENDING
-        OutboxStatus.fromDbValue("PENDING") shouldBe OutboxStatus.PENDING
-        OutboxStatus.fromDbValue("processed") shouldBe OutboxStatus.PROCESSED
-        OutboxStatus.fromDbValue("failed") shouldBe OutboxStatus.FAILED
-    }
-
-    "OutboxStatus.fromDbValue - 잘못된 값 → ValidationError" {
-        val ex = shouldThrow<DomainError.ValidationError> {
-            OutboxStatus.fromDbValue("unknown")
-        }
-        ex.field shouldBe "outboxStatus"
-        ex.msg shouldBe "Unknown OutboxStatus: unknown"
-    }
-
-    "OutboxStatus.fromDbValueOrNull - 정상 변환" {
-        OutboxStatus.fromDbValueOrNull("pending") shouldBe OutboxStatus.PENDING
-    }
-
-    "OutboxStatus.fromDbValueOrNull - 잘못된 값 → null" {
-        OutboxStatus.fromDbValueOrNull("invalid") shouldBe null
-    }
-
     // ==================== Roundtrip 테스트 ====================
 
     "SliceType - toDbValue → fromDbValue roundtrip" {
@@ -125,14 +93,6 @@ class EnumTypesTest : StringSpec({
         AggregateType.entries.forEach { original ->
             val dbValue = original.toDbValue()
             val restored = AggregateType.fromDbValue(dbValue)
-            restored shouldBe original
-        }
-    }
-
-    "OutboxStatus - toDbValue → fromDbValue roundtrip" {
-        OutboxStatus.entries.forEach { original ->
-            val dbValue = original.toDbValue()
-            val restored = OutboxStatus.fromDbValue(dbValue)
             restored shouldBe original
         }
     }

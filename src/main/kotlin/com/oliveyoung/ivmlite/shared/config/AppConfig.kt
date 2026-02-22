@@ -6,7 +6,7 @@ import com.sksamuel.hoplite.sources.SystemPropertiesPropertySource
 
 /**
  * Application Configuration (RFC-IMPL-009)
- * 
+ *
  * Hoplite 기반 타입 안전한 설정.
  * 우선순위: Env > YAML > defaults
  */
@@ -44,20 +44,28 @@ data class DynamoDbConfig(
     val accessKeyId: String? = null,
     /** AWS Secret Access Key (환경 변수 AWS_SECRET_ACCESS_KEY 우선) */
     val secretAccessKey: String? = null,
-)
+) {
+    /** DynamoDB 데이터 테이블명 (환경 suffix 자동 추출) */
+    val dataTableName: String get() =
+        if (tableName.isNotBlank()) "ivm-lite-data-${tableName.substringAfterLast("-")}" else "ivm-lite-data"
+
+    /** DynamoDB SinkEvent 테이블명 */
+    val sinkEventsTableName: String get() =
+        if (tableName.isNotBlank()) "ivm-sink-events-${tableName.substringAfterLast("-")}" else "ivm-sink-events"
+}
 
 data class KafkaConfig(
     val bootstrapServers: String = "localhost:9094",
     val consumerGroup: String = "ivm-lite",
     /**
      * Kafka 토픽 prefix (RFC-IMPL-008)
-     * 
-     * Outbox 이벤트가 발행되는 토픽명 패턴: {topicPrefix}.events.{aggregatetype}
-     * 
+     *
+     * 이벤트 토픽명 패턴: {topicPrefix}.events.{aggregatetype}
+     *
      * 예시:
      * - topicPrefix = "ivm" → 토픽: ivm.events.raw_data, ivm.events.slice
      * - topicPrefix = "oliveyoung" → 토픽: oliveyoung.events.raw_data
-     * 
+     *
      * 기본값: "ivm"
      */
     val topicPrefix: String = "ivm",
@@ -94,9 +102,9 @@ data class CacheConfig(
 /**
  * Worker Configuration (RFC-IMPL Phase B-2)
  *
- * Outbox Polling Worker 설정.
- * Exponential backoff with jitter 지원.
- * 
+ * Worker 설정 (현재 미사용 - DynamoDB Streams로 대체됨).
+ * Kafka Consumer 등에서 활용 가능.
+ *
  * Kafka Consumer와 PostgreSQL Polling 모두에서 동일한 토픽 패턴 지원.
  */
 data class WorkerConfig(
@@ -118,25 +126,25 @@ data class WorkerConfig(
     val shutdownTimeoutMs: Long = 10_000,
     /**
      * 처리할 AggregateType 목록 (RFC-IMPL-013)
-     * 
+     *
      * null이면 모든 타입 처리 (기존 동작)
      * 특정 타입만 지정하면 해당 타입만 조회 → Worker 분리 가능
-     * 
+     *
      * 예시:
      * - [RAW_DATA] → Slicing 전용 Worker
      * - [SLICE] → Ship 전용 Worker
-     * 
+     *
      * 토픽으로 설정하려면 topics 사용 권장
      */
     val aggregateTypes: List<String>? = null,
     /**
      * 처리할 토픽 목록 (Kafka/Polling 통합)
-     * 
+     *
      * null이면 모든 토픽 처리 (기존 동작)
      * 특정 토픽만 지정하면 해당 토픽만 조회
-     * 
+     *
      * 토픽명 패턴: {topicPrefix}.events.{suffix}
-     * 
+     *
      * 예시:
      * - ["ivm.events.raw_data"] → Slicing 전용 Worker
      * - ["ivm.events.slice"] → Ship 전용 Worker
@@ -146,7 +154,7 @@ data class WorkerConfig(
 ) {
     /**
      * 실제 처리할 AggregateType 목록
-     * 
+     *
      * topics가 설정되면 topics에서 추론, 없으면 aggregateTypes 사용
      */
     fun resolvedAggregateTypes(): List<com.oliveyoung.ivmlite.shared.domain.types.AggregateType>? {
@@ -157,8 +165,8 @@ data class WorkerConfig(
             }.ifEmpty { null }
         }
         // 기존 aggregateTypes 사용
-        return aggregateTypes?.mapNotNull { 
-            try { com.oliveyoung.ivmlite.shared.domain.types.AggregateType.valueOf(it) } 
+        return aggregateTypes?.mapNotNull {
+            try { com.oliveyoung.ivmlite.shared.domain.types.AggregateType.valueOf(it) }
             catch (e: Exception) { null }
         }?.ifEmpty { null }
     }
@@ -170,13 +178,13 @@ data class WorkerConfig(
 data class AdminConfig(
     /** Slack Webhook URL (알림 발송용) */
     val slackWebhookUrl: String? = null,
-    
+
     /** 알림 평가 주기 (ms) */
     val alertIntervalMs: Long = 10_000,
-    
+
     /** Backfill 최대 동시 실행 수 */
     val maxConcurrentBackfills: Int = 3,
-    
+
     /** Health Check 타임아웃 (ms) */
     val healthCheckTimeoutMs: Long = 5000,
 )
@@ -211,7 +219,7 @@ object ConfigLoader {
 
         return config
     }
-    
+
     /**
      * Load config for testing (with overrides)
      */

@@ -65,7 +65,7 @@ class TraceService(
                 }
 
                 val traceSummaries = response.traceSummaries()
-                
+
                 TraceListResult(
                     traces = traceSummaries.map { summary ->
                         TraceSummary(
@@ -82,8 +82,8 @@ class TraceService(
                                     status = http.httpStatus()
                                 )
                             },
-                            annotations = summary.annotations()?.orEmpty()?.mapValues { 
-                                it.value.firstOrNull()?.toString() ?: "" 
+                            annotations = summary.annotations()?.orEmpty()?.mapValues {
+                                it.value.firstOrNull()?.toString() ?: ""
                             } ?: emptyMap(),
                             serviceIds = summary.serviceIds()?.orEmpty()?.map { it.name() } ?: emptyList()
                         )
@@ -154,7 +154,7 @@ class TraceService(
 
     /**
      * X-Ray 세그먼트 JSON 문서 파싱
-     * 
+     *
      * X-Ray 세그먼트 구조:
      * - id: 세그먼트 ID
      * - name: 서비스/세그먼트 이름
@@ -173,17 +173,17 @@ class TraceService(
         parentId: String?
     ): List<SpanDetail> {
         val spans = mutableListOf<SpanDetail>()
-        
+
         try {
             val json = Json { ignoreUnknownKeys = true }
             val doc = json.parseToJsonElement(documentJson).jsonObject
-            
+
             val spanId = doc["id"]?.jsonPrimitive?.content ?: return emptyList()
             val name = doc["name"]?.jsonPrimitive?.content ?: "unknown"
             val startTime = doc["start_time"]?.jsonPrimitive?.double ?: 0.0
             val endTime = doc["end_time"]?.jsonPrimitive?.double ?: startTime
             val duration = (endTime - startTime) * 1000 // seconds to ms
-            
+
             // HTTP 정보 추출
             val httpObj = doc["http"]?.jsonObject
             val httpInfo = httpObj?.let { http ->
@@ -195,7 +195,7 @@ class TraceService(
                     status = response?.get("status")?.jsonPrimitive?.intOrNull
                 )
             }
-            
+
             // 어노테이션 추출
             val annotationsObj = doc["annotations"]?.jsonObject
             val annotations = annotationsObj?.mapValues { (_, value) ->
@@ -204,7 +204,7 @@ class TraceService(
                     else -> value.toString()
                 }
             } ?: emptyMap()
-            
+
             // 메타데이터 추출 (첫 번째 레벨만)
             val metadataObj = doc["metadata"]?.jsonObject
             val metadata = mutableMapOf<String, String>()
@@ -220,14 +220,14 @@ class TraceService(
                     else -> metadata[key] = value.toString()
                 }
             }
-            
+
             // 에러 정보
             val hasError = doc["error"]?.jsonPrimitive?.booleanOrNull == true
             val hasFault = doc["fault"]?.jsonPrimitive?.booleanOrNull == true
             val cause = doc["cause"]?.jsonObject
             val errorMessage = cause?.get("message")?.jsonPrimitive?.content
                 ?: cause?.get("exceptions")?.jsonArray?.firstOrNull()?.jsonObject?.get("message")?.jsonPrimitive?.content
-            
+
             // 세그먼트 타입 결정
             val origin = doc["origin"]?.jsonPrimitive?.content
             val namespace = doc["namespace"]?.jsonPrimitive?.content
@@ -238,7 +238,7 @@ class TraceService(
                 httpInfo != null -> "HTTP"
                 else -> "Segment"
             }
-            
+
             // 현재 스팬 추가
             spans.add(SpanDetail(
                 spanId = spanId,
@@ -255,14 +255,14 @@ class TraceService(
                 hasError = hasError || hasFault,
                 errorMessage = errorMessage
             ))
-            
+
             // 하위 세그먼트 재귀 파싱
             val subsegments = doc["subsegments"]?.jsonArray
             subsegments?.forEach { subsegment ->
                 val subsegmentSpans = parseSubsegment(subsegment.jsonObject, spanId)
                 spans.addAll(subsegmentSpans)
             }
-            
+
         } catch (e: Exception) {
             // JSON 파싱 실패 시 기본 스팬 반환
             spans.add(SpanDetail(
@@ -278,10 +278,10 @@ class TraceService(
                 errorMessage = "Failed to parse segment: ${e.message}"
             ))
         }
-        
+
         return spans
     }
-    
+
     /**
      * 하위 세그먼트 파싱 (재귀)
      */
@@ -290,13 +290,13 @@ class TraceService(
         parentId: String
     ): List<SpanDetail> {
         val spans = mutableListOf<SpanDetail>()
-        
+
         val spanId = subsegmentObj["id"]?.jsonPrimitive?.content ?: "sub-${System.nanoTime()}"
         val name = subsegmentObj["name"]?.jsonPrimitive?.content ?: "unknown"
         val startTime = subsegmentObj["start_time"]?.jsonPrimitive?.double ?: 0.0
         val endTime = subsegmentObj["end_time"]?.jsonPrimitive?.double ?: startTime
         val duration = (endTime - startTime) * 1000
-        
+
         // HTTP 정보
         val httpObj = subsegmentObj["http"]?.jsonObject
         val httpInfo = httpObj?.let { http ->
@@ -308,7 +308,7 @@ class TraceService(
                 status = response?.get("status")?.jsonPrimitive?.intOrNull
             )
         }
-        
+
         // 어노테이션
         val annotationsObj = subsegmentObj["annotations"]?.jsonObject
         val annotations = annotationsObj?.mapValues { (_, value) ->
@@ -317,7 +317,7 @@ class TraceService(
                 else -> value.toString()
             }
         } ?: emptyMap()
-        
+
         // SQL 정보 (있으면 메타데이터에 추가)
         val sqlObj = subsegmentObj["sql"]?.jsonObject
         val metadata = mutableMapOf<String, String>()
@@ -326,14 +326,14 @@ class TraceService(
             sql["sanitized_query"]?.jsonPrimitive?.content?.let { metadata["sql.query"] = it }
             sql["database_type"]?.jsonPrimitive?.content?.let { metadata["sql.database_type"] = it }
         }
-        
+
         // 에러 정보
         val hasError = subsegmentObj["error"]?.jsonPrimitive?.booleanOrNull == true
         val hasFault = subsegmentObj["fault"]?.jsonPrimitive?.booleanOrNull == true
         val cause = subsegmentObj["cause"]?.jsonObject
         val errorMessage = cause?.get("message")?.jsonPrimitive?.content
             ?: cause?.get("exceptions")?.jsonArray?.firstOrNull()?.jsonObject?.get("message")?.jsonPrimitive?.content
-        
+
         // 네임스페이스 기반 타입 결정
         val namespace = subsegmentObj["namespace"]?.jsonPrimitive?.content
         val type = when (namespace) {
@@ -341,7 +341,7 @@ class TraceService(
             "remote" -> "Remote"
             else -> if (sqlObj != null) "Database" else if (httpInfo != null) "HTTP" else "Subsegment"
         }
-        
+
         spans.add(SpanDetail(
             spanId = spanId,
             parentId = parentId,
@@ -357,12 +357,12 @@ class TraceService(
             hasError = hasError || hasFault,
             errorMessage = errorMessage
         ))
-        
+
         // 하위 세그먼트 재귀 파싱
         subsegmentObj["subsegments"]?.jsonArray?.forEach { nestedSub ->
             spans.addAll(parseSubsegment(nestedSub.jsonObject, spanId))
         }
-        
+
         return spans
     }
 

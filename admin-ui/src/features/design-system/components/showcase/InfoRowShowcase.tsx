@@ -1,7 +1,7 @@
 /**
  * InfoRow Showcase - InfoRow 컴포넌트 전시
  */
-import { InfoRow, InfoList } from '@/shared/ui'
+import { InfoList, InfoRow } from '@/shared/ui'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

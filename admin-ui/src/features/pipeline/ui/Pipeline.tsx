@@ -243,11 +243,11 @@ export function Pipeline() {
                 <div className="flow-section-header">
                   <Send size={20} />
                   <span>Outbox</span>
-                  <span className="flow-count">{entityFlow.outbox.length}</span>
+                  <span className="flow-count">{entityFlow.sinkEvent.length}</span>
                 </div>
-                {entityFlow.outbox.length > 0 ? (
+                {entityFlow.sinkEvent.length > 0 ? (
                   <div className="flow-items">
-                    {entityFlow.outbox.map((item, i) => (
+                    {entityFlow.sinkEvent.map((item, i) => (
                       <div key={i} className="flow-item">
                         <span className={`item-status badge-${item.status.toLowerCase()}`}>{item.status}</span>
                         <span className="item-event">{item.eventType}</span>
@@ -348,19 +348,19 @@ export function Pipeline() {
           <div className="stats-content">
             <div className="outbox-stats-grid">
               <div className="outbox-stat pending">
-                <span className="stat-val">{overview?.outbox?.pending ?? 0}</span>
+                <span className="stat-val">{overview?.sinkEvent?.pending ?? 0}</span>
                 <span className="stat-lbl">Pending</span>
               </div>
               <div className="outbox-stat processing">
-                <span className="stat-val">{overview?.outbox?.processing ?? 0}</span>
+                <span className="stat-val">{overview?.sinkEvent?.processing ?? 0}</span>
                 <span className="stat-lbl">Processing</span>
               </div>
               <div className="outbox-stat shipped">
-                <span className="stat-val">{overview?.outbox?.shipped ?? 0}</span>
+                <span className="stat-val">{overview?.sinkEvent?.shipped ?? 0}</span>
                 <span className="stat-lbl">Shipped</span>
               </div>
               <div className="outbox-stat failed">
-                <span className="stat-val">{overview?.outbox?.failed ?? 0}</span>
+                <span className="stat-val">{overview?.sinkEvent?.failed ?? 0}</span>
                 <span className="stat-lbl">Failed</span>
               </div>
             </div>

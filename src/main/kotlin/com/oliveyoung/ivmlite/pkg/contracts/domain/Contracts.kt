@@ -3,7 +3,7 @@ package com.oliveyoung.ivmlite.pkg.contracts.domain
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 
 data class ContractMeta(
-    val kind: String,
+    val kind: ContractKind,
     val id: String,
     val version: SemVer,
     val status: ContractStatus,
@@ -30,8 +30,6 @@ data class JoinSpecContract(
     val meta: ContractMeta,
     val maxJoinDepth: Int,
     val maxFanout: Int,
-    @Deprecated("invertedIndexRef는 더 이상 사용되지 않습니다. IndexSpec.references로 통합됨")
-    val invertedIndexRef: ContractRef? = null,
 )
 
 data class ChangeSetContract(

@@ -5,7 +5,6 @@ import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerRepositoryPort
 import com.oliveyoung.ivmlite.apps.admin.ports.RawDataItem
 import com.oliveyoung.ivmlite.apps.admin.ports.RawDataListResult
 import com.oliveyoung.ivmlite.apps.admin.ports.VersionHistoryItem
-import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
@@ -36,7 +35,6 @@ class RawDataExplorerServiceTest {
 
     private lateinit var rawDataRepo: RawDataRepositoryPort
     private lateinit var explorerRepo: ExplorerRepositoryPort
-    private lateinit var ingestWorkflow: IngestWorkflow
     private lateinit var slicingWorkflow: SlicingWorkflow
     private lateinit var service: RawDataExplorerService
 
@@ -44,13 +42,13 @@ class RawDataExplorerServiceTest {
     fun setup() {
         rawDataRepo = mockk(relaxed = true)
         explorerRepo = mockk(relaxed = true)
-        ingestWorkflow = mockk()
         slicingWorkflow = mockk()
+
+        coEvery { rawDataRepo.putIdempotent(any()) } returns Result.Ok(Unit)
 
         service = RawDataExplorerService(
             rawDataRepo = rawDataRepo,
             explorerRepo = explorerRepo,
-            ingestWorkflow = ingestWorkflow,
             slicingWorkflow = slicingWorkflow
         )
     }
@@ -65,7 +63,7 @@ class RawDataExplorerServiceTest {
             val itemCount = 5
 
             coEvery {
-                ingestWorkflow.execute(any(), any(), any(), any(), any(), any())
+                rawDataRepo.putIdempotent(any())
             } coAnswers {
                 delay(delayMs)
                 Result.Ok(Unit)
@@ -93,7 +91,7 @@ class RawDataExplorerServiceTest {
 
             // 모든 항목이 처리됨
             coVerify(exactly = itemCount) {
-                ingestWorkflow.execute(any(), any(), any(), any(), any(), any())
+                rawDataRepo.putIdempotent(any())
             }
         }
 
@@ -101,16 +99,15 @@ class RawDataExplorerServiceTest {
         fun `ingestBatch 일부 실패해도 다른 항목 처리 계속`() = runTest {
             // Given
             coEvery {
-                ingestWorkflow.execute(any(), EntityKey("entity-1"), any(), any(), any(), any())
-            } returns Result.Ok(Unit)
-
-            coEvery {
-                ingestWorkflow.execute(any(), EntityKey("entity-2"), any(), any(), any(), any())
-            } returns Result.Err(DomainError.ValidationError("test", "failed"))
-
-            coEvery {
-                ingestWorkflow.execute(any(), EntityKey("entity-3"), any(), any(), any(), any())
-            } returns Result.Ok(Unit)
+                rawDataRepo.putIdempotent(any())
+            } answers {
+                val record = firstArg<RawDataRecord>()
+                when (record.entityKey.value) {
+                    "entity-1", "entity-3" -> Result.Ok(Unit)
+                    "entity-2" -> Result.Err(DomainError.ValidationError("test", "failed"))
+                    else -> Result.Ok(Unit)
+                }
+            }
 
             val items = listOf(
                 IngestItem("entity-1", "schema", "1.0.0", "{}", false),
@@ -146,12 +143,15 @@ class RawDataExplorerServiceTest {
         fun `ingestBatch 결과에 성공 실패 항목 정확히 분류`() = runTest {
             // Given
             coEvery {
-                ingestWorkflow.execute(any(), EntityKey("success-1"), any(), any(), any(), any())
-            } returns Result.Ok(Unit)
-
-            coEvery {
-                ingestWorkflow.execute(any(), EntityKey("fail-1"), any(), any(), any(), any())
-            } returns Result.Err(DomainError.StorageError("DB error"))
+                rawDataRepo.putIdempotent(any())
+            } answers {
+                val record = firstArg<RawDataRecord>()
+                when (record.entityKey.value) {
+                    "success-1" -> Result.Ok(Unit)
+                    "fail-1" -> Result.Err(DomainError.StorageError("DB error"))
+                    else -> Result.Ok(Unit)
+                }
+            }
 
             val items = listOf(
                 IngestItem("success-1", "schema", "1.0.0", "{}", false),
@@ -309,29 +309,21 @@ class RawDataExplorerServiceTest {
     inner class IngestTests {
 
         @Test
-        fun `ingest IngestWorkflow 없으면 ConfigError`() = runTest {
-            // Given
-            val serviceWithoutWorkflow = RawDataExplorerService(
-                rawDataRepo = rawDataRepo,
-                explorerRepo = explorerRepo,
-                ingestWorkflow = null,
-                slicingWorkflow = null
-            )
-
-            // When
-            val result = serviceWithoutWorkflow.ingest(
+        fun `ingest 잘못된 JSON이면 ContractError`() = runTest {
+            // When - invalid JSON
+            val result = service.ingest(
                 tenantId = "oliveyoung",
                 entityKey = "test",
                 schemaId = "schema",
                 schemaVersion = "1.0.0",
-                payload = "{}",
+                payload = "not-valid-json",
                 compile = false
             )
 
             // Then
             assertTrue(result is Result.Err)
             val error = (result as Result.Err).error
-            assertTrue(error is DomainError.ConfigError)
+            assertTrue(error is DomainError.ContractError)
         }
 
         @Test

@@ -9,6 +9,7 @@ import kotlinx.serialization.json.JsonObject
 
 @Serializable
 data class IngestRequest(
+    val jobId: String? = null,
     val tenantId: String,
     val entityKey: String,
     val version: Long,

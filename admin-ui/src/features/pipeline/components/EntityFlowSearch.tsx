@@ -105,11 +105,11 @@ export function EntityFlowSearch({
             <FlowSection
               icon={<Send size={20} />}
               title="Outbox"
-              count={entityFlow.outbox.length}
+              count={entityFlow.sinkEvent.length}
             >
-              {entityFlow.outbox.length > 0 ? (
+              {entityFlow.sinkEvent.length > 0 ? (
                 <div className="flow-items">
-                  {entityFlow.outbox.map((item, i) => (
+                  {entityFlow.sinkEvent.map((item, i) => (
                     <div key={`outbox-${item.eventType}-${i}`} className="flow-item">
                       <span className={`item-status badge-${item.status.toLowerCase()}`}>{item.status}</span>
                       <span className="item-event">{item.eventType}</span>

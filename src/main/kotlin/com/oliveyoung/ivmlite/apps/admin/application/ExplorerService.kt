@@ -1,10 +1,13 @@
 package com.oliveyoung.ivmlite.apps.admin.application
 
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerRepositoryPort
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
-import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
+import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
+import com.oliveyoung.ivmlite.shared.domain.determinism.CanonicalJson
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractError
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
@@ -19,8 +22,6 @@ import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
-import org.jooq.DSLContext
-import org.jooq.impl.DSL
 import org.slf4j.LoggerFactory
 import java.time.Instant
 
@@ -40,11 +41,10 @@ import java.time.Instant
 class ExplorerService(
     private val rawDataRepo: RawDataRepositoryPort,
     private val sliceRepo: SliceRepositoryPort,
+    private val explorerRepo: ExplorerRepositoryPort,
     private val queryViewWorkflow: QueryViewWorkflow?,
     private val contractRegistry: ContractRegistryPort?,
-    private val ingestWorkflow: IngestWorkflow?,
-    private val slicingWorkflow: SlicingWorkflow?,
-    private val dsl: DSLContext
+    private val slicingWorkflow: SlicingWorkflow?
 ) {
     private val logger = LoggerFactory.getLogger(ExplorerService::class.java)
     private val json = Json { ignoreUnknownKeys = true; prettyPrint = true }
@@ -66,9 +66,6 @@ class ExplorerService(
         payload: String,
         compile: Boolean = false
     ): Result<IngestResult> {
-        val workflow = ingestWorkflow
-            ?: return Result.Err(DomainError.ConfigError("IngestWorkflow not configured"))
-
         val tenant = TenantId(tenantId)
         val entity = EntityKey(entityKey)
         val version = VersionGenerator.generate()
@@ -79,9 +76,23 @@ class ExplorerService(
             return Result.Err(DomainError.ValidationError("schemaVersion", "Invalid schema version: $schemaVersion"))
         }
 
-        // 1. RawData Ingest
+        // JSON 검증 및 RawData 저장 (IngestionOrchestrator 대신 RawData만 저장)
+        val canonical = CanonicalJson.canonicalizeOrNull(payload)
+            ?: return Result.Err(ContractError("invalid json payload"))
+        val hashInput = "$canonical|$schemaId|$semVer"
+        val hash = "sha256:${Hashing.sha256Hex(hashInput)}"
+        val record = RawDataRecord(
+            tenantId = tenant,
+            entityKey = entity,
+            version = version,
+            schemaId = schemaId,
+            schemaVersion = semVer,
+            payload = canonical,
+            payloadHash = hash,
+        )
+
         return try {
-            when (val result = workflow.execute(tenant, entity, version, schemaId, semVer, payload)) {
+            when (val result = rawDataRepo.putIdempotent(record)) {
                 is Result.Ok -> {
                     // 2. 선택적 Compile (Slicing)
                     var slicesCreated = 0
@@ -167,7 +178,7 @@ class ExplorerService(
     // ==================== RawData 조회 ====================
 
     /**
-     * RawData 목록 조회 (페이지네이션 지원)
+     * RawData 목록 조회 (페이지네이션 지원, DynamoDB via ExplorerRepositoryPort)
      */
     suspend fun listRawData(
         tenantId: String,
@@ -176,82 +187,30 @@ class ExplorerService(
         cursor: String? = null
     ): Result<RawDataListResult> {
         val safeLimit = limit.coerceIn(1, 100)
+        val tenant = TenantId(tenantId)
+        val entityType = entityPrefix?.takeIf { it.isNotBlank() }
 
         return try {
-            val entityKeyField = DSL.field("entity_key", String::class.java)
-            val tenantIdField = DSL.field("tenant_id", String::class.java)
-            val versionField = DSL.field("version", Long::class.java)
-            val schemaIdField = DSL.field("schema_id", String::class.java)
-            val createdAtField = DSL.field("created_at", java.time.OffsetDateTime::class.java)
-
-            // 기본 조건: tenant + prefix
-            var condition = tenantIdField.eq(tenantId)
-            if (!entityPrefix.isNullOrBlank()) {
-                val escapedPrefix = escapeLikePattern(entityPrefix)
-                condition = condition.and(entityKeyField.like("$escapedPrefix%"))
-            }
-            if (!cursor.isNullOrBlank()) {
-                condition = condition.and(entityKeyField.gt(cursor))
-            }
-
-            // 전체 개수 조회 (distinct entity_key, cursor 제외)
-            var countCondition = tenantIdField.eq(tenantId)
-            if (!entityPrefix.isNullOrBlank()) {
-                countCondition = countCondition.and(entityKeyField.like("${escapeLikePattern(entityPrefix)}%"))
-            }
-            val totalCount = dsl.selectCount()
-                .from(
-                    dsl.selectDistinct(entityKeyField)
-                        .from(DSL.table("raw_data"))
-                        .where(countCondition)
-                )
-                .fetchOne(0, Int::class.java) ?: 0
-
-            // 단순 쿼리: 모든 레코드 조회 후 앱에서 최신 버전만 필터링
-            val allResults = dsl.select(
-                entityKeyField,
-                versionField,
-                schemaIdField,
-                createdAtField
-            )
-                .from(DSL.table("raw_data"))
-                .where(condition)
-                .orderBy(entityKeyField.asc(), versionField.desc())
-                .limit((safeLimit + 1) * 5) // 충분한 버퍼
-                .fetch()
-
-            // 애플리케이션 레벨에서 각 entity_key별 최신 버전만 선택
-            val seenKeys = mutableSetOf<String>()
-            val items = mutableListOf<RawDataListItem>()
-
-            for (record in allResults) {
-                val entityKey = record.get(entityKeyField) ?: continue
-                if (entityKey in seenKeys) continue
-                seenKeys.add(entityKey)
-
-                items.add(
-                    RawDataListItem(
-                        entityId = entityKey,
-                        version = record.get(versionField) ?: 0L,
-                        schemaRef = record.get(schemaIdField) ?: "",
-                        updatedAt = record.get(createdAtField)?.toInstant()?.toString()
+            explorerRepo.listRawData(tenant, entityType, safeLimit, cursor).fold(
+                { err -> Result.Err(err) },
+                { r ->
+                    val entries = r.items.map { item ->
+                        RawDataListItem(
+                            entityId = item.entityKey,
+                            version = item.version,
+                            schemaRef = item.schemaId,
+                            updatedAt = item.updatedAt
+                        )
+                    }
+                    Result.Ok(
+                        RawDataListResult(
+                            entries = entries,
+                            total = r.totalCount ?: entries.size,
+                            hasMore = r.nextCursor != null,
+                            nextCursor = r.nextCursor
+                        )
                     )
-                )
-
-                if (items.size > safeLimit) break
-            }
-
-            val hasMore = items.size > safeLimit
-            val finalItems = items.take(safeLimit)
-            val nextCursor = if (hasMore) finalItems.lastOrNull()?.entityId else null
-
-            Result.Ok(
-                RawDataListResult(
-                    entries = finalItems,
-                    total = totalCount,
-                    hasMore = hasMore,
-                    nextCursor = nextCursor
-                )
+                }
             )
         } catch (e: Exception) {
             logger.error("Failed to list RawData: ${e.message}", e)
@@ -305,28 +264,14 @@ class ExplorerService(
     }
 
     /**
-     * RawData 버전 목록 조회
+     * RawData 버전 목록 조회 (DynamoDB via ExplorerRepositoryPort)
      */
-    private fun getVersionHistory(tenantId: TenantId, entityKey: EntityKey): List<VersionInfo> {
+    private suspend fun getVersionHistory(tenantId: TenantId, entityKey: EntityKey): List<VersionInfo> {
         return try {
-            dsl.select(
-                DSL.field("version", Long::class.java),
-                DSL.field("created_at", java.time.OffsetDateTime::class.java),
-                DSL.field("payload_hash", String::class.java)
+            explorerRepo.getVersionHistory(tenantId, entityKey, 20).fold(
+                { emptyList() },
+                { items -> items.map { VersionInfo(version = it.version, createdAt = it.createdAt, hash = it.payloadHash) } }
             )
-                .from(DSL.table("raw_data"))
-                .where(DSL.field("tenant_id").eq(tenantId.value))
-                .and(DSL.field("entity_key").eq(entityKey.value))
-                .orderBy(DSL.field("version").desc())
-                .limit(20)
-                .fetch()
-                .map { record ->
-                    VersionInfo(
-                        version = record.get("version", Long::class.java) ?: 0L,
-                        createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant()?.toString(),
-                        hash = record.get("payload_hash", String::class.java) ?: ""
-                    )
-                }
         } catch (e: Exception) {
             logger.warn("Failed to get version history", e)
             emptyList()
@@ -418,8 +363,7 @@ class ExplorerService(
     }
 
     /**
-     * 슬라이스 타입별 전체 목록 조회
-     * (특정 sliceType의 모든 Entity 슬라이스 조회)
+     * 슬라이스 타입별 전체 목록 조회 (DynamoDB via ExplorerRepositoryPort)
      */
     suspend fun listSlicesByType(
         tenantId: String,
@@ -428,93 +372,39 @@ class ExplorerService(
         cursor: String? = null
     ): Result<SliceListByTypeResult> {
         val safeLimit = limit.coerceIn(1, 100)
+        val tenant = TenantId(tenantId)
+        val sliceTypeEnum = SliceType.fromDbValueOrNull(sliceType)
+            ?: return Result.Err(DomainError.ValidationError("sliceType", "Invalid slice type: $sliceType"))
 
         return try {
-            val sliceTypeField = DSL.field("slice_type", String::class.java)
-            val tenantIdField = DSL.field("tenant_id", String::class.java)
-            val entityKeyField = DSL.field("entity_key", String::class.java)
-            val versionField = DSL.field("version", Long::class.java)
-            val dataField = DSL.field("data", String::class.java)
-            val hashField = DSL.field("hash", String::class.java)
-            val rulesetIdField = DSL.field("ruleset_id", String::class.java)
-            val rulesetVersionField = DSL.field("ruleset_version", String::class.java)
-            val isDeletedField = DSL.field("is_deleted", Boolean::class.java)
-            val createdAtField = DSL.field("created_at", java.time.OffsetDateTime::class.java)
-
-            // 기본 조건: tenant + sliceType
-            var condition = tenantIdField.eq(tenantId)
-                .and(sliceTypeField.eq(sliceType))
-            if (!cursor.isNullOrBlank()) {
-                condition = condition.and(entityKeyField.gt(cursor))
-            }
-
-            // 전체 개수 조회
-            var countCondition = tenantIdField.eq(tenantId).and(sliceTypeField.eq(sliceType))
-            val totalCount = dsl.selectCount()
-                .from(
-                    dsl.selectDistinct(entityKeyField)
-                        .from(DSL.table("slices"))
-                        .where(countCondition)
-                )
-                .fetchOne(0, Int::class.java) ?: 0
-
-            // 최신 버전만 가져오기 위해 각 entity_key별 최대 version 조회
-            val allResults = dsl.select(
-                entityKeyField,
-                versionField,
-                dataField,
-                hashField,
-                rulesetIdField,
-                rulesetVersionField,
-                isDeletedField,
-                createdAtField
-            )
-                .from(DSL.table("slices"))
-                .where(condition)
-                .orderBy(entityKeyField.asc(), versionField.desc())
-                .limit((safeLimit + 1) * 3)
-                .fetch()
-
-            // 애플리케이션 레벨에서 각 entity_key별 최신 버전만 선택
-            val seenKeys = mutableSetOf<String>()
-            val items = mutableListOf<SliceListItem>()
-
-            for (record in allResults) {
-                val entityKey = record.get(entityKeyField) ?: continue
-                if (entityKey in seenKeys) continue
-                seenKeys.add(entityKey)
-
-                items.add(
-                    SliceListItem(
-                        entityId = entityKey,
-                        sliceType = sliceType,
-                        version = record.get(versionField) ?: 0L,
-                        data = parseJsonSafe(record.get(dataField) ?: "{}"),
-                        dataRaw = record.get(dataField) ?: "{}",
-                        hash = record.get(hashField) ?: "",
-                        ruleSetId = record.get(rulesetIdField) ?: "",
-                        ruleSetVersion = record.get(rulesetVersionField) ?: "",
-                        isDeleted = record.get(isDeletedField) ?: false,
-                        updatedAt = record.get(createdAtField)?.toInstant()?.toString()
+            explorerRepo.listSlicesByType(tenant, sliceTypeEnum, safeLimit, cursor).fold(
+                { err -> Result.Err(err) },
+                { r ->
+                    val entries = r.items.map { item ->
+                        SliceListItem(
+                            entityId = item.sourceKey,
+                            sliceType = item.sliceType,
+                            version = item.version,
+                            data = null,
+                            dataRaw = "{}",
+                            hash = "",
+                            ruleSetId = "",
+                            ruleSetVersion = "",
+                            isDeleted = false,
+                            updatedAt = item.updatedAt
+                        )
+                    }
+                    Result.Ok(
+                        SliceListByTypeResult(
+                            tenantId = tenantId,
+                            sliceType = sliceType,
+                            entries = entries,
+                            total = r.totalCount ?: entries.size,
+                            hasMore = r.nextCursor != null,
+                            nextCursor = r.nextCursor
+                        )
                     )
-                )
-
-                if (items.size > safeLimit) break
-            }
-
-            val hasMore = items.size > safeLimit
-            val finalItems = items.take(safeLimit)
-            val nextCursor = if (hasMore) finalItems.lastOrNull()?.entityId else null
-
-            Result.Ok(
-                SliceListByTypeResult(
-                    tenantId = tenantId,
-                    sliceType = sliceType,
-                    entries = finalItems,
-                    total = totalCount,
-                    hasMore = hasMore,
-                    nextCursor = nextCursor
-                )
+                }
             )
         } catch (e: Exception) {
             logger.error("Failed to list slices by type: ${e.message}", e)
@@ -523,40 +413,22 @@ class ExplorerService(
     }
 
     /**
-     * 사용 가능한 슬라이스 타입 목록 조회
+     * 사용 가능한 슬라이스 타입 목록 조회 (DynamoDB via ExplorerRepositoryPort)
      */
     suspend fun getSliceTypes(tenantId: String): Result<SliceTypesResult> {
+        val tenant = TenantId(tenantId)
         return try {
-            val sliceTypeField = DSL.field("slice_type", String::class.java)
-            val tenantIdField = DSL.field("tenant_id", String::class.java)
-
-            val types = dsl.selectDistinct(sliceTypeField)
-                .from(DSL.table("slices"))
-                .where(tenantIdField.eq(tenantId))
-                .orderBy(sliceTypeField.asc())
-                .fetch()
-                .mapNotNull { record -> record.get(sliceTypeField) }
-                .filter { it.isNotBlank() }
-
-            // 각 타입별 개수도 조회
-            val typeCounts = types.map { type ->
-                val count = dsl.selectCount()
-                    .from(
-                        dsl.selectDistinct(DSL.field("entity_key", String::class.java))
-                            .from(DSL.table("slices"))
-                            .where(tenantIdField.eq(tenantId))
-                            .and(sliceTypeField.eq(type))
+            explorerRepo.getSliceTypes(tenant).fold(
+                { err -> Result.Err(err) },
+                { typeInfos ->
+                    Result.Ok(
+                        SliceTypesResult(
+                            tenantId = tenantId,
+                            types = typeInfos.map { SliceTypeInfo(type = it.sliceType, count = it.count) },
+                            total = typeInfos.size
+                        )
                     )
-                    .fetchOne(0, Int::class.java) ?: 0
-                SliceTypeInfo(type = type, count = count)
-            }
-
-            Result.Ok(
-                SliceTypesResult(
-                    tenantId = tenantId,
-                    types = typeCounts,
-                    total = types.size
-                )
+                }
             )
         } catch (e: Exception) {
             logger.error("Failed to get slice types: ${e.message}", e)
@@ -612,7 +484,7 @@ class ExplorerService(
     // ==================== Lineage 그래프 ====================
 
     /**
-     * 데이터 Lineage 조회 (RawData → Slices → View)
+     * 데이터 Lineage 조회 (RawData -> Slices -> View)
      */
     suspend fun getLineage(
         tenantId: String,
@@ -685,7 +557,7 @@ class ExplorerService(
                     )
                 )
 
-                // RawData → Slice 엣지
+                // RawData -> Slice 엣지
                 if (rawData != null) {
                     edges.add(
                         LineageEdge(
@@ -723,7 +595,7 @@ class ExplorerService(
                     )
                 )
 
-                // Slice → View 엣지 (ViewDef가 참조하는 Slice 타입)
+                // Slice -> View 엣지 (ViewDef가 참조하는 Slice 타입)
                 viewDef.requiredSlices.forEach { sliceType ->
                     val sliceNode = nodes.find { it.id == "slice-${sliceType.name}" }
                     if (sliceNode != null) {
@@ -756,7 +628,7 @@ class ExplorerService(
     // ==================== 스마트 검색 ====================
 
     /**
-     * 통합 검색 (엔티티 키 검색)
+     * 통합 검색 (엔티티 키 검색, DynamoDB via ExplorerRepositoryPort)
      */
     suspend fun search(
         tenantId: String,
@@ -764,39 +636,19 @@ class ExplorerService(
         limit: Int = 20
     ): Result<SearchResult> {
         val safeLimit = limit.coerceIn(1, 100)
-        // SQL Injection 방지: LIKE 특수문자 이스케이프
-        val escapedQuery = escapeLikePattern(query)
-        val likePattern = "%$escapedQuery%"
-
+        val tenant = TenantId(tenantId)
         return try {
-            // RawData 테이블에서 entity_key 검색
-            val entityKeyField = DSL.field("entity_key", String::class.java)
-            val tenantIdField = DSL.field("tenant_id", String::class.java)
-
-            val results = dsl.selectDistinct(entityKeyField)
-                .from(DSL.table("raw_data"))
-                .where(tenantIdField.eq(tenantId))
-                .and(entityKeyField.like(likePattern))
-                .orderBy(entityKeyField)
-                .limit(safeLimit)
-                .fetch()
-                .mapNotNull { record ->
-                    record.get(entityKeyField)
-                }
-                .filter { it.isNotBlank() }
-
-            Result.Ok(
-                SearchResult(
-                    query = query,
-                    items = results.map { entityKey ->
-                        SearchItem(
-                            entityKey = entityKey,
-                            tenantId = tenantId,
-                            type = extractEntityType(entityKey)
+            explorerRepo.searchEntities(tenant, query, safeLimit).fold(
+                { err -> Result.Err(err) },
+                { r ->
+                    Result.Ok(
+                        SearchResult(
+                            query = query,
+                            items = r.items.map { SearchItem(entityKey = it.entityKey, tenantId = tenantId, type = it.type) },
+                            count = r.items.size
                         )
-                    },
-                    count = results.size
-                )
+                    )
+                }
             )
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to search: ${e.message}"))
@@ -804,7 +656,7 @@ class ExplorerService(
     }
 
     /**
-     * 자동완성 (빠른 프리픽스 매칭)
+     * 자동완성 (빠른 프리픽스 매칭, DynamoDB via ExplorerRepositoryPort)
      */
     suspend fun autocomplete(
         tenantId: String,
@@ -812,26 +664,12 @@ class ExplorerService(
         limit: Int = 10
     ): Result<List<String>> {
         val safeLimit = limit.coerceIn(1, 50)
-        // SQL Injection 방지: LIKE 특수문자 이스케이프
-        val escapedPrefix = escapeLikePattern(prefix)
-        val likePattern = "$escapedPrefix%"
-
+        val tenant = TenantId(tenantId)
         return try {
-            val entityKeyField = DSL.field("entity_key", String::class.java)
-            val tenantIdField = DSL.field("tenant_id", String::class.java)
-
-            val results = dsl.selectDistinct(entityKeyField)
-                .from(DSL.table("raw_data"))
-                .where(tenantIdField.eq(tenantId))
-                .and(entityKeyField.like(likePattern))
-                .orderBy(entityKeyField)
-                .limit(safeLimit)
-                .fetch()
-                .mapNotNull { record ->
-                    record.get(entityKeyField)
-                }
-
-            Result.Ok(results)
+            explorerRepo.autocomplete(tenant, prefix, safeLimit).fold(
+                { err -> Result.Err(err) },
+                { items -> Result.Ok(items.map { it.value }) }
+            )
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to autocomplete: ${e.message}"))
         }
@@ -869,17 +707,6 @@ class ExplorerService(
     }
 
     // ==================== Helper Functions ====================
-
-    /**
-     * LIKE 패턴 특수문자 이스케이프 (SQL Injection 방지)
-     * %, _, \ 문자를 이스케이프 처리
-     */
-    private fun escapeLikePattern(pattern: String): String {
-        return pattern
-            .replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_")
-    }
 
     private fun parseJsonSafe(jsonStr: String): JsonElement? {
         return try {

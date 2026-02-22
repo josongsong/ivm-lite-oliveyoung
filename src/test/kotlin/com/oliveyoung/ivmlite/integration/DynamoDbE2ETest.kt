@@ -10,7 +10,6 @@ import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.DynamoDbRawDataRepository
-import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DynamoDbInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DynamoDbSliceRepository
@@ -22,7 +21,6 @@ import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.future.await
@@ -43,7 +41,7 @@ import kotlinx.coroutines.delay
  * - Slice 생성 (DynamoDB)
  * - Inverted Index 생성 (DynamoDB)
  * - Query 결과 확인
- * - Outbox는 InMemory (PostgreSQL 대신)
+ * - SinkEvent는 DynamoDB (Outbox 제거됨)
  *
  * 실행 전 요구사항:
  * - DynamoDB Local 실행: docker-compose up dynamodb
@@ -133,8 +131,6 @@ class DynamoDbE2ETest : StringSpec(init@{
     val rawDataRepo = DynamoDbRawDataRepository(dynamoClient, tableName)
     val sliceRepo = DynamoDbSliceRepository(dynamoClient, tableName)
     val invertedIndexRepo = DynamoDbInvertedIndexRepository(dynamoClient, tableName)
-    val outboxRepo = InMemoryOutboxRepository()  // Outbox만 InMemory
-
     // Contract Registry (LocalYaml)
     val contractRegistry = LocalYamlContractRegistryAdapter()
     val joinExecutor = JoinExecutor(rawDataRepo)
@@ -144,7 +140,7 @@ class DynamoDbE2ETest : StringSpec(init@{
     val impactCalculator = DefaultImpactCalculatorAdapter(ImpactCalculator())
 
     // Workflow 생성
-    val ingestWorkflow = IngestWorkflow(rawDataRepo, outboxRepo)
+    val ingestWorkflow = IngestWorkflow(rawDataRepo)
     val slicingWorkflow = SlicingWorkflow(
         rawDataRepo,
         sliceRepo,

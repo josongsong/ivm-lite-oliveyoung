@@ -1,12 +1,10 @@
 package com.oliveyoung.ivmlite.pkg.fanout
 
 import com.oliveyoung.ivmlite.shared.domain.types.Result
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
-import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.IndexSpec
-import com.oliveyoung.ivmlite.pkg.contracts.domain.JoinCardinality
-import com.oliveyoung.ivmlite.pkg.contracts.domain.JoinSpec as ContractJoinSpec
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
 import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceBuildRules
 import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceDefinition
@@ -20,7 +18,6 @@ import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutPriority
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
-import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
@@ -31,7 +28,6 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldBeEmpty
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import io.mockk.coEvery
 import io.mockk.coVerify
@@ -615,7 +611,7 @@ private fun createMockContractRegistry(): ContractRegistryPort {
 
     val ruleSet = RuleSetContract(
         meta = ContractMeta(
-            kind = "RULE_SET",
+            kind = ContractKind.RULESET,
             id = "ruleset.core.v1",
             version = SemVer.parse("1.0.0"),
             status = ContractStatus.ACTIVE,
@@ -624,20 +620,6 @@ private fun createMockContractRegistry(): ContractRegistryPort {
         impactMap = mapOf(
             SliceType.CORE to listOf("/productId", "/name"),
             SliceType.DERIVED to listOf("/description", "/price"),
-        ),
-        joins = listOf(
-            ContractJoinSpec(
-                sourceSlice = SliceType.CORE,
-                targetEntity = "brand",
-                joinPath = "/brandCode",
-                cardinality = JoinCardinality.MANY_TO_ONE,
-            ),
-            ContractJoinSpec(
-                sourceSlice = SliceType.CORE,
-                targetEntity = "category",
-                joinPath = "/categoryCode",
-                cardinality = JoinCardinality.MANY_TO_ONE,
-            ),
         ),
         slices = listOf(
             SliceDefinition(
@@ -656,8 +638,8 @@ private fun createMockContractRegistry(): ContractRegistryPort {
             ),
         ),
         indexes = listOf(
-            IndexSpec(type = "product_by_brand", selector = "$.brandCode"),
-            IndexSpec(type = "product_by_category", selector = "$.categoryCode"),
+            IndexSpec(type = "product_by_brand", selector = "$.brandCode", references = "brand"),
+            IndexSpec(type = "product_by_category", selector = "$.categoryCode", references = "category"),
         ),
     )
 

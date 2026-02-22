@@ -18,7 +18,7 @@ class ViewExplorerService(
     private val rawDataRepo: RawDataRepositoryPort,
     private val queryViewWorkflow: QueryViewWorkflow?
 ) {
-    private val logger = LoggerFactory.getLogger(ViewExplorerService::class.java)
+    @Suppress("UnusedPrivateProperty") private val logger = LoggerFactory.getLogger(ViewExplorerService::class.java)
 
     /**
      * View 조합 미리보기

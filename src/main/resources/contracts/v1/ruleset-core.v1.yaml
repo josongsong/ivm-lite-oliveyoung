@@ -1,0 +1,44 @@
+# 테스트 및 SlicingWorkflow 폴백용 최소 RuleSet 계약
+# ruleset.core.v1 - PRODUCT 엔티티 기본 슬라이싱 규칙
+kind: RULESET
+id: ruleset.core.v1
+version: 1.0.0
+status: ACTIVE
+
+entityType: PRODUCT
+
+impactMap:
+  CORE:
+    - "/title"
+    - "/brand"
+    - "/price"
+    - "/categoryId"
+    - "/tags"
+  CATEGORY:
+    - "/categoryId"
+
+slices:
+  - type: CORE
+    buildRules:
+      type: PassThrough
+      fields:
+        - "*"
+    joins: []
+  - type: CATEGORY
+    buildRules:
+      type: PassThrough
+      fields:
+        - "categoryId"
+    joins: []
+
+indexes:
+  - type: brand
+    selector: $.brand
+    references: BRAND
+    maxFanout: 10000
+  - type: category
+    selector: $.categoryId
+    references: CATEGORY
+    maxFanout: 50000
+  - type: tag
+    selector: $.tags[*]

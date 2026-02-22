@@ -15,6 +15,9 @@ import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.json.JsonPathExtractor
 import com.oliveyoung.ivmlite.shared.domain.types.Result
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 
 /**
  * RFC-IMPL-010 Phase D-3: SlicingEngine - RuleSet 기반 슬라이싱 엔진
@@ -50,30 +53,49 @@ class SlicingEngine(
             is Result.Err -> return Result.Err(r.error)
         }
 
-        return try {
-            // 1. 슬라이싱 (JOIN 포함)
-            val slices = mutableListOf<SliceRecord>()
-            for (def in ruleSet.slices) {
-                val sliceResult = buildSlice(rawData, def, ruleSet)
-                when (sliceResult) {
-                    is Result.Ok -> slices.add(sliceResult.value)
-                    is Result.Err -> return Result.Err(sliceResult.error)
-                }
-            }
+        // 1. RFC-018: ExecutionPlan 기반 슬라이싱 (의존성 순서 + Wave별 병렬 실행)
+        val plan = when (val r = SliceExecutionPlanner.plan(ruleSet)) {
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Err(r.error)
+        }
+        val slicesList = when (val r = runSlicesByPlan(rawData, plan, ruleSet)) {
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Err(r.error)
+        }
 
-            // 2. Inverted Index 생성
-            val indexes: List<InvertedIndexEntry> = slices.flatMap { slice ->
-                indexBuilder.build(slice, ruleSet.indexes)
-            }
-
-            Result.Ok(SlicingResult(slices, indexes))
-        } catch (e: Exception) {
-            Result.Err(
-                DomainError.InvariantViolation(
-                    "SlicingEngine.slice failed: ${e.message}",
-                ),
+        // 2. Inverted Index 생성
+        val indexes: List<InvertedIndexEntry> = runCatching {
+            slicesList.flatMap { slice -> indexBuilder.build(slice, ruleSet.indexes) }
+        }.getOrElse { e ->
+            return Result.Err(
+                DomainError.InvariantViolation("Inverted index build failed: ${e.message}")
             )
         }
+
+        return Result.Ok(SlicingResult(slicesList, indexes))
+    }
+
+    /**
+     * RFC-018: Wave별 병렬 실행 (동일 Wave 내 Slice는 동시 실행)
+     */
+    private suspend fun runSlicesByPlan(
+        rawData: RawDataRecord,
+        plan: SliceExecutionPlan,
+        ruleSet: RuleSetContract,
+    ): Result<List<SliceRecord>> = coroutineScope {
+        val allSlices = mutableListOf<SliceRecord>()
+        for (wave in plan.toWaves()) {
+            val waveResults = wave.map { def ->
+                async { buildSlice(rawData, def, ruleSet) }
+            }.awaitAll()
+            for (r in waveResults) {
+                when (r) {
+                    is Result.Ok -> allSlices.add(r.value)
+                    is Result.Err -> return@coroutineScope Result.Err(r.error)
+                }
+            }
+        }
+        Result.Ok(allSlices)
     }
 
     /**
@@ -94,30 +116,32 @@ class SlicingEngine(
             is Result.Err -> return Result.Err(r.error)
         }
 
-        return try {
-            // 1. 영향받은 SliceType만 슬라이싱
-            val slices = mutableListOf<SliceRecord>()
-            for (def in ruleSet.slices.filter { it.type in impactedTypes }) {
-                val sliceResult = buildSlice(rawData, def, ruleSet)
-                when (sliceResult) {
-                    is Result.Ok -> slices.add(sliceResult.value)
-                    is Result.Err -> return Result.Err(sliceResult.error)
-                }
-            }
+        // 1. RFC-018: 의존성 closure + ExecutionPlan 기반 부분 슬라이싱
+        val closure = SliceExecutionPlanner.computeClosure(ruleSet, impactedTypes)
+        val plan = when (val r = SliceExecutionPlanner.plan(ruleSet)) {
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Err(r.error)
+        }
+        val defsToRun = plan.slices.filter { it.type in closure }
+        val subPlan = SliceExecutionPlan(
+            slices = defsToRun,
+            steps = plan.steps.filter { it.sliceRef in closure.map { t -> t.name } },
+        )
+        val slicesList = when (val r = runSlicesByPlan(rawData, subPlan, ruleSet)) {
+            is Result.Ok -> r.value
+            is Result.Err -> return Result.Err(r.error)
+        }
 
-            // 2. Inverted Index 생성
-            val indexes: List<InvertedIndexEntry> = slices.flatMap { slice ->
-                indexBuilder.build(slice, ruleSet.indexes)
-            }
-
-            Result.Ok(SlicingResult(slices, indexes))
-        } catch (e: Exception) {
-            Result.Err(
-                DomainError.InvariantViolation(
-                    "SlicingEngine.slicePartial failed: ${e.message}",
-                ),
+        // 2. Inverted Index 생성
+        val indexes: List<InvertedIndexEntry> = runCatching {
+            slicesList.flatMap { slice -> indexBuilder.build(slice, ruleSet.indexes) }
+        }.getOrElse { e ->
+            return Result.Err(
+                DomainError.InvariantViolation("Inverted index build failed: ${e.message}")
             )
         }
+
+        return Result.Ok(SlicingResult(slicesList, indexes))
     }
 
     /**
@@ -173,7 +197,10 @@ class SlicingEngine(
         }
 
         // 3. 정규화 및 해싱
-        val canonical = CanonicalJson.canonicalize(data)
+        val canonical = CanonicalJson.canonicalizeOrNull(data)
+            ?: return Result.Err(
+                DomainError.InvariantViolation("Failed to canonicalize slice data for ${def.type.name}")
+            )
         val hash = Hashing.sha256Tagged(canonical)
 
         return Result.Ok(

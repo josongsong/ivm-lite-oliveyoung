@@ -3,265 +3,127 @@ package com.oliveyoung.ivmlite.sdk.execution
 import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
-import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
-import com.oliveyoung.ivmlite.pkg.orchestration.application.ShipWorkflow
-import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
-import com.oliveyoung.ivmlite.pkg.rawdata.domain.OutboxEntry
-import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
-import com.oliveyoung.ivmlite.sdk.domain.CompileResult
-import com.oliveyoung.ivmlite.sdk.domain.IngestResult
-import com.oliveyoung.ivmlite.sdk.domain.ShipResult
+import com.oliveyoung.ivmlite.pkg.rawdata.application.IngestionOrchestrator
+import com.oliveyoung.ivmlite.pkg.rawdata.domain.IngestionCommand
 import com.oliveyoung.ivmlite.sdk.dsl.entity.BrandInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.CategoryInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.EntityInput
+import com.oliveyoung.ivmlite.sdk.dsl.entity.GenericEntityInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductInput
-import com.oliveyoung.ivmlite.sdk.model.*
+import com.oliveyoung.ivmlite.sdk.model.DeployJob
+import com.oliveyoung.ivmlite.sdk.model.DeployResult
+import com.oliveyoung.ivmlite.sdk.model.DeployState
+import com.oliveyoung.ivmlite.sdk.model.IngestResult
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
-import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
-import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.shared.domain.types.VersionGenerator
 import com.oliveyoung.ivmlite.shared.domain.types.Result
-import kotlinx.serialization.json.Json
+import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 
 /**
- * Deploy Executor (RFC-IMPL-011 Wave 5-L)
+ * Deploy Executor (SOTA - DynamoDB Streams + Contract is Law)
  *
- * 실제 Workflow 연동 및 Deploy 실행
- * - executeSync: RawData Ingest → Compile → Ship (동기/비동기)
- * - executeAsync: RawData Ingest → COMPILE_TASK Outbox 적재
+ * IngestionOrchestrator 기반:
+ * - RawData → Slicing → View → SinkEvent (단일 트랜잭션)
+ * - DynamoDB Streams → Lambda → S3/OpenSearch/Personalize
+ *
+ * EntityContractResolver로 EntityType별 RuleSet/ViewDef 동적 해석:
+ * - PRODUCT → ruleset.core.v1, view.product.core.v1
+ * - BRAND   → ruleset.brand.v1, view.brand.detail.v1
+ * - CATEGORY → ruleset.category.v1, (ViewDef 미정의 시 에러)
  */
 class DeployExecutor(
-    private val ingestWorkflow: IngestWorkflow,
-    private val slicingWorkflow: SlicingWorkflow,
-    private val shipWorkflow: ShipWorkflow,
-    private val outboxRepository: OutboxRepositoryPort
+    private val orchestrator: IngestionOrchestrator,
+    private val contractResolver: EntityContractResolver
 ) {
-    companion object {
-        private val json = Json {
-            prettyPrint = false
-            encodeDefaults = true
-        }
-    }
-
     /**
-     * 동기 Deploy 실행
+     * 동기 Deploy 실행 (올인원)
      *
-     * 1. RawData Ingest
-     * 2. Compile (Slicing) - spec.compileMode에 따라 sync/async
-     * 3. Ship - spec.shipSpec에 따라 sync/async
+     * RawData → Slicing → View → SinkEvent (DynamoDB)
+     * DynamoDB Streams → Lambda → S3/OpenSearch/Personalize
      */
-    suspend fun <T : EntityInput> executeSync(input: T, spec: DeploySpec): DeployResult {
-        // 1. EntityInput → RawData 변환
-        val rawDataParams = when (val result = convertToRawDataParams(input)) {
+    suspend fun <T : EntityInput> executeSync(input: T): DeployResult {
+        // 1. EntityInput → IngestionCommand 변환
+        val command = when (val result = convertToIngestionCommand(input)) {
             is Either.Left -> return DeployResult.failure("unknown", "0", result.value.message ?: "Conversion failed")
             is Either.Right -> result.value
         }
 
-        // 2. RawData Ingest (항상 동기)
-        val ingestResult = ingestWorkflow.execute(
-            tenantId = rawDataParams.tenantId,
-            entityKey = rawDataParams.entityKey,
-            version = rawDataParams.version,
-            schemaId = rawDataParams.schemaId,
-            schemaVersion = rawDataParams.schemaVersion,
-            payloadJson = rawDataParams.payloadJson
-        )
+        // 2. IngestionOrchestrator 실행 (RawData → Slicing → View → SinkEvent)
+        val ingestionResult = orchestrator.ingest(command)
 
-        when (ingestResult) {
+        return when (ingestionResult) {
             is Result.Err -> {
-                return DeployResult.failure(
-                    rawDataParams.entityKey.value,
-                    rawDataParams.version.toString(),
-                    ingestResult.error.toString()
+                DeployResult.failure(
+                    command.entityKey.value,
+                    command.version.toString(),
+                    ingestionResult.error.toString()
                 )
             }
-            is Result.Ok -> { /* continue */ }
-        }
-
-        // 3. Compile (Slicing)
-        when (spec.compileMode) {
-            is CompileMode.Sync -> {
-                // 동기 Compile
-                val slicingResult = slicingWorkflow.execute(
-                    tenantId = rawDataParams.tenantId,
-                    entityKey = rawDataParams.entityKey,
-                    version = rawDataParams.version
+            is Result.Ok<*> -> {
+                DeployResult.success(
+                    command.entityKey.value,
+                    command.version.toString()
                 )
-
-                when (slicingResult) {
-                    is Result.Err -> {
-                        return DeployResult.failure(
-                            rawDataParams.entityKey.value,
-                            rawDataParams.version.toString(),
-                            slicingResult.error.toString()
-                        )
-                    }
-                    is Result.Ok -> { /* continue */ }
-                }
-            }
-            is CompileMode.SyncWithTargets -> {
-                // 동기 Compile (SyncWithTargets는 v1에서 Sync와 동일하게 처리)
-                val slicingResult = slicingWorkflow.execute(
-                    tenantId = rawDataParams.tenantId,
-                    entityKey = rawDataParams.entityKey,
-                    version = rawDataParams.version
-                )
-
-                when (slicingResult) {
-                    is Result.Err -> {
-                        return DeployResult.failure(
-                            rawDataParams.entityKey.value,
-                            rawDataParams.version.toString(),
-                            slicingResult.error.toString()
-                        )
-                    }
-                    is Result.Ok -> { /* continue */ }
-                }
-            }
-            is CompileMode.Async -> {
-                // Async Compile → Outbox에 적재
-                val compileTaskEntry = OutboxEntry.create(
-                    aggregateType = AggregateType.RAW_DATA,
-                    aggregateId = "${rawDataParams.tenantId.value}:${rawDataParams.entityKey.value}",
-                    eventType = "CompileRequested",
-                    payload = buildJsonObject {
-                        put("payloadVersion", "1.0")
-                        put("tenantId", rawDataParams.tenantId.value)
-                        put("entityKey", rawDataParams.entityKey.value)
-                        put("version", rawDataParams.version.toString())
-                        put("compileMode", "async")
-                    }.toString()
-                )
-
-                when (val r = outboxRepository.insert(compileTaskEntry)) {
-                    is Result.Err -> {
-                        return DeployResult.failure(
-                            rawDataParams.entityKey.value,
-                            rawDataParams.version.toString(),
-                            r.error.toString()
-                        )
-                    }
-                    is Result.Ok -> { /* continue */ }
-                }
             }
         }
-
-        // 4. Ship (항상 Outbox를 통해 비동기 처리)
-        spec.shipSpec?.let { shipSpec ->
-            // ShipMode.Sync도 Outbox를 통해 처리 (일관성 및 확장성)
-            shipSpec.sinks.forEach { sink ->
-                val shipTaskEntry = OutboxEntry.create(
-                    aggregateType = AggregateType.SLICE,
-                    aggregateId = "${rawDataParams.tenantId.value}:${rawDataParams.entityKey.value}",
-                    eventType = "ShipRequested",
-                    payload = buildJsonObject {
-                        put("payloadVersion", "1.0")
-                        put("tenantId", rawDataParams.tenantId.value)
-                        put("entityKey", rawDataParams.entityKey.value)
-                        put("version", rawDataParams.version.toString())
-                        put("sink", sinkSpecToType(sink))
-                        put("shipMode", "async")
-                    }.toString()
-                )
-
-                when (val r = outboxRepository.insert(shipTaskEntry)) {
-                    is Result.Err -> {
-                        return DeployResult.failure(
-                            rawDataParams.entityKey.value,
-                            rawDataParams.version.toString(),
-                            "Ship outbox insert failed: ${r.error}"
-                        )
-                    }
-                    is Result.Ok -> { /* continue */ }
-                }
-            }
-        }
-
-        return DeployResult.success(
-            rawDataParams.entityKey.value,
-            rawDataParams.version.toString()
-        )
     }
 
     /**
-     * 비동기 Deploy 실행
+     * Deploy 실행 (Either 반환 - 함수형 에러 핸들링)
      *
-     * 1. RawData Ingest만 동기
-     * 2. COMPILE_TASK Outbox 적재
-     * 3. Job 정보 반환
+     * SOTA: Ingestion(RawData→Slice→View→SinkEvent)은 동기 처리.
+     * Sink 전송은 DynamoDB Streams → Lambda가 비동기 처리.
+     *
+     * executeSync()와 동일한 파이프라인이지만 Either<DomainError, DeployJob>을 반환하여
+     * 함수형 에러 핸들링을 지원합니다.
      */
-    suspend fun <T : EntityInput> executeAsync(input: T, spec: DeploySpec): Either<DomainError, DeployJob> {
-        // 1. EntityInput → RawData 변환
-        val rawDataParams = when (val result = convertToRawDataParams(input)) {
-            is Either.Left -> return result
-            is Either.Right -> result.value
+    suspend fun <T : EntityInput> executeAsync(input: T): Either<DomainError, DeployJob> {
+        val result = executeSync(input)
+
+        return if (result.success) {
+            DeployJob(
+                jobId = "deploy-${result.version}",
+                entityKey = result.entityKey,
+                version = result.version,
+                state = DeployState.DONE
+            ).right()
+        } else {
+            DomainError.StorageError(result.error ?: "Deploy failed").left()
         }
-
-        // 2. RawData Ingest (항상 동기)
-        val ingestResult = ingestWorkflow.execute(
-            tenantId = rawDataParams.tenantId,
-            entityKey = rawDataParams.entityKey,
-            version = rawDataParams.version,
-            schemaId = rawDataParams.schemaId,
-            schemaVersion = rawDataParams.schemaVersion,
-            payloadJson = rawDataParams.payloadJson
-        )
-
-        when (ingestResult) {
-            is Result.Err -> {
-                return DomainError.StorageError("Ingest failed: ${ingestResult.error}").left()
-            }
-            is Result.Ok -> { /* continue */ }
-        }
-
-        // 3. COMPILE_TASK Outbox 적재
-        val compileTaskEntry = OutboxEntry.create(
-            aggregateType = AggregateType.RAW_DATA,
-            aggregateId = "${rawDataParams.tenantId.value}:${rawDataParams.entityKey.value}",
-            eventType = "CompileRequested",
-            payload = buildJsonObject {
-                put("payloadVersion", "1.0")
-                put("tenantId", rawDataParams.tenantId.value)
-                put("entityKey", rawDataParams.entityKey.value)
-                put("version", rawDataParams.version.toString())
-                put("compileMode", spec.compileMode.toString())
-                put("shipSpec", if (spec.shipSpec != null) "present" else "absent")
-            }.toString()
-        )
-
-        val jobId = when (val r = outboxRepository.insert(compileTaskEntry)) {
-            is Result.Ok -> r.value.id.toString()
-            is Result.Err -> {
-                return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
-            }
-        }
-
-        return DeployJob(
-            jobId = jobId,
-            entityKey = rawDataParams.entityKey.value,
-            version = rawDataParams.version.toString(),
-            state = DeployState.QUEUED
-        ).right()
     }
 
     /**
-     * EntityInput을 RawData 파라미터로 변환
+     * EntityInput을 IngestionCommand로 변환
+     *
+     * EntityContractResolver를 통해 entityType별 RuleSet/ViewDef를 동적 해석.
      */
-    private fun <T : EntityInput> convertToRawDataParams(input: T): Either<DomainError, RawDataParams> {
+    private fun <T : EntityInput> convertToIngestionCommand(input: T): Either<DomainError, IngestionCommand> {
         val tenantId = TenantId(input.tenantId)
-        val version = VersionGenerator.generate() // 충돌 없는 고유 버전 (SSOT)
+        val version = VersionGenerator.generate()
+
+        // Contract is Law: EntityType에서 RuleSet/ViewDef 동적 해석
+        val ruleSetRef = when (val r = contractResolver.resolveRuleSetRef(input.entityType)) {
+            is Either.Left -> return r
+            is Either.Right -> r.value
+        }
+        val viewDefId = when (val r = contractResolver.resolveViewDefId(input.entityType)) {
+            is Either.Left -> return r
+            is Either.Right -> r.value
+        }
+        val viewDefVersion = when (val r = contractResolver.resolveViewDefVersion(input.entityType)) {
+            is Either.Left -> return r
+            is Either.Right -> r.value
+        }
 
         // EntityType별 처리
-        val (entityKey, schemaId, schemaVersion, payloadJson) = when (input) {
+        val (entityKey, data) = when (input) {
             is ProductInput -> {
                 val key = EntityKey("${input.entityType}:${input.sku}")
-                val schema = "product.v1"
-                val schemaVer = SemVer.parse("1.0.0")
-                val payload = buildJsonObject {
+                val jsonData = buildJsonObject {
                     put("sku", input.sku)
                     put("name", input.name)
                     put("price", input.price)
@@ -278,14 +140,12 @@ class DeployExecutor(
                             }
                         }
                     })
-                }.toString()
-                Tuple4(key, schema, schemaVer, payload)
+                }
+                Pair(key, jsonData)
             }
             is BrandInput -> {
                 val key = EntityKey("${input.entityType}:${input.brandId}")
-                val schema = "brand.v1"
-                val schemaVer = SemVer.parse("1.0.0")
-                val payload = buildJsonObject {
+                val jsonData = buildJsonObject {
                     put("brandId", input.brandId)
                     put("name", input.name)
                     input.logoUrl?.let { put("logoUrl", it) }
@@ -301,14 +161,12 @@ class DeployExecutor(
                             }
                         }
                     })
-                }.toString()
-                Tuple4(key, schema, schemaVer, payload)
+                }
+                Pair(key, jsonData)
             }
             is CategoryInput -> {
                 val key = EntityKey("${input.entityType}:${input.categoryId}")
-                val schema = "category.v1"
-                val schemaVer = SemVer.parse("1.0.0")
-                val payload = buildJsonObject {
+                val jsonData = buildJsonObject {
                     put("categoryId", input.categoryId)
                     put("name", input.name)
                     input.parentId?.let { put("parentId", it) }
@@ -324,64 +182,78 @@ class DeployExecutor(
                             }
                         }
                     })
-                }.toString()
-                Tuple4(key, schema, schemaVer, payload)
+                }
+                Pair(key, jsonData)
+            }
+            is GenericEntityInput -> {
+                convertGenericEntityInput(input)
+                    ?: return DomainError.NotSupportedError(
+                        "GenericEntityInput requires entityKey, sku, brandId, or categoryId in data"
+                    ).left()
             }
             else -> return DomainError.NotSupportedError("Unsupported EntityInput type: ${input::class}").left()
         }
 
-        return RawDataParams(
+        return IngestionCommand(
             tenantId = tenantId,
             entityKey = entityKey,
+            data = data,
+            ruleSetRef = ruleSetRef,
+            viewDefId = viewDefId,
+            viewDefVersion = viewDefVersion,
             version = version,
-            schemaId = schemaId,
-            schemaVersion = schemaVersion,
-            payloadJson = payloadJson
+            jobId = null
         ).right()
     }
 
-    /**
-     * RawData 변환 결과
-     */
-    private data class RawDataParams(
-        val tenantId: TenantId,
-        val entityKey: EntityKey,
-        val version: Long,
-        val schemaId: String,
-        val schemaVersion: SemVer,
-        val payloadJson: String
-    )
-
-    /**
-     * Tuple4 helper
-     */
-    private data class Tuple4<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
-
-    /**
-     * SinkSpec을 sinkType 문자열로 변환
-     */
-    private fun sinkSpecToType(spec: SinkSpec): String = when (spec) {
-        is OpenSearchSinkSpec -> "opensearch"
-        is PersonalizeSinkSpec -> "personalize"
+    private fun convertGenericEntityInput(input: GenericEntityInput): Pair<EntityKey, JsonObject>? {
+        val entityKeyValue = input.data["entityKey"]?.toString()
+            ?: input.data["sku"]?.toString()
+            ?: input.data["brandId"]?.toString()
+            ?: input.data["categoryId"]?.toString()
+            ?: return null
+        val key = EntityKey("${input.entityType}:$entityKeyValue")
+        val jsonData = buildJsonObject {
+            input.data.forEach { (k, v) ->
+                when (v) {
+                    is String -> put(k, v)
+                    is Number -> put(k, v.toDouble())
+                    is Boolean -> put(k, v)
+                    null -> { /* skip nulls */ }
+                    else -> put(k, v.toString())
+                }
+            }
+        }
+        return Pair(key, jsonData)
     }
 
     /**
-     * EntityInput에서 EntityKey 추출 (DRY)
+     * Contract 기반 DeployPlan 생성 (explain용)
+     *
+     * EntityContractResolver에서 실제 RuleSet/ViewDef/Slice 정보를 해석.
      */
-    private fun <T : EntityInput> extractEntityKey(input: T): Either<DomainError, EntityKey> = when (input) {
-        is ProductInput -> EntityKey("${input.entityType}:${input.sku}").right()
-        is BrandInput -> EntityKey("${input.entityType}:${input.brandId}").right()
-        is CategoryInput -> EntityKey("${input.entityType}:${input.categoryId}").right()
-        else -> DomainError.NotSupportedError("Unsupported EntityInput type: ${input::class}").left()
+    fun explain(entityType: String, entityKey: String): com.oliveyoung.ivmlite.sdk.domain.DeployPlan {
+        val sliceTypes = contractResolver.resolveSliceTypes(entityType)
+        val viewDefIds = contractResolver.resolveViewDefIds(entityType)
+        val ruleSetId = when (val r = contractResolver.resolveRuleSetRef(entityType)) {
+            is Either.Right -> r.value.id
+            is Either.Left -> "unknown"
+        }
+
+        return com.oliveyoung.ivmlite.sdk.domain.DeployPlan(
+            entityKey = entityKey,
+            entityType = entityType,
+            slices = sliceTypes,
+            views = viewDefIds,
+            rules = listOf(ruleSetId)
+        )
     }
 
-    // ===== 단계별 제어 API (DX 끝판왕) =====
-
     /**
-     * Ingest만 실행 (동기)
+     * Ingest만 실행 (올인원 처리)
      */
-    suspend fun <T : EntityInput> ingestOnly(input: T): IngestResult {
-        val rawDataParams = when (val result = convertToRawDataParams(input)) {
+    internal suspend fun <T : EntityInput> ingestOnly(input: T): IngestResult {
+        val command = when (val result = convertToIngestionCommand(input)) {
             is Either.Left -> return IngestResult(
                 entityKey = "unknown",
                 version = 0L,
@@ -391,229 +263,20 @@ class DeployExecutor(
             is Either.Right -> result.value
         }
 
-        val ingestResult = ingestWorkflow.execute(
-            tenantId = rawDataParams.tenantId,
-            entityKey = rawDataParams.entityKey,
-            version = rawDataParams.version,
-            schemaId = rawDataParams.schemaId,
-            schemaVersion = rawDataParams.schemaVersion,
-            payloadJson = rawDataParams.payloadJson
-        )
+        val ingestionResult = orchestrator.ingest(command)
 
-        return when (ingestResult) {
+        return when (ingestionResult) {
             is Result.Err -> IngestResult(
-                entityKey = rawDataParams.entityKey.value,
-                version = rawDataParams.version,
+                entityKey = command.entityKey.value,
+                version = command.version,
                 success = false,
-                error = ingestResult.error.toString()
+                error = ingestionResult.error.toString()
             )
-            is Result.Ok -> IngestResult(
-                entityKey = rawDataParams.entityKey.value,
-                version = rawDataParams.version,
+            is Result.Ok<*> -> IngestResult(
+                entityKey = command.entityKey.value,
+                version = command.version,
                 success = true
             )
         }
-    }
-
-    /**
-     * Compile만 실행 (동기) - 이미 Ingest된 데이터
-     */
-    suspend fun <T : EntityInput> compileOnly(input: T, version: Long): CompileResult {
-        val tenantId = TenantId(input.tenantId)
-        val entityKey = when (val result = extractEntityKey(input)) {
-            is Either.Left -> return CompileResult(
-                entityKey = "unknown",
-                version = version,
-                slices = emptyList(),
-                success = false,
-                error = result.value.message ?: "EntityKey extraction failed"
-            )
-            is Either.Right -> result.value
-        }
-
-        val slicingResult = slicingWorkflow.execute(
-            tenantId = tenantId,
-            entityKey = entityKey,
-            version = version
-        )
-
-        return when (slicingResult) {
-            is Result.Err -> CompileResult(
-                entityKey = entityKey.value,
-                version = version,
-                slices = emptyList(),
-                success = false,
-                error = slicingResult.error.toString()
-            )
-            is Result.Ok -> CompileResult(
-                entityKey = entityKey.value,
-                version = version,
-                slices = slicingResult.value.map { it.sliceType.name.lowercase() },
-                success = true
-            )
-        }
-    }
-
-    /**
-     * Compile 비동기 실행 (Outbox)
-     */
-    suspend fun <T : EntityInput> compileAsync(input: T, version: Long): Either<DomainError, DeployJob> {
-        val tenantId = TenantId(input.tenantId)
-        val entityKey = when (val result = extractEntityKey(input)) {
-            is Either.Left -> return result
-            is Either.Right -> result.value
-        }
-
-        val compileTaskEntry = OutboxEntry.create(
-            aggregateType = AggregateType.RAW_DATA,
-            aggregateId = "${tenantId.value}:${entityKey.value}",
-            eventType = "CompileRequested",
-            payload = buildJsonObject {
-                put("payloadVersion", "1.0")
-                put("tenantId", tenantId.value)
-                put("entityKey", entityKey.value)
-                put("version", version.toString())
-                put("compileMode", "async")
-            }.toString()
-        )
-
-        val jobId = when (val r = outboxRepository.insert(compileTaskEntry)) {
-            is Result.Ok -> r.value.id.toString()
-            is Result.Err -> return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
-        }
-
-        return DeployJob(
-            jobId = jobId,
-            entityKey = entityKey.value,
-            version = version.toString(),
-            state = DeployState.QUEUED
-        ).right()
-    }
-
-    /**
-     * Ship 실행 (항상 Outbox를 통해 비동기 처리)
-     *
-     * @deprecated 동기 실행은 제거되었습니다. 항상 Outbox를 통해 비동기로 처리됩니다.
-     *             shipAsync()를 사용하세요.
-     */
-    @Deprecated("Ship은 항상 Outbox를 통해 비동기로 처리됩니다. shipAsync()를 사용하세요.", ReplaceWith("shipAsync(input, version)"))
-    suspend fun <T : EntityInput> shipSync(input: T, version: Long, sinkTypes: List<String>): Either<DomainError, ShipResult> {
-        // Outbox를 통해 비동기로 처리 (일관성 유지)
-        return when (val result = shipAsync(input, version)) {
-            is Either.Left -> result
-            is Either.Right -> ShipResult(
-                entityKey = result.value.entityKey,
-                version = result.value.version.toLong(),
-                sinks = sinkTypes,
-                success = true,
-                error = null
-            ).right()
-        }
-    }
-
-    /**
-     * Ship 비동기 실행 (Outbox)
-     */
-    suspend fun <T : EntityInput> shipAsync(input: T, version: Long): Either<DomainError, DeployJob> {
-        val tenantId = TenantId(input.tenantId)
-        val entityKey = when (val result = extractEntityKey(input)) {
-            is Either.Left -> return result
-            is Either.Right -> result.value
-        }
-
-        val shipTaskEntry = OutboxEntry.create(
-            aggregateType = AggregateType.SLICE,
-            aggregateId = "${tenantId.value}:${entityKey.value}",
-            eventType = "ShipRequested",
-            payload = buildJsonObject {
-                put("payloadVersion", "1.0")
-                put("tenantId", tenantId.value)
-                put("entityKey", entityKey.value)
-                put("version", version.toString())
-                put("shipMode", "async")
-            }.toString()
-        )
-
-        val jobId = when (val r = outboxRepository.insert(shipTaskEntry)) {
-            is Result.Ok -> r.value.id.toString()
-            is Result.Err -> return DomainError.StorageError("Outbox insert failed: ${r.error}").left()
-        }
-
-        return DeployJob(
-            jobId = jobId,
-            entityKey = entityKey.value,
-            version = version.toString(),
-            state = DeployState.QUEUED
-        ).right()
-    }
-
-    /**
-     * 특정 Sink만 Ship 실행 (항상 Outbox를 통해 비동기 처리)
-     *
-     * @deprecated 동기 실행은 제거되었습니다. 항상 Outbox를 통해 비동기로 처리됩니다.
-     *             shipAsyncTo()를 사용하세요.
-     */
-    @Deprecated("Ship은 항상 Outbox를 통해 비동기로 처리됩니다. shipAsyncTo()를 사용하세요.", ReplaceWith("shipAsyncTo(input, version, sinks)"))
-    suspend fun <T : EntityInput> shipSyncTo(input: T, version: Long, sinks: List<SinkSpec>): Either<DomainError, ShipResult> {
-        // Outbox를 통해 비동기로 처리 (일관성 유지)
-        return when (val result = shipAsyncTo(input, version, sinks)) {
-            is Either.Left -> result
-            is Either.Right -> {
-                val sinkTypes = sinks.map { sinkSpecToType(it) }
-                ShipResult(
-                    entityKey = result.value.entityKey,
-                    version = result.value.version.toLong(),
-                    sinks = sinkTypes,
-                    success = true,
-                    error = null
-                ).right()
-            }
-        }
-    }
-
-    /**
-     * 특정 Sink만 비동기 Ship (Outbox)
-     */
-    suspend fun <T : EntityInput> shipAsyncTo(input: T, version: Long, sinks: List<SinkSpec>): Either<DomainError, DeployJob> {
-        val tenantId = TenantId(input.tenantId)
-        val entityKey = when (val result = extractEntityKey(input)) {
-            is Either.Left -> return result
-            is Either.Right -> result.value
-        }
-
-        if (sinks.isEmpty()) {
-            return DomainError.ValidationError("sinks", "No sinks specified").left()
-        }
-
-        val jobIds = mutableListOf<String>()
-
-        for (sink in sinks) {
-            val shipTaskEntry = OutboxEntry.create(
-                aggregateType = AggregateType.SLICE,
-                aggregateId = "${tenantId.value}:${entityKey.value}",
-                eventType = "ShipRequested",
-                payload = buildJsonObject {
-                    put("payloadVersion", "1.0")
-                    put("tenantId", tenantId.value)
-                    put("entityKey", entityKey.value)
-                    put("version", version.toString())
-                    put("sink", sinkSpecToType(sink))
-                    put("shipMode", "async")
-                }.toString()
-            )
-
-            // fail-closed: 에러 발생 시 즉시 반환
-            when (val r = outboxRepository.insert(shipTaskEntry)) {
-                is Result.Ok -> jobIds.add(r.value.id.toString())
-                is Result.Err -> return DomainError.StorageError("Ship outbox insert failed: ${r.error}").left()
-            }
-        }
-
-        return DeployJob(
-            jobId = jobIds.first(),
-            entityKey = entityKey.value,
-            version = version.toString(),
-            state = DeployState.QUEUED
-        ).right()
     }
 }

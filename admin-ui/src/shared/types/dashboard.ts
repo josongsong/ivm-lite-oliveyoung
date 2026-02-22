@@ -1,29 +1,27 @@
 export interface DashboardResponse {
-  outbox: OutboxStats
+  sinkEvent: SinkEventStats
   worker: WorkerStatus
   database: DatabaseStats
   timestamp: string
 }
 
-export interface OutboxStats {
+export interface SinkEventStats {
   total: {
     pending: number
     processing: number
     failed: number
-    processed: number
+    completed: number
   }
   byStatus: Record<string, number>
-  byType: Record<string, number>
-  details: OutboxDetail[]
+  details: SinkEventDetail[]
 }
 
-export interface OutboxDetail {
+export interface SinkEventDetail {
   status: string
-  aggregateType: string
+  viewType: string
   count: number
   oldest: string | null
   newest: string | null
-  avgLatencySeconds: number | null
 }
 
 export interface WorkerStatus {
@@ -36,7 +34,7 @@ export interface WorkerStatus {
 
 export interface DatabaseStats {
   rawDataCount: number
+  sinkEventCount: number
   contractsCount: number
-  outboxCount: number
   note: string
 }

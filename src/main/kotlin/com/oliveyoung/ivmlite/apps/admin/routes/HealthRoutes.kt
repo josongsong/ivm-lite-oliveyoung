@@ -9,8 +9,6 @@ import io.ktor.server.application.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
 import kotlinx.serialization.Serializable
-import kotlinx.serialization.json.JsonElement
-import kotlinx.serialization.json.JsonPrimitive
 import org.koin.ktor.ext.inject
 
 /**
@@ -23,7 +21,7 @@ import org.koin.ktor.ext.inject
  */
 fun Route.healthRoutes() {
     val healthService by inject<HealthService>()
-    
+
     /**
      * GET /health
      * 전체 시스템 상태
@@ -31,14 +29,14 @@ fun Route.healthRoutes() {
     get("/health") {
         try {
             val health = healthService.checkAll()
-            
+
             val statusCode = when (health.overall) {
                 com.oliveyoung.ivmlite.pkg.health.domain.HealthStatus.HEALTHY -> HttpStatusCode.OK
                 com.oliveyoung.ivmlite.pkg.health.domain.HealthStatus.DEGRADED -> HttpStatusCode.OK
                 com.oliveyoung.ivmlite.pkg.health.domain.HealthStatus.UNHEALTHY -> HttpStatusCode.ServiceUnavailable
                 com.oliveyoung.ivmlite.pkg.health.domain.HealthStatus.UNKNOWN -> HttpStatusCode.OK
             }
-            
+
             call.respond(statusCode, health.toDto())
         } catch (e: Exception) {
             call.application.log.error("Health check failed", e)
@@ -48,7 +46,7 @@ fun Route.healthRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /health/live
      * Kubernetes Liveness Probe
@@ -60,7 +58,7 @@ fun Route.healthRoutes() {
             call.respond(HttpStatusCode.ServiceUnavailable, mapOf("status" to "dead"))
         }
     }
-    
+
     /**
      * GET /health/ready
      * Kubernetes Readiness Probe
@@ -79,7 +77,7 @@ fun Route.healthRoutes() {
             ))
         }
     }
-    
+
     /**
      * GET /health/{component}
      * 개별 컴포넌트 상태
@@ -90,7 +88,7 @@ fun Route.healthRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "MISSING_COMPONENT", message = "Component name required"))
                 return@get
             }
-            
+
             val health = healthService.checkComponent(componentName)
             if (health != null) {
                 val statusCode = when (health.status) {
@@ -113,7 +111,7 @@ fun Route.healthRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /health/components
      * 사용 가능한 컴포넌트 목록
@@ -123,7 +121,7 @@ fun Route.healthRoutes() {
             "components" to healthService.getComponentNames()
         ))
     }
-    
+
     /**
      * GET /health/version
      * 버전 정보

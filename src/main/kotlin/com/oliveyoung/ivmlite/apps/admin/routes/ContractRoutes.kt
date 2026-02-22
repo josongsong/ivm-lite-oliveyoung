@@ -130,7 +130,7 @@ fun Route.contractRoutes() {
         val id = call.parameters["id"]
             ?: throw IllegalArgumentException("ID is required")
 
-        val kind = ContractKind.fromString(kindParam)
+        val kind = ContractKind.fromWireValue(kindParam)
             ?: throw IllegalArgumentException("Invalid contract kind: $kindParam")
 
         when (val result = contractService.getById(kind, id)) {

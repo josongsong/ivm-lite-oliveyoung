@@ -1,7 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.workflow.canvas.domain
 
 import kotlinx.serialization.Serializable
-import java.time.Instant
 
 /**
  * 워크플로우 노드 타입

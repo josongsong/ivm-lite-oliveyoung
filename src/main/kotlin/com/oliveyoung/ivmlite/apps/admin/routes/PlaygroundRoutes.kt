@@ -7,7 +7,6 @@ import io.ktor.server.application.*
 import io.ktor.server.request.*
 import io.ktor.server.response.*
 import io.ktor.server.routing.*
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.Serializable
 import org.koin.ktor.ext.inject
 
@@ -285,7 +284,7 @@ private fun getPresets() = PresetResponse(
   "stock": 150,
   "isActive": true,
   "tags": ["신상", "베스트셀러"]
-}""",
+}""".trimIndent(),
             sampleYaml = """kind: RULESET
 id: product_ruleset
 version: "1.0.0"
@@ -300,7 +299,7 @@ slices:
         name: displayName
         price: displayPrice
         brandId: brand
-"""
+""".trimIndent()
         ),
         PresetItem(
             id = "category",
@@ -314,7 +313,7 @@ slices:
   "depth": 2,
   "displayOrder": 1,
   "isActive": true
-}""",
+}""".trimIndent(),
             sampleYaml = """kind: RULESET
 id: category_ruleset
 version: "1.0.0"
@@ -323,7 +322,7 @@ slices:
   - type: CORE
     buildRules:
       passThrough: ["*"]
-"""
+""".trimIndent()
         ),
         PresetItem(
             id = "brand",
@@ -336,7 +335,7 @@ slices:
   "logoUrl": "https://cdn.oliveyoung.co.kr/brands/romand.png",
   "isPartner": true,
   "ranking": 5
-}""",
+}""".trimIndent(),
             sampleYaml = """kind: RULESET
 id: brand_ruleset
 version: "1.0.0"
@@ -348,7 +347,7 @@ slices:
   - type: ENRICHED
     buildRules:
       passThrough: ["*"]
-"""
+""".trimIndent()
         ),
         PresetItem(
             id = "order",
@@ -365,7 +364,7 @@ slices:
   "totalAmount": 51000,
   "status": "COMPLETED",
   "orderedAt": "2024-01-15T10:30:00Z"
-}""",
+}""".trimIndent(),
             sampleYaml = """kind: RULESET
 id: order_ruleset
 version: "1.0.0"
@@ -377,7 +376,7 @@ slices:
   - type: DETAIL
     buildRules:
       passThrough: ["*"]
-"""
+""".trimIndent()
         )
     )
 )

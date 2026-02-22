@@ -2,9 +2,11 @@ package com.oliveyoung.ivmlite.apps.admin.application.explorer
 
 import com.oliveyoung.ivmlite.apps.admin.config.AdminConstants
 import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerRepositoryPort
-import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
+import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
+import com.oliveyoung.ivmlite.shared.domain.determinism.CanonicalJson
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractError
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
@@ -30,7 +32,6 @@ import java.time.Instant
 class RawDataExplorerService(
     private val rawDataRepo: RawDataRepositoryPort,
     private val explorerRepo: ExplorerRepositoryPort,
-    private val ingestWorkflow: IngestWorkflow?,
     private val slicingWorkflow: SlicingWorkflow?
 ) {
     private val logger = LoggerFactory.getLogger(RawDataExplorerService::class.java)
@@ -46,9 +47,6 @@ class RawDataExplorerService(
         payload: String,
         compile: Boolean = false
     ): Result<IngestResult> {
-        val workflow = ingestWorkflow
-            ?: return Result.Err(DomainError.ConfigError("IngestWorkflow not configured"))
-
         val tenant = TenantId(tenantId)
         val entity = EntityKey(entityKey)
         val version = VersionGenerator.generate()
@@ -63,8 +61,22 @@ class RawDataExplorerService(
                 }
             }
 
+        val canonical = CanonicalJson.canonicalizeOrNull(payload)
+            ?: return Result.Err(ContractError("invalid json payload"))
+        val hashInput = "$canonical|$schemaId|$semVer"
+        val hash = "sha256:${Hashing.sha256Hex(hashInput)}"
+        val record = RawDataRecord(
+            tenantId = tenant,
+            entityKey = entity,
+            version = version,
+            schemaId = schemaId,
+            schemaVersion = semVer,
+            payload = canonical,
+            payloadHash = hash,
+        )
+
         return Result.catch {
-            when (val result = workflow.execute(tenant, entity, version, schemaId, semVer, payload)) {
+            when (val result = rawDataRepo.putIdempotent(record)) {
                 is Result.Ok -> {
                     val (slicesCreated, compiled) = compileIfNeeded(tenant, entity, version, compile)
                     IngestResult(

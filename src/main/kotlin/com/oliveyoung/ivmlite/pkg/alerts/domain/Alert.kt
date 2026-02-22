@@ -6,7 +6,7 @@ import java.util.UUID
 
 /**
  * 발생한 Alert 엔티티
- * 
+ *
  * AlertRule의 조건이 충족되면 생성되어 상태를 추적한다.
  *
  * @property id 고유 식별자
@@ -45,7 +45,7 @@ data class Alert(
         require(name.isNotBlank()) { "name must not be blank" }
         require(occurrences >= 1) { "occurrences must be at least 1" }
     }
-    
+
     companion object {
         /**
          * 새 Alert 생성 (FIRING 상태)
@@ -66,7 +66,7 @@ data class Alert(
             labels = rule.labels
         )
     }
-    
+
     /**
      * 사용자가 Alert 확인
      */
@@ -78,7 +78,7 @@ data class Alert(
             acknowledgedBy = by
         )
     }
-    
+
     /**
      * Alert 해결 (조건이 더 이상 충족되지 않음)
      */
@@ -89,7 +89,7 @@ data class Alert(
             resolvedAt = at
         )
     }
-    
+
     /**
      * 일시적으로 무음 처리
      */
@@ -99,7 +99,7 @@ data class Alert(
             silencedUntil = at.plus(duration)
         )
     }
-    
+
     /**
      * 동일 조건 재발생 (카운트 증가)
      */
@@ -109,23 +109,23 @@ data class Alert(
         }
         return copy(occurrences = occurrences + 1)
     }
-    
+
     /**
      * 무음 상태 해제 여부 확인
      */
     fun isSilenceExpired(now: Instant = Instant.now()): Boolean =
         status == AlertStatus.SILENCED && silencedUntil != null && now.isAfter(silencedUntil)
-    
+
     /**
      * 활성 상태 여부 (FIRING 또는 ACKNOWLEDGED)
      */
     fun isActive(): Boolean = status == AlertStatus.FIRING || status == AlertStatus.ACKNOWLEDGED
-    
+
     /**
      * Alert 지속 시간
      */
     fun duration(now: Instant = Instant.now()): Duration = Duration.between(firedAt, resolvedAt ?: now)
-    
+
     /**
      * 알림 메시지 생성
      */
@@ -143,7 +143,7 @@ data class Alert(
             append(" (${occurrences}x)")
         }
     }
-    
+
     /**
      * Slack 메시지 포맷
      */
@@ -153,13 +153,13 @@ data class Alert(
             AlertSeverity.WARNING -> "⚠️"
             AlertSeverity.INFO -> "ℹ️"
         }
-        
+
         val color = when (severity) {
             AlertSeverity.CRITICAL -> "#dc3545"  // red
             AlertSeverity.WARNING -> "#ffc107"   // yellow
             AlertSeverity.INFO -> "#17a2b8"      // blue
         }
-        
+
         return mapOf(
             "attachments" to listOf(
                 mapOf(

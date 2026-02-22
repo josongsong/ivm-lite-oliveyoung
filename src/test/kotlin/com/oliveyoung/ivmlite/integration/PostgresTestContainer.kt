@@ -1,12 +1,9 @@
 package com.oliveyoung.ivmlite.integration
 
 import org.flywaydb.core.Flyway
-import org.jooq.DSLContext
-import org.jooq.SQLDialect
-import org.jooq.impl.DSL
+import org.jetbrains.exposed.sql.Database
 import org.testcontainers.DockerClientFactory
 import org.testcontainers.containers.PostgreSQLContainer
-import java.sql.DriverManager
 
 /**
  * PostgreSQL Testcontainer 공통 설정 (RFC-IMPL Phase B-4)
@@ -36,7 +33,7 @@ object PostgresTestContainer {
         }
     }
 
-    fun start(): DSLContext {
+    fun start(): Database {
         require(isDockerAvailable) { "Docker is not available. Skipping integration tests." }
 
         if (!container.isRunning) {
@@ -48,7 +45,7 @@ object PostgresTestContainer {
             initialized = true
         }
 
-        return createDSLContext()
+        return connectDatabase()
     }
 
     private fun runMigrations() {
@@ -59,13 +56,13 @@ object PostgresTestContainer {
             .migrate()
     }
 
-    fun createDSLContext(): DSLContext {
-        val connection = DriverManager.getConnection(
-            container.jdbcUrl,
-            container.username,
-            container.password,
+    fun connectDatabase(): Database {
+        return Database.connect(
+            url = container.jdbcUrl,
+            driver = "org.postgresql.Driver",
+            user = container.username,
+            password = container.password
         )
-        return DSL.using(connection, SQLDialect.POSTGRES)
     }
 
     fun jdbcUrl(): String = container.jdbcUrl

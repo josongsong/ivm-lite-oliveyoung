@@ -2,7 +2,6 @@ package com.oliveyoung.ivmlite.pkg.rawdata.adapters
 
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.RawDataRecord
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.InvariantViolation
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.NotFoundError

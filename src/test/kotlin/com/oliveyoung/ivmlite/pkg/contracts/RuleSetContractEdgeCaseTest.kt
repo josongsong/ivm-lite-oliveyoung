@@ -1,10 +1,9 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
-import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
@@ -54,7 +53,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": []
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -90,7 +89,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -126,7 +125,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -171,7 +170,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -203,7 +202,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             },
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -227,47 +226,6 @@ class RuleSetContractEdgeCaseTest : StringSpec({
 
     // ==================== 순환성 검증 ====================
 
-    "DynamoDB - joins에 순환 참조 → 정상 로드 (순환 감지는 워크플로우 책임)" {
-        val dataJson = """{
-            "entityType": "PRODUCT",
-            "impactMap": {},
-            "joins": [
-                {
-                    "sourceSlice": "CORE",
-                    "targetEntity": "CATEGORY",
-                    "joinPath": "/categoryId",
-                    "cardinality": "MANY_TO_ONE"
-                },
-                {
-                    "sourceSlice": "CATEGORY",
-                    "targetEntity": "PRODUCT",
-                    "joinPath": "/products",
-                    "cardinality": "ONE_TO_MANY"
-                }
-            ],
-            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
-
-        val responseItem = mapOf(
-            "id" to attr("ruleset.v1"),
-            "version" to attr("1.0.0"),
-            "kind" to attr("RULESET"),
-            "status" to attr("ACTIVE"),
-            "data" to attr(dataJson),
-        )
-
-        val mockClient = createMockClient(responseItem)
-        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
-        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
-
-        val result = adapter.loadRuleSetContract(ref)
-
-        // 순환 참조는 파싱 단계에서 감지하지 않음 (워크플로우에서 처리)
-        result.shouldBeInstanceOf<Result.Ok<*>>()
-        val contract = (result as Result.Ok).value
-        contract.joins.size shouldBe 2
-    }
-
     // ==================== 결정성 검증 (대소문자 정규화) ====================
 
     "DynamoDB - SliceType 대소문자 혼합 → ContractError" {
@@ -278,7 +236,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             },
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -313,7 +271,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -343,7 +301,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             },
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -379,7 +337,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -417,7 +375,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -461,7 +419,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -498,7 +456,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -534,7 +492,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             },
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -564,7 +522,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [$slicesJson]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -593,7 +551,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             "impactMap": {},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -614,40 +572,6 @@ class RuleSetContractEdgeCaseTest : StringSpec({
         contract.entityType shouldBe "상품"
     }
 
-    "DynamoDB - joinPath에 특수문자 → 정상 로드" {
-        val dataJson = """{
-            "entityType": "PRODUCT",
-            "impactMap": {},
-            "joins": [
-                {
-                    "sourceSlice": "CORE",
-                    "targetEntity": "CATEGORY",
-                    "joinPath": "/data/attributes/category-id",
-                    "cardinality": "MANY_TO_ONE"
-                }
-            ],
-            "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
-
-        val responseItem = mapOf(
-            "id" to attr("ruleset.v1"),
-            "version" to attr("1.0.0"),
-            "kind" to attr("RULESET"),
-            "status" to attr("ACTIVE"),
-            "data" to attr(dataJson),
-        )
-
-        val mockClient = createMockClient(responseItem)
-        val adapter = DynamoDBContractRegistryAdapter(mockClient, tableName)
-        val ref = ContractRef("ruleset.v1", SemVer.parse("1.0.0"))
-
-        val result = adapter.loadRuleSetContract(ref)
-
-        result.shouldBeInstanceOf<Result.Ok<*>>()
-        val contract = (result as Result.Ok).value
-        contract.joins[0].joinPath shouldBe "/data/attributes/category-id"
-    }
-
     // ==================== 불변식 위반 테스트 ====================
 
     "DynamoDB - impactMap에 있지만 slices에 없는 타입 → 정상 로드 (워크플로우 책임)" {
@@ -656,7 +580,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             "impactMap": {"PRICE": ["/price"]},
             "joins": [],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -689,7 +613,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
                 }
             ],
             "slices": [{"type": "CORE", "buildRules": {"type": "PassThrough", "fields": ["*"]}}]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -755,7 +679,7 @@ class RuleSetContractEdgeCaseTest : StringSpec({
             "impactMap": {"CORE": 123},
             "joins": [],
             "slices": []
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),

@@ -31,7 +31,7 @@ import java.util.UUID
  */
 fun Route.backfillRoutes() {
     val backfillService by inject<BackfillService>()
-    
+
     /**
      * GET /backfill
      * Job 목록 조회
@@ -41,14 +41,14 @@ fun Route.backfillRoutes() {
             val status = call.request.queryParameters["status"]
                 ?.let { BackfillStatus.valueOf(it.uppercase()) }
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
-            
+
             val jobs = if (status != null) {
                 // TODO: status 필터 지원
                 backfillService.getRecentJobs(limit)
             } else {
                 backfillService.getRecentJobs(limit)
             }
-            
+
             call.respond(HttpStatusCode.OK, BackfillJobListResponse(
                 jobs = jobs.map { it.toDto() },
                 total = jobs.size
@@ -61,7 +61,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /backfill
      * Job 생성
@@ -69,7 +69,7 @@ fun Route.backfillRoutes() {
     post("/backfill") {
         try {
             val request = call.receive<CreateBackfillRequestDto>()
-            
+
             // Scope 파싱
             val scope = BackfillScope(
                 tenantIds = request.scope.tenantIds?.toSet(),
@@ -81,7 +81,7 @@ fun Route.backfillRoutes() {
                 sliceTypes = request.scope.sliceTypes?.toSet(),
                 schemaIds = request.scope.schemaIds?.toSet()
             )
-            
+
             val config = BackfillConfig(
                 batchSize = request.config?.batchSize ?: 100,
                 concurrency = request.config?.concurrency ?: 4,
@@ -89,7 +89,7 @@ fun Route.backfillRoutes() {
                 batchDelayMs = request.config?.batchDelayMs ?: 0,
                 dryRun = request.config?.dryRun ?: false
             )
-            
+
             val createRequest = CreateBackfillRequest(
                 name = request.name,
                 type = BackfillType.valueOf(request.type.uppercase()),
@@ -99,7 +99,7 @@ fun Route.backfillRoutes() {
                 description = request.description ?: "",
                 priority = request.priority ?: 5
             )
-            
+
             when (val result = backfillService.createJob(createRequest)) {
                 is Result.Ok -> {
                     call.respond(HttpStatusCode.Created, result.value.toDto())
@@ -119,7 +119,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /backfill/active
      * 활성 Job 목록
@@ -138,7 +138,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /backfill/{id}
      * Job 상세 조회
@@ -149,7 +149,7 @@ fun Route.backfillRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid job ID"))
                 return@get
             }
-            
+
             val job = backfillService.getJob(id)
             if (job != null) {
                 call.respond(HttpStatusCode.OK, job.toDto())
@@ -163,7 +163,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /backfill/{id}/dry-run
      * Dry Run 실행
@@ -174,7 +174,7 @@ fun Route.backfillRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid job ID"))
                 return@post
             }
-            
+
             when (val result = backfillService.dryRun(id)) {
                 is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, result.value.toDto())
@@ -194,7 +194,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /backfill/{id}/start
      * Job 시작
@@ -205,7 +205,7 @@ fun Route.backfillRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid job ID"))
                 return@post
             }
-            
+
             when (val result = backfillService.startJob(id)) {
                 is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf(
@@ -228,7 +228,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /backfill/{id}/pause
      * Job 일시정지
@@ -239,7 +239,7 @@ fun Route.backfillRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid job ID"))
                 return@post
             }
-            
+
             when (val result = backfillService.pauseJob(id)) {
                 is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf("success" to true, "status" to "PAUSED"))
@@ -258,7 +258,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /backfill/{id}/resume
      * Job 재개
@@ -269,7 +269,7 @@ fun Route.backfillRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid job ID"))
                 return@post
             }
-            
+
             when (val result = backfillService.resumeJob(id)) {
                 is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf("success" to true, "status" to "RUNNING"))
@@ -288,7 +288,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /backfill/{id}/cancel
      * Job 취소
@@ -299,7 +299,7 @@ fun Route.backfillRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid job ID"))
                 return@post
             }
-            
+
             when (val result = backfillService.cancelJob(id)) {
                 is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf("success" to true, "status" to "CANCELLED"))
@@ -318,7 +318,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /backfill/{id}/retry
      * 실패한 Job 재시도
@@ -329,7 +329,7 @@ fun Route.backfillRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid job ID"))
                 return@post
             }
-            
+
             when (val result = backfillService.retryJob(id)) {
                 is Result.Ok -> {
                     call.respond(HttpStatusCode.OK, mapOf("success" to true, "status" to "PENDING"))
@@ -348,7 +348,7 @@ fun Route.backfillRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /backfill/stats
      * 통계 조회

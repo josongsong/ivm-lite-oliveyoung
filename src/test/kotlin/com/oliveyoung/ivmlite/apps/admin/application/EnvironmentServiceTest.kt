@@ -3,7 +3,7 @@ package com.oliveyoung.ivmlite.apps.admin.application
 import arrow.core.Either
 import com.oliveyoung.ivmlite.shared.config.*
 import io.mockk.mockk
-import org.jooq.DSLContext
+import org.jetbrains.exposed.sql.Database
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -18,7 +18,7 @@ import kotlin.test.assertTrue
 class EnvironmentServiceTest {
 
     private lateinit var appConfig: AppConfig
-    private lateinit var dsl: DSLContext
+    private lateinit var dsl: Database
     private lateinit var service: EnvironmentService
 
     @BeforeEach

@@ -3,8 +3,6 @@ package com.oliveyoung.ivmlite.shared.domain.determinism
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.databind.SerializationFeature
-import com.fasterxml.jackson.databind.node.ArrayNode
-import com.fasterxml.jackson.databind.node.ObjectNode
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 
 /**
@@ -20,6 +18,12 @@ object CanonicalJson {
   }
 
   fun canonicalize(json: String): String = canonicalize(mapper.readTree(json))
+
+  fun canonicalizeOrNull(json: String): String? = try {
+    canonicalize(json)
+  } catch (_: Exception) {
+    null
+  }
 
   fun canonicalize(node: JsonNode): String {
     val sorted = sortKeys(node)

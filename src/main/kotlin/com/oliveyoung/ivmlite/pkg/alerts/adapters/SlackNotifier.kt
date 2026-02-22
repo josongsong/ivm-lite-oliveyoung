@@ -14,7 +14,7 @@ import java.time.Duration
 
 /**
  * Slack Webhook Notifier
- * 
+ *
  * Slack Incoming Webhook을 통해 Alert를 발송한다.
  */
 class SlackNotifier(
@@ -23,32 +23,32 @@ class SlackNotifier(
         .connectTimeout(Duration.ofSeconds(10))
         .build()
 ) : NotifierPort {
-    
+
     private val logger = LoggerFactory.getLogger(SlackNotifier::class.java)
     private val json = Json { encodeDefaults = true }
-    
+
     override val channel = NotificationChannel.SLACK
-    
+
     override fun isEnabled(): Boolean = !webhookUrl.isNullOrBlank()
-    
+
     override suspend fun send(alert: Alert): Boolean {
         if (!isEnabled()) {
             logger.debug("Slack notifier is disabled")
             return false
         }
-        
+
         return try {
             val payload = alert.toSlackPayload()
             val body = json.encodeToString(payload)
-            
+
             val request = HttpRequest.newBuilder()
                 .uri(URI.create(webhookUrl!!))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build()
-            
+
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
-            
+
             if (response.statusCode() == 200) {
                 logger.info("Slack alert sent: {} [{}]", alert.name, alert.id)
                 true
@@ -61,10 +61,10 @@ class SlackNotifier(
             false
         }
     }
-    
+
     override suspend fun sendResolved(alert: Alert): Boolean {
         if (!isEnabled()) return false
-        
+
         return try {
             val payload = mapOf(
                 "attachments" to listOf(
@@ -91,14 +91,14 @@ class SlackNotifier(
                     )
                 )
             )
-            
+
             val body = json.encodeToString(payload)
             val request = HttpRequest.newBuilder()
                 .uri(URI.create(webhookUrl!!))
                 .header("Content-Type", "application/json")
                 .POST(HttpRequest.BodyPublishers.ofString(body))
                 .build()
-            
+
             val response = httpClient.send(request, HttpResponse.BodyHandlers.ofString())
             response.statusCode() == 200
         } catch (e: Exception) {

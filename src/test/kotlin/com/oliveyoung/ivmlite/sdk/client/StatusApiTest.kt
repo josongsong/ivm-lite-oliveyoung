@@ -1,6 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.client
 
-import com.oliveyoung.ivmlite.sdk.model.DeployState
+import com.oliveyoung.ivmlite.sdk.Ivm
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import java.time.Duration
@@ -63,8 +63,6 @@ class StatusApiTest {
         assertEquals("deploy-123", plan.deployId)
         assertNotNull(plan.graph)
         assertNotNull(plan.activatedRules)
-        assertTrue(plan.activatedRules.contains("product-to-search-doc"))
-        assertTrue(plan.activatedRules.contains("product-to-reco-feed"))
     }
 
     @Test

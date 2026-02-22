@@ -2,16 +2,14 @@ package com.oliveyoung.ivmlite.apps.admin.application
 
 import arrow.core.Either
 import arrow.core.raise.either
-import arrow.core.raise.ensureNotNull
 import arrow.core.right
 import com.oliveyoung.ivmlite.shared.config.AppConfig
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
-import org.jooq.DSLContext
-import org.jooq.impl.DSL
+import org.jetbrains.exposed.sql.Database
+import org.jetbrains.exposed.sql.transactions.transaction
 import org.slf4j.LoggerFactory
 import java.net.URI
 import java.time.Instant
-import java.time.OffsetDateTime
 
 /**
  * Environment Service
@@ -20,7 +18,7 @@ import java.time.OffsetDateTime
  */
 class EnvironmentService(
     private val appConfig: AppConfig,
-    private val dsl: DSLContext
+    private val database: Database
 ) {
     private val logger = LoggerFactory.getLogger(EnvironmentService::class.java)
 
@@ -54,7 +52,7 @@ class EnvironmentService(
         try {
             val dbUrl = appConfig.database.url
             // JDBC URL 파싱: jdbc:postgresql://host:port/database
-            val (host, port, database) = try {
+            val (host, port, dbName) = try {
                 // jdbc:postgresql:// 형식을 http:// 형식으로 변환하여 URI 파싱
                 val normalizedUrl = dbUrl.replace("jdbc:postgresql://", "http://")
                 val uri = URI(normalizedUrl)
@@ -82,7 +80,9 @@ class EnvironmentService(
             // 연결 테스트
             val startTime = System.currentTimeMillis()
             val connected = try {
-                dsl.select(DSL.field("1")).fetchOne() != null
+                transaction(database) {
+                    exec("SELECT 1") { rs -> rs.next() }
+                } ?: false
             } catch (e: Exception) {
                 logger.debug("[Environment] Database connection test failed: ${e.message}")
                 false
@@ -95,7 +95,7 @@ class EnvironmentService(
                     type = "PostgreSQL",
                     host = host,
                     port = port,
-                    database = database,
+                    database = dbName,
                     status = if (connected) "connected" else "disconnected",
                     latencyMs = latencyMs
                 )
@@ -214,7 +214,7 @@ class EnvironmentService(
                 gitCheckProcess.destroyForcibly()
                 -1
             }
-            
+
             if (gitCheckExitCode != 0) {
                 // Git 저장소가 아니거나 git이 없는 경우
                 GitInfo(

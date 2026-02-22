@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSet
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeType
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangedPath
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
@@ -55,7 +56,6 @@ class ImpactCalculatorEdgeCaseTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/brand/")  // trailing slash!
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -93,7 +93,6 @@ class ImpactCalculatorEdgeCaseTest {
                 SliceType.CORE to listOf("/"),  // 루트 감시
                 SliceType.PRICE to listOf("/price")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -103,6 +102,44 @@ class ImpactCalculatorEdgeCaseTest {
         // THEN: 루트 변경은 / prefix 매칭
         assertEquals(1, result.size)
         assertTrue(result.containsKey("CORE"))
+    }
+
+    @Test
+    fun `와일드카드 패턴 - _audit 하위 경로 매칭`() {
+        // GIVEN: impactMap에 /_audit/* (하위 모든 경로)
+        val changeSet = ChangeSet(
+            changeSetId = "cs-1",
+            tenantId = TenantId("t1"),
+            entityType = "Product",
+            entityKey = EntityKey("p1"),
+            fromVersion = 1,
+            toVersion = 2,
+            changeType = ChangeType.UPDATE,
+            changedPaths = listOf(
+                ChangedPath("/_audit/updatedAt", "hash1"),
+                ChangedPath("/_audit/updatedBy", "hash2")
+            ),
+            impactedSliceTypes = emptySet(),
+            impactMap = emptyMap(),
+            payloadHash = "hash"
+        )
+
+        val ruleSet = RuleSetContract(
+            meta = createMeta(),
+            entityType = "Product",
+            impactMap = mapOf(
+                SliceType.CORE to listOf("/_audit/*")
+            ),
+            slices = emptyList()
+        )
+
+        // WHEN
+        val result = calculator.calculate(changeSet, ruleSet)
+
+        // THEN: 와일드카드로 하위 경로 모두 매칭
+        assertEquals(1, result.size)
+        assertTrue(result.containsKey("CORE"))
+        assertEquals(2, result["CORE"]?.paths?.size)
     }
 
     @Test
@@ -131,7 +168,6 @@ class ImpactCalculatorEdgeCaseTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/items")  // prefix로 모든 배열 요소 커버
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -169,7 +205,6 @@ class ImpactCalculatorEdgeCaseTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/a/b/c")  // 상위 경로로 매칭
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -207,7 +242,6 @@ class ImpactCalculatorEdgeCaseTest {
                 SliceType.CORE to listOf("/brand"),
                 SliceType.CUSTOM to listOf("/brand/name")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -246,7 +280,6 @@ class ImpactCalculatorEdgeCaseTest {
                 SliceType.CORE to emptyList(),
                 SliceType.PRICE to emptyList()
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -282,7 +315,6 @@ class ImpactCalculatorEdgeCaseTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/name")  // 소문자
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -319,7 +351,6 @@ class ImpactCalculatorEdgeCaseTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/name")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -330,6 +361,149 @@ class ImpactCalculatorEdgeCaseTest {
         assertEquals(1, result.size)
         assertEquals(1, result["CORE"]?.paths?.size)
         assertEquals("/name", result["CORE"]?.paths?.first())
+    }
+
+    @Test
+    fun `경로 prefix 오매칭 방지 - options vs options2`() {
+        // GIVEN: /options2는 /options에 매칭되면 안 됨
+        val changeSet = ChangeSet(
+            changeSetId = "cs-1",
+            tenantId = TenantId("t1"),
+            entityType = "Product",
+            entityKey = EntityKey("p1"),
+            fromVersion = 1,
+            toVersion = 2,
+            changeType = ChangeType.UPDATE,
+            changedPaths = listOf(
+                ChangedPath("/options2/price", "hash1")
+            ),
+            impactedSliceTypes = emptySet(),
+            impactMap = emptyMap(),
+            payloadHash = "hash"
+        )
+
+        val ruleSet = RuleSetContract(
+            meta = createMeta(),
+            entityType = "Product",
+            impactMap = mapOf(
+                SliceType.PRICE to listOf("/options")
+            ),
+            slices = emptyList()
+        )
+
+        // WHEN & THEN: /options2는 /options/ 로 시작 안 함 → unmapped
+        val exception = assertThrows<DomainError.UnmappedChangePathError> {
+            calculator.calculate(changeSet, ruleSet)
+        }
+        assertTrue(exception.unmappedPaths.contains("/options2/price"))
+    }
+
+    @Test
+    fun `와일드카드 - 정확 경로와 혼재`() {
+        // GIVEN: /_audit/* 와 /title 둘 다
+        val changeSet = ChangeSet(
+            changeSetId = "cs-1",
+            tenantId = TenantId("t1"),
+            entityType = "Product",
+            entityKey = EntityKey("p1"),
+            fromVersion = 1,
+            toVersion = 2,
+            changeType = ChangeType.UPDATE,
+            changedPaths = listOf(
+                ChangedPath("/_audit/updatedAt", "hash1"),
+                ChangedPath("/title", "hash2")
+            ),
+            impactedSliceTypes = emptySet(),
+            impactMap = emptyMap(),
+            payloadHash = "hash"
+        )
+
+        val ruleSet = RuleSetContract(
+            meta = createMeta(),
+            entityType = "Product",
+            impactMap = mapOf(
+                SliceType.CORE to listOf("/_audit/*", "/title")
+            ),
+            slices = emptyList()
+        )
+
+        // WHEN
+        val result = calculator.calculate(changeSet, ruleSet)
+
+        // THEN: 둘 다 CORE에 매칭
+        assertEquals(1, result.size)
+        assertEquals(2, result["CORE"]?.paths?.size)
+    }
+
+    @Test
+    fun `배열 인덱스 - options0 vs options`() {
+        // GIVEN: /options0/price (options0 필드) vs impactMap /options
+        val changeSet = ChangeSet(
+            changeSetId = "cs-1",
+            tenantId = TenantId("t1"),
+            entityType = "Product",
+            entityKey = EntityKey("p1"),
+            fromVersion = 1,
+            toVersion = 2,
+            changeType = ChangeType.UPDATE,
+            changedPaths = listOf(
+                ChangedPath("/options0/price", "hash1")
+            ),
+            impactedSliceTypes = emptySet(),
+            impactMap = emptyMap(),
+            payloadHash = "hash"
+        )
+
+        val ruleSet = RuleSetContract(
+            meta = createMeta(),
+            entityType = "Product",
+            impactMap = mapOf(
+                SliceType.PRICE to listOf("/options")
+            ),
+            slices = emptyList()
+        )
+
+        // WHEN & THEN: /options0 는 /options/ 로 시작 안 함
+        val exception = assertThrows<DomainError.UnmappedChangePathError> {
+            calculator.calculate(changeSet, ruleSet)
+        }
+        assertTrue(exception.unmappedPaths.contains("/options0/price"))
+    }
+
+    @Test
+    fun `와일드카드 - 루트 하위 전체`() {
+        // GIVEN: impactPath가 "/*" (루트 하위 전체)
+        val changeSet = ChangeSet(
+            changeSetId = "cs-1",
+            tenantId = TenantId("t1"),
+            entityType = "Product",
+            entityKey = EntityKey("p1"),
+            fromVersion = 1,
+            toVersion = 2,
+            changeType = ChangeType.UPDATE,
+            changedPaths = listOf(
+                ChangedPath("/any/deep/path", "hash1")
+            ),
+            impactedSliceTypes = emptySet(),
+            impactMap = emptyMap(),
+            payloadHash = "hash"
+        )
+
+        val ruleSet = RuleSetContract(
+            meta = createMeta(),
+            entityType = "Product",
+            impactMap = mapOf(
+                SliceType.CORE to listOf("/*")
+            ),
+            slices = emptyList()
+        )
+
+        // WHEN: "/*" → basePath "" → "" + "/" prefix 매칭
+        val result = calculator.calculate(changeSet, ruleSet)
+
+        // THEN
+        assertEquals(1, result.size)
+        assertTrue(result.containsKey("CORE"))
     }
 
     @Test
@@ -360,7 +534,6 @@ class ImpactCalculatorEdgeCaseTest {
             meta = createMeta(),
             entityType = "Product",
             impactMap = impactMap,
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -372,7 +545,7 @@ class ImpactCalculatorEdgeCaseTest {
     }
 
     private fun createMeta() = ContractMeta(
-        kind = "RuleSet",
+        kind = ContractKind.RULESET,
         id = "rs-1",
         version = SemVer(1, 0, 0),
         status = ContractStatus.ACTIVE

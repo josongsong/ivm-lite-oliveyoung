@@ -1,12 +1,10 @@
 package com.oliveyoung.ivmlite.pkg.fanout
 
 import com.oliveyoung.ivmlite.shared.domain.types.Result
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
-import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.IndexSpec
-import com.oliveyoung.ivmlite.pkg.contracts.domain.JoinCardinality
-import com.oliveyoung.ivmlite.pkg.contracts.domain.JoinSpec as ContractJoinSpec
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
 import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceBuildRules
 import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceDefinition
@@ -35,7 +33,6 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.awaitAll
 import kotlinx.coroutines.coroutineScope
 import kotlin.time.Duration.Companion.milliseconds
-import kotlin.time.Duration.Companion.seconds
 
 /**
  * RFC-IMPL-012: Fanout Edge Case 및 Corner Case 테스트
@@ -356,7 +353,7 @@ class FanoutEdgeCaseTest : StringSpec({
 
         result1.shouldBeInstanceOf<Result.Ok<*>>()
         result2.shouldBeInstanceOf<Result.Ok<*>>()
-        
+
         // 둘 다 처리됨 (SKIPPED 아님)
         (result1 as Result.Ok).value.status shouldBe FanoutResultStatus.SUCCESS
         (result2 as Result.Ok).value.status shouldBe FanoutResultStatus.SUCCESS
@@ -399,14 +396,13 @@ class FanoutEdgeCaseTest : StringSpec({
         val contractRegistry = mockk<ContractRegistryPort>()
         val emptyRuleSet = RuleSetContract(
             meta = ContractMeta(
-                kind = "RULE_SET",
+                kind = ContractKind.RULESET,
                 id = "ruleset.core.v1",
                 version = SemVer.parse("1.0.0"),
                 status = ContractStatus.ACTIVE,
             ),
             entityType = "product",
             impactMap = emptyMap(),
-            joins = emptyList(),  // 빈 joins
             slices = emptyList(),
             indexes = emptyList(),
         )
@@ -524,7 +520,7 @@ class FanoutEdgeCaseTest : StringSpec({
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
         // RFC-IMPL-013: indexValue는 entityId만 (소문자)
         val brandIdValue = "br001"
-        
+
         // 일반 엔트리
         val normalEntry = InvertedIndexEntry(
             tenantId = tenantId,
@@ -538,7 +534,7 @@ class FanoutEdgeCaseTest : StringSpec({
             sliceHash = "hash_p001",
             tombstone = false,
         )
-        
+
         // tombstone 엔트리 (삭제됨)
         val tombstoneEntry = InvertedIndexEntry(
             tenantId = tenantId,
@@ -552,7 +548,7 @@ class FanoutEdgeCaseTest : StringSpec({
             sliceHash = "hash_p002",
             tombstone = true,  // 삭제됨
         )
-        
+
         invertedIndexRepo.putAllIdempotent(listOf(normalEntry, tombstoneEntry))
 
         coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
@@ -628,10 +624,10 @@ class FanoutEdgeCaseTest : StringSpec({
         val brandKey = EntityKey("BRAND#other-tenant#BR001")
         // 다른 테넌트의 데이터
         setupInvertedIndex(
-            invertedIndexRepo, 
+            invertedIndexRepo,
             TenantId("other-tenant"),  // 다른 테넌트
-            "product_by_brand", 
-            brandKey.value, 
+            "product_by_brand",
+            brandKey.value,
             listOf(EntityKey("PRODUCT#other-tenant#P001") to 1L)
         )
 
@@ -677,7 +673,7 @@ private fun createMockContractRegistry(): ContractRegistryPort {
 
     val ruleSet = RuleSetContract(
         meta = ContractMeta(
-            kind = "RULE_SET",
+            kind = ContractKind.RULESET,
             id = "ruleset.core.v1",
             version = SemVer.parse("1.0.0"),
             status = ContractStatus.ACTIVE,
@@ -685,14 +681,6 @@ private fun createMockContractRegistry(): ContractRegistryPort {
         entityType = "product",
         impactMap = mapOf(
             SliceType.CORE to listOf("/productId", "/name"),
-        ),
-        joins = listOf(
-            ContractJoinSpec(
-                sourceSlice = SliceType.CORE,
-                targetEntity = "brand",
-                joinPath = "/brandCode",
-                cardinality = JoinCardinality.MANY_TO_ONE,
-            ),
         ),
         slices = listOf(
             SliceDefinition(
@@ -711,7 +699,7 @@ private fun createMockContractRegistry(): ContractRegistryPort {
             ),
         ),
         indexes = listOf(
-            IndexSpec(type = "product_by_brand", selector = "$.brandCode"),
+            IndexSpec(type = "product_by_brand", selector = "$.brandCode", references = "brand"),
         ),
     )
 

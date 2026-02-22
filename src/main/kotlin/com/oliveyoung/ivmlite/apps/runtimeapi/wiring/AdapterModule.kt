@@ -15,22 +15,19 @@ import com.oliveyoung.ivmlite.pkg.contracts.domain.DefaultContractStatusGate
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.DynamoDbRawDataRepository
-import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryIngestUnitOfWork
-import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
-import com.oliveyoung.ivmlite.pkg.rawdata.adapters.JooqIngestUnitOfWork
-// import com.oliveyoung.ivmlite.pkg.rawdata.adapters.JooqOutboxRepository  // Temporarily disabled - requires PostgreSQL
-import com.oliveyoung.ivmlite.pkg.rawdata.adapters.JooqRawDataRepository
-import com.oliveyoung.ivmlite.pkg.rawdata.ports.IngestUnitOfWorkPort
-import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.DynamoDbSinkEventRepository
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.DynamoDBSinkRuleRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkEventRepository
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.LocalYamlSinkRuleRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkEventRepositoryPort
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DynamoDbInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DynamoDbSliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
-import com.oliveyoung.ivmlite.pkg.slices.adapters.JooqSliceRepository
-import com.oliveyoung.ivmlite.pkg.slices.adapters.JooqInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
 import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
@@ -41,16 +38,16 @@ import com.oliveyoung.ivmlite.shared.config.AppConfig
 import com.oliveyoung.ivmlite.shared.ports.ContractCachePort
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import io.opentelemetry.api.trace.Tracer
-import org.jooq.DSLContext
 import org.koin.dsl.bind
 import org.koin.dsl.binds
 import org.koin.dsl.module
+
 
 /**
  * Domain Service Module (RFC-IMPL-010)
  *
  * 도메인 서비스 Port/Adapter 바인딩.
- * 모든 환경(InMemory, jOOQ, DynamoDB)에서 공통 사용.
+ * 모든 환경(InMemory, Exposed, DynamoDB)에서 공통 사용.
  * SOLID DIP 준수: Domain → Port ← Adapter
  */
 val domainServiceModule = module {
@@ -87,7 +84,7 @@ val domainServiceModule = module {
  *
  * Port → Adapter 바인딩.
  * v1: InMemory/LocalYaml 어댑터 (개발/테스트)
- * v2: jOOQ/DynamoDB 어댑터로 교체 가능 (DI만 변경)
+ * v2: Exposed/DynamoDB 어댑터로 교체 가능 (DI만 변경)
  *
  * NOTE: domainServiceModule을 함께 로드해야 함
  */
@@ -102,77 +99,34 @@ val adapterModule = module {
         )
     } binds arrayOf(ContractRegistryPort::class, HealthCheckable::class)
 
-    // RawData Repository (v1: InMemory, v2: jOOQ)
+    // RawData Repository (v1: InMemory, v2: Exposed)
     single { InMemoryRawDataRepository() } binds arrayOf(RawDataRepositoryPort::class, HealthCheckable::class)
 
-    // Slice Repository (v1: InMemory, v2: jOOQ)
+    // Slice Repository (v1: InMemory, v2: Exposed)
     single { InMemorySliceRepository() } binds arrayOf(SliceRepositoryPort::class, HealthCheckable::class)
 
-    // InvertedIndex Repository (v1: InMemory, v2: jOOQ)
+    // InvertedIndex Repository (v1: InMemory, v2: Exposed)
     // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
     single { InMemoryInvertedIndexRepository() } binds arrayOf(InvertedIndexRepositoryPort::class, HealthCheckable::class)
 
-    // Outbox Repository (v1: InMemory Polling, v2: jOOQ + Debezium)
-    single { InMemoryOutboxRepository() } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
-
-    // Ingest Unit of Work (v1: InMemory, v2: jOOQ)
-    // RFC-IMPL Transactional Outbox: RawData + Outbox 원자성 보장
-    single { InMemoryIngestUnitOfWork(get(), get()) } binds arrayOf(IngestUnitOfWorkPort::class, HealthCheckable::class)
-
-    // ChangeSet Repository (v1.1: InMemory, v2: jOOQ)
+    // ChangeSet Repository (v1.1: InMemory, v2: Exposed)
     // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
     single { InMemoryChangeSetRepository() } binds arrayOf(ChangeSetRepositoryPort::class, HealthCheckable::class)
-}
 
-/**
- * Production Adapter Module (jOOQ 기반)
- *
- * PostgreSQL 연결 시 사용. infraModule과 함께 로드해야 함.
- * DSLContext는 infraModule에서 제공.
- */
-val jooqAdapterModule = module {
+    // SinkEvent Repository (v1: InMemory, v2: DynamoDB Streams)
+    single { InMemorySinkEventRepository() } bind SinkEventRepositoryPort::class
 
-    // Contract Registry (v1: LocalYaml + StatusGate, v2: DynamoDB)
-    single {
+    // SinkRule Registry (v1: LocalYaml - RFC-022 Phase 2)
+    single<SinkRuleRegistryPort> {
         val config: AppConfig = get()
-        GatedContractRegistryAdapter(
-            delegate = LocalYamlContractRegistryAdapter(config.contracts.resourcePath),
-            statusGate = DefaultContractStatusGate,
-        )
-    } binds arrayOf(ContractRegistryPort::class, HealthCheckable::class)
-
-    // RawData Repository (jOOQ)
-    single { JooqRawDataRepository(get<DSLContext>()) } binds arrayOf(RawDataRepositoryPort::class, HealthCheckable::class)
-
-    // Slice Repository (jOOQ)
-    single { JooqSliceRepository(get<DSLContext>()) } binds arrayOf(SliceRepositoryPort::class, HealthCheckable::class)
-
-    // InvertedIndex Repository (jOOQ - RFC-IMPL-010 GAP-E)
-    // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
-    single { JooqInvertedIndexRepository(get<DSLContext>()) } binds arrayOf(InvertedIndexRepositoryPort::class, HealthCheckable::class)
-
-    // Outbox Repository (InMemory - JooqOutboxRepository temporarily disabled)
-    single { InMemoryOutboxRepository() } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
-
-    // Ingest Unit of Work (jOOQ - Transactional Outbox)
-    // RFC-IMPL Transactional Outbox: RawData + Outbox 원자성 보장
-    single { JooqIngestUnitOfWork(get<DSLContext>()) } binds arrayOf(IngestUnitOfWorkPort::class, HealthCheckable::class)
-
-    // ChangeSet Repository (v1.1: InMemory, v2: jOOQ)
-    // RFC-IMPL-010 GAP-G: HealthCheckable 바인딩 추가
-    single { InMemoryChangeSetRepository() } binds arrayOf(ChangeSetRepositoryPort::class, HealthCheckable::class)
+        LocalYamlSinkRuleRegistryAdapter(config.contracts.resourcePath)
+    }
 }
 
 /**
- * DynamoDB Adapter Module (RFC-IMPL Phase B-5)
+ * DynamoDB Contract Module (RFC-IMPL Phase B-5)
  *
- * 운영 환경에서 사용할 DynamoDB 기반 어댑터.
- * jooqAdapterModule + dynamodbContractModule 조합으로 사용.
- *
- * 사용법:
- * - infraModule (DynamoDbAsyncClient 제공)
- * - jooqAdapterModule (PostgreSQL 리포지토리)
- * - dynamodbContractModule (DynamoDB ContractRegistry)
+ * productionAdapterModule과 함께 사용 (Contract Registry만 DynamoDB).
  */
 val dynamodbContractModule = module {
     // Contract Cache (RFC-IMPL-010 Phase C-1)
@@ -199,10 +153,10 @@ val dynamodbContractModule = module {
  * Full Production Adapter Module (DynamoDB 기반)
  *
  * 운영 환경용 (DynamoDB 중심):
- * - DynamoDB: RawData, Slice, InvertedIndex, Contract Registry
- * - PostgreSQL: Outbox (트랜잭션 보장)
+ * - DynamoDB: RawData, Slice, InvertedIndex, Contract Registry, SinkEvent
+ * - PostgreSQL: alerts, backfill_jobs, TransactionPort (ChangeSet/View 저장 없음)
  *
- * NOTE: DynamoDB는 트랜잭션이 제한적이므로 Outbox만 PostgreSQL 사용
+ * NOTE: SinkEvent는 DynamoDB Streams → Lambda로 처리 (PostgreSQL Outbox 제거됨)
  */
 val productionAdapterModule = module {
 
@@ -231,7 +185,7 @@ val productionAdapterModule = module {
         val config: AppConfig = get()
         DynamoDbRawDataRepository(
             dynamoClient = get<DynamoDbAsyncClient>(),
-            tableName = "ivm-lite-data-${config.dynamodb.tableName.substringAfterLast("-")}"
+            tableName = config.dynamodb.dataTableName
         )
     } binds arrayOf(RawDataRepositoryPort::class, HealthCheckable::class)
 
@@ -240,7 +194,7 @@ val productionAdapterModule = module {
         val config: AppConfig = get()
         DynamoDbSliceRepository(
             dynamoClient = get<DynamoDbAsyncClient>(),
-            tableName = "ivm-lite-data-${config.dynamodb.tableName.substringAfterLast("-")}"
+            tableName = config.dynamodb.dataTableName
         )
     } binds arrayOf(SliceRepositoryPort::class, HealthCheckable::class)
 
@@ -249,17 +203,28 @@ val productionAdapterModule = module {
         val config: AppConfig = get()
         DynamoDbInvertedIndexRepository(
             dynamoClient = get<DynamoDbAsyncClient>(),
-            tableName = "ivm-lite-data-${config.dynamodb.tableName.substringAfterLast("-")}"
+            tableName = config.dynamodb.dataTableName
         )
     } binds arrayOf(InvertedIndexRepositoryPort::class, HealthCheckable::class)
 
-    // Outbox Repository (InMemory - JooqOutboxRepository temporarily disabled)
-    single { InMemoryOutboxRepository() } binds arrayOf(OutboxRepositoryPort::class, HealthCheckable::class)
-
-    // Ingest Unit of Work (jOOQ - Transactional Outbox)
-    // RFC-IMPL Transactional Outbox: RawData + Outbox 원자성 보장
-    single { JooqIngestUnitOfWork(get<DSLContext>()) } binds arrayOf(IngestUnitOfWorkPort::class, HealthCheckable::class)
-
-    // ChangeSet Repository (InMemory for now)
+    // ChangeSet Repository (InMemory - 저장 미사용, HealthCheck만)
     single { InMemoryChangeSetRepository() } binds arrayOf(ChangeSetRepositoryPort::class, HealthCheckable::class)
+
+    // SinkEvent Repository (DynamoDB Streams 기반)
+    single<SinkEventRepositoryPort> {
+        val config: AppConfig = get()
+        DynamoDbSinkEventRepository(
+            dynamoClient = get<DynamoDbAsyncClient>(),
+            tableName = config.dynamodb.sinkEventsTableName
+        )
+    }
+
+    // SinkRule Registry (RFC-022 Phase 2: DynamoDB)
+    single<SinkRuleRegistryPort> {
+        val config: AppConfig = get()
+        DynamoDBSinkRuleRegistryAdapter(
+            dynamoClient = get<DynamoDbAsyncClient>(),
+            tableName = config.dynamodb.tableName
+        )
+    }
 }

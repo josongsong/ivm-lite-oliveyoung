@@ -1,6 +1,10 @@
 package com.oliveyoung.ivmlite.pkg.workflow.canvas
 
 import com.oliveyoung.ivmlite.apps.admin.routes.*
+import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.LocalYamlSinkRuleRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.adapters.WorkflowGraphBuilder
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.ports.WorkflowGraphBuilderPort
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.application.WorkflowCanvasService
@@ -45,7 +49,11 @@ class WorkflowCanvasApiTest : StringSpec({
             }
             install(Koin) {
                 modules(module {
-                    single<WorkflowGraphBuilderPort> { WorkflowGraphBuilder() }
+                    single<ContractRegistryPort> { LocalYamlContractRegistryAdapter("/contracts/v1") }
+                    single<SinkRuleRegistryPort> { LocalYamlSinkRuleRegistryAdapter("/contracts/v1") }
+                    single<WorkflowGraphBuilderPort> {
+                        WorkflowGraphBuilder(get(), get())
+                    }
                     single { WorkflowCanvasService(get(), null) }
                 })
             }

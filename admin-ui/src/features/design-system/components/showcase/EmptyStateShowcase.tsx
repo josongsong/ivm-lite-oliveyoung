@@ -1,8 +1,8 @@
 /**
  * EmptyState Showcase - EmptyState 컴포넌트 전시
  */
-import { Database, AlertCircle, Inbox } from 'lucide-react'
-import { EmptyState, Button } from '@/shared/ui'
+import { AlertCircle, Database, Inbox } from 'lucide-react'
+import { Button, EmptyState } from '@/shared/ui'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

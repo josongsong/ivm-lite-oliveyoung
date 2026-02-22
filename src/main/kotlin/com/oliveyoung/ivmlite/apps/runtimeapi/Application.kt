@@ -3,10 +3,11 @@ package com.oliveyoung.ivmlite.apps.runtimeapi
 import com.oliveyoung.ivmlite.shared.config.DotenvLoader
 import com.oliveyoung.ivmlite.apps.runtimeapi.routes.healthRoutes
 import com.oliveyoung.ivmlite.apps.runtimeapi.routes.ingestRoutes
-import com.oliveyoung.ivmlite.apps.runtimeapi.routes.outboxRoutes
+import com.oliveyoung.ivmlite.apps.runtimeapi.routes.jobStatusRoutes
+import com.oliveyoung.ivmlite.apps.runtimeapi.routes.sinkEventRoutes
 import com.oliveyoung.ivmlite.apps.runtimeapi.routes.queryRoutes
 import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.allModules
-import com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
+import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.productionModules
 import com.oliveyoung.ivmlite.shared.config.AppConfig
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import io.ktor.http.*
@@ -23,7 +24,6 @@ import io.ktor.server.routing.*
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Span
 import io.opentelemetry.context.Scope
-import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import io.micrometer.core.instrument.MeterRegistry
 import org.koin.ktor.ext.getKoin
@@ -35,7 +35,7 @@ import java.util.*
 
 /**
  * ivm-lite Runtime API Application (RFC-IMPL-009)
- * 
+ *
  * HTTP Server: Ktor + Netty (고정)
  * DI: Koin
  * Config: Hoplite
@@ -50,23 +50,30 @@ fun main() {
 }
 
 fun Application.module() {
-    // Koin DI
+    // Koin DI - 프로파일 기반 모듈 선택
+    val profile = System.getenv("IVM_PROFILE") ?: System.getProperty("IVM_PROFILE") ?: "inmemory"
+    val selectedModules = when (profile) {
+        "production", "full-production" -> productionModules  // DynamoDB (RawData/Slice/InvertedIndex/SinkEvent) + PostgreSQL
+        else -> allModules  // InMemory (개발/테스트)
+    }
+    log.info("IVM_PROFILE=$profile → ${selectedModules.size} modules loaded")
+
     install(Koin) {
         slf4jLogger()
-        modules(allModules)
+        modules(selectedModules)
     }
-    
+
     // OpenTelemetry (RFC-IMPL-009: Tracing SSOT)
     // NOTE: Ktor OTel instrumentation은 패키지명 확인 필요
     // 현재는 수동 HTTP span + MDC 연동 구현 (하이브리드 계획에 따라)
-    
+
     val openTelemetry by inject<OpenTelemetry>()
     val tracer = openTelemetry.getTracer("ivm-lite-http")
-    
+
     // HTTP 요청 span 생성 + MDC 연동 (RFC-IMPL-009: Log Correlation)
     val otelSpanKey = io.ktor.util.AttributeKey<Span>("otel.span")
     val otelScopeKey = io.ktor.util.AttributeKey<io.opentelemetry.context.Scope>("otel.scope")
-    
+
     install(createApplicationPlugin("HttpTracing") {
         onCall { call ->
             val method = call.request.local.method.value
@@ -76,11 +83,11 @@ fun Application.module() {
                 .setAttribute("http.target", path)
                 .setAttribute("http.route", path)
                 .startSpan()
-            
+
             val scope = span.makeCurrent()
             call.attributes.put(otelScopeKey, scope)
             call.attributes.put(otelSpanKey, span)
-            
+
             if (span.spanContext.isValid) {
                 MDC.put("traceId", span.spanContext.traceId)
                 MDC.put("spanId", span.spanContext.spanId)
@@ -89,10 +96,11 @@ fun Application.module() {
         onCallRespond { call, _ ->
             val span = call.attributes.getOrNull(otelSpanKey)
             val scope = call.attributes.getOrNull(otelScopeKey)
-            
+
             span?.let {
                 it.setAttribute("http.status_code", call.response.status()?.value?.toLong() ?: 0L)
                 it.setStatus(
+                    @Suppress("UnnecessaryParentheses")
                     if ((call.response.status()?.value ?: 0) < 400) {
                         io.opentelemetry.api.trace.StatusCode.OK
                     } else {
@@ -102,20 +110,20 @@ fun Application.module() {
                 it.end()
             }
             scope?.close()
-            
+
             call.attributes.remove(otelSpanKey)
             call.attributes.remove(otelScopeKey)
-            
+
             MDC.remove("traceId")
             MDC.remove("spanId")
         }
     })
-    
+
     // HTTP span 예외 처리 (StatusPages와 함께 사용)
     fun cleanupSpan(call: ApplicationCall, cause: Throwable? = null) {
         val span = call.attributes.getOrNull(otelSpanKey)
         val scope = call.attributes.getOrNull(otelScopeKey)
-        
+
         span?.let {
             if (cause != null) {
                 it.setStatus(io.opentelemetry.api.trace.StatusCode.ERROR, cause.message ?: "unknown")
@@ -126,14 +134,14 @@ fun Application.module() {
             it.end()
         }
         scope?.close()
-        
+
         call.attributes.remove(otelSpanKey)
         call.attributes.remove(otelScopeKey)
-        
+
         MDC.remove("traceId")
         MDC.remove("spanId")
     }
-    
+
     // Content Negotiation (JSON)
     install(ContentNegotiation) {
         json(Json {
@@ -142,14 +150,14 @@ fun Application.module() {
             isLenient = false
         })
     }
-    
+
     // Call ID (Tracing correlation)
     install(CallId) {
         header(HttpHeaders.XRequestId)
         generate { UUID.randomUUID().toString() }
         verify { it.isNotEmpty() }
     }
-    
+
     // Status Pages (Error handling)
     install(StatusPages) {
         exception<kotlinx.serialization.SerializationException> { call, cause ->
@@ -175,28 +183,13 @@ fun Application.module() {
             )
         }
     }
-    
+
     // Config
     val config by inject<AppConfig>()
 
-    // Worker Lifecycle (RFC-IMPL Phase B-2)
-    val worker by inject<OutboxPollingWorker>()
-
-    environment.monitor.subscribe(ApplicationStarted) {
-        if (worker.start()) {
-            log.info("OutboxPollingWorker started")
-        } else {
-            log.warn("OutboxPollingWorker not started (disabled or already running)")
-        }
-    }
-
-    environment.monitor.subscribe(ApplicationStopped) {
-        runBlocking {
-            if (worker.stop()) {
-                log.info("OutboxPollingWorker stopped gracefully")
-            }
-        }
-    }
+    // ⚠️ SOTA: OutboxPollingWorker 제거 (DynamoDB Streams로 대체)
+    // - DynamoDB Streams → Lambda (SinkStreamHandler) 자동 트리거
+    // - Polling 불필요
 
     // Routes
     val healthCheckAdapters = getKoin().getAll<HealthCheckable>()
@@ -206,7 +199,8 @@ fun Application.module() {
         healthRoutes(healthCheckAdapters, meterRegistry = meterRegistry)
         ingestRoutes()
         queryRoutes()
-        outboxRoutes()
+        sinkEventRoutes()
+        jobStatusRoutes()
     }
 
     log.info("ivm-lite Runtime API started on ${config.server.host}:${config.server.port}")

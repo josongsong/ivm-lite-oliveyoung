@@ -4,6 +4,7 @@ import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSet
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeType
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangedPath
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
@@ -55,7 +56,6 @@ class ImpactCalculatorTest {
                 SliceType.PRICE to listOf("/price", "/discount"),
                 SliceType.INVENTORY to listOf("/stock", "/warehouse")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -93,7 +93,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/name", "/description")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -132,7 +131,6 @@ class ImpactCalculatorTest {
                 SliceType.CUSTOM to listOf("/name", "/tags"),
                 SliceType.PRICE to listOf("/price")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -168,7 +166,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/name")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -206,7 +203,6 @@ class ImpactCalculatorTest {
                 SliceType.CORE to listOf("/brand", "/title"),
                 SliceType.PRICE to listOf("/price")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -247,7 +243,6 @@ class ImpactCalculatorTest {
                 SliceType.CORE to listOf("/name"),
                 SliceType.PRICE to emptyList()
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -287,7 +282,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/name", "/description", "/title")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -326,7 +320,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/brand", "/name")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -363,7 +356,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/name")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -398,7 +390,6 @@ class ImpactCalculatorTest {
             meta = createMeta(),
             entityType = "product",
             impactMap = emptyMap(),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -453,7 +444,6 @@ class ImpactCalculatorTest {
                 SliceType.CORE to listOf("/name"),
                 SliceType.PRICE to listOf("/price")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -493,7 +483,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/name")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -533,7 +522,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/meta-data/og:title", "/data_source")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -572,7 +560,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/meta/seo")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -610,7 +597,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/brand")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -646,7 +632,6 @@ class ImpactCalculatorTest {
             impactMap = mapOf(
                 SliceType.CORE to listOf("/brand")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -686,7 +671,6 @@ class ImpactCalculatorTest {
                 SliceType.CORE to listOf("/brand"),
                 SliceType.CATEGORY to listOf("/brand")
             ),
-            joins = emptyList(),
             slices = emptyList()
         )
 
@@ -702,7 +686,7 @@ class ImpactCalculatorTest {
 
     // Helper
     private fun createMeta() = ContractMeta(
-        kind = "RuleSet",
+        kind = ContractKind.RULESET,
         id = "ruleset.product.v1",
         version = SemVer(1, 0, 0),
         status = ContractStatus.ACTIVE

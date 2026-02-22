@@ -3,7 +3,6 @@ package com.oliveyoung.ivmlite.apps.admin.adapters
 import io.mockk.coEvery
 import io.mockk.mockk
 import io.mockk.slot
-import kotlinx.coroutines.future.asCompletableFuture
 import kotlinx.coroutines.test.runTest
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Nested

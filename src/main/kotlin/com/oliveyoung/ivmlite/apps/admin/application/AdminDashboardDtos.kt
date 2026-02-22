@@ -10,33 +10,32 @@ import java.time.Instant
  */
 
 data class DashboardData(
-    val outbox: OutboxStats,
+    val sinkEvent: SinkEventStats,
     val worker: WorkerStatus,
     val database: DatabaseStats,
     val timestamp: Instant
 )
 
-data class OutboxStats(
-    val total: OutboxTotalStats,
+/** SinkEvent 통계 (DynamoDB Streams 기반, Outbox 대체) */
+data class SinkEventStats(
+    val total: SinkEventTotalStats,
     val byStatus: Map<String, Long>,
-    val byType: Map<String, Long>,
-    val details: List<OutboxStatDetail>
+    val details: List<SinkEventStatDetail>
 )
 
-data class OutboxTotalStats(
+data class SinkEventTotalStats(
     val pending: Long,
     val processing: Long,
     val failed: Long,
-    val processed: Long
+    val completed: Long
 )
 
-data class OutboxStatDetail(
+data class SinkEventStatDetail(
     val status: String,
-    val aggregateType: String,
+    val viewType: String,
     val count: Long,
     val oldest: Instant?,
-    val newest: Instant?,
-    val avgLatencySeconds: Double?
+    val newest: Instant?
 )
 
 data class WorkerStatus(
@@ -49,29 +48,26 @@ data class WorkerStatus(
 
 data class DatabaseStats(
     val rawDataCount: Long,
-    val outboxCount: Long,
+    val sinkEventCount: Long,
+    val contractsCount: Long = 0L,
     val note: String
 )
 
-data class RecentOutboxItem(
+/** SinkEvent 기반 (Outbox 대체) */
+data class RecentSinkEventItem(
     val id: String,
-    val aggregateType: String,
-    val aggregateId: String,
-    val eventType: String,
+    val entityKey: String,
+    val viewType: String,
     val status: String,
     val createdAt: Instant?,
-    val processedAt: Instant?,
-    val retryCount: Int
+    val processedAt: Instant?
 )
 
-data class FailedOutboxItem(
+data class FailedSinkEventItem(
     val id: String,
-    val aggregateType: String,
-    val aggregateId: String,
-    val eventType: String,
-    val createdAt: Instant?,
-    val retryCount: Int,
-    val failureReason: String?
+    val entityKey: String,
+    val viewType: String,
+    val createdAt: Instant?
 )
 
 data class HourlyStatsData(
@@ -98,20 +94,15 @@ data class StaleOutboxItem(
     val ageSeconds: Long
 )
 
-data class OutboxEntryDetail(
+/** SinkEvent 상세 (Outbox 대체) */
+data class SinkEventEntryDetail(
     val id: String,
     val idempotencyKey: String,
-    val aggregateType: String,
-    val aggregateId: String,
-    val eventType: String,
-    val payload: String,
+    val entityKey: String,
+    val viewType: String,
     val status: String,
     val createdAt: Instant,
     val processedAt: Instant?,
-    val claimedAt: Instant?,
-    val claimedBy: String?,
-    val retryCount: Int,
-    val failureReason: String?,
-    val priority: Int?,
-    val entityVersion: Long?
+    val sinkTargets: List<String>
 )
+

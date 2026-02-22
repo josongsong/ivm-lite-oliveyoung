@@ -1,0 +1,33 @@
+kind: VIEW_DEFINITION
+id: view.product.storefront.v1
+version: 1.0.0
+status: ACTIVE
+
+viewName: PRODUCT_STOREFRONT
+entityType: PRODUCT
+description: "스토어프론트 전시 - 카테고리/메인/전시용 (뱃지, 할인, 컬러칩, 속성 요약 포함)"
+
+requiredSlices:
+  - CORE
+  - PRICE
+  - MEDIA
+  - CATEGORY
+  - INDEX
+
+optionalSlices:
+  - ENRICHED
+
+missingPolicy: FAIL_CLOSED
+
+partialPolicy:
+  allowed: true
+  optionalOnly: true
+  responseMeta:
+    includeMissingSlices: true
+    includeUsedContracts: true
+
+fallbackPolicy: NONE
+
+ruleSetRef:
+  id: ruleset.product.oliveyoung.v1
+  version: 1.0.0

@@ -1,25 +1,17 @@
 package com.oliveyoung.ivmlite.pkg.orchestration
-import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
-import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryOutboxRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
-import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
-import com.oliveyoung.ivmlite.shared.domain.types.AggregateType
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
-import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.collections.shouldHaveSize
-import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
-import io.opentelemetry.api.OpenTelemetry
-import kotlinx.coroutines.runBlocking
 
 /**
  * IngestWorkflow 단위 테스트 (RFC-IMPL-003)
- * 
+ *
  * 테스트 범위:
  * - 결정성: 동일 입력 → 동일 해시
  * - 멱등성: 같은 데이터 2번 저장 → OK
@@ -27,10 +19,8 @@ import kotlinx.coroutines.runBlocking
  */
 class IngestWorkflowTest : StringSpec({
 
-    val testTracer = OpenTelemetry.noop().getTracer("test")
     val rawRepository = InMemoryRawDataRepository()
-    val outboxRepository = InMemoryOutboxRepository()
-    val workflow = IngestWorkflow(rawRepository, outboxRepository, testTracer)
+    val workflow = IngestWorkflow(rawRepository)
 
     val tenantId = TenantId("tenant-1")
     val entityKey = EntityKey("PRODUCT#tenant-1#product-123")
@@ -46,7 +36,7 @@ class IngestWorkflowTest : StringSpec({
             schemaVersion = schemaVersion,
             payloadJson = """{"name": "Product A", "price": 100}"""
         )
-        
+
         result.shouldBeInstanceOf<Result.Ok<Unit>>()
     }
 
@@ -76,7 +66,7 @@ class IngestWorkflowTest : StringSpec({
 
     "멱등성: 같은 데이터 2번 저장 → OK" {
         val payload = """{"id": "idempotent-test", "count": 1}"""
-        
+
         val result1 = workflow.execute(
             tenantId = tenantId,
             entityKey = entityKey,
@@ -124,7 +114,7 @@ class IngestWorkflowTest : StringSpec({
 
     "충돌: 같은 payload, 다른 schemaVersion → Err" {
         val payload = """{"test": "schema-conflict"}"""
-        
+
         // 첫 번째 저장
         val result1 = workflow.execute(
             tenantId = tenantId,
@@ -160,29 +150,18 @@ class IngestWorkflowTest : StringSpec({
         result.shouldBeInstanceOf<Result.Err>()
     }
 
-    "Outbox 통합: Ingest 성공 시 Outbox에 이벤트 저장" {
+    "RawData 저장 성공" {
         val freshRawRepo = InMemoryRawDataRepository()
-        val freshOutboxRepo = InMemoryOutboxRepository()
-        val freshWorkflow = IngestWorkflow(freshRawRepo, freshOutboxRepo)
+        val freshWorkflow = IngestWorkflow(freshRawRepo)
 
         val result = freshWorkflow.execute(
-            tenantId = TenantId("outbox-tenant"),
-            entityKey = EntityKey("outbox-entity"),
+            tenantId = TenantId("test-tenant"),
+            entityKey = EntityKey("test-entity"),
             version = 1L,
             schemaId = schemaId,
             schemaVersion = schemaVersion,
-            payloadJson = """{"test": "outbox"}"""
+            payloadJson = """{"test": "data"}"""
         )
         result.shouldBeInstanceOf<Result.Ok<Unit>>()
-
-        // Outbox에 이벤트가 저장되었는지 확인
-        val pending = runBlocking { freshOutboxRepo.findPending(10) }
-        pending.shouldBeInstanceOf<Result.Ok<*>>()
-        val entries = (pending as Result.Ok).value
-        entries shouldHaveSize 1
-        entries[0].aggregateType shouldBe AggregateType.RAW_DATA
-        entries[0].aggregateId shouldBe "outbox-tenant:outbox-entity"
-        entries[0].eventType shouldBe "RawDataIngested"
-        entries[0].status shouldBe OutboxStatus.PENDING
     }
 })

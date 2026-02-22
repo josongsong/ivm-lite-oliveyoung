@@ -37,8 +37,8 @@ object DotenvLoader {
                                 val key = line.substring(0, idx).trim()
                                 var value = line.substring(idx + 1).trim()
                                 // 따옴표 제거 (single/double quotes)
-                                if ((value.startsWith("'") && value.endsWith("'")) ||
-                                    (value.startsWith("\"") && value.endsWith("\""))) {
+                                if (value.startsWith("'") && value.endsWith("'") ||
+                                    value.startsWith("\"") && value.endsWith("\"")) {
                                     value = value.substring(1, value.length - 1)
                                 }
                                 key to value

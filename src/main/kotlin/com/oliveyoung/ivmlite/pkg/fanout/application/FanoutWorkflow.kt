@@ -3,12 +3,12 @@ package com.oliveyoung.ivmlite.pkg.fanout.application
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.sdk.execution.EntityContractResolver
 import com.oliveyoung.ivmlite.pkg.fanout.domain.CircuitBreakerAction
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutConfig
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutDependency
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutJob
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutJobStatus
-import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutPriority
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.slices.ports.FanoutTarget
 import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
@@ -17,7 +17,6 @@ import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
-import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Tracer
@@ -56,6 +55,7 @@ class FanoutWorkflow(
     private val slicingWorkflow: SlicingWorkflow,
     private val config: FanoutConfig = FanoutConfig.DEFAULT,
     private val tracer: Tracer = OpenTelemetry.noop().getTracer("fanout"),
+    private val contractResolver: EntityContractResolver? = null,
 ) {
     private val log = LoggerFactory.getLogger(FanoutWorkflow::class.java)
 
@@ -68,7 +68,7 @@ class FanoutWorkflow(
     // 중복 제거용 캐시 (entityKey → lastFanoutTime)
     // NOTE: TTL 기반 자동 만료 구현 (메모리 누수 방지)
     private val deduplicationCache = ConcurrentHashMap<String, Long>()
-    
+
     // 캐시 클린업 임계치 (이 수를 초과하면 오래된 항목 정리)
     private val maxCacheSize = 10_000
 
@@ -79,9 +79,7 @@ class FanoutWorkflow(
     private val skippedCount = AtomicLong(0)
 
     companion object {
-        private const val V1_RULESET_ID = "ruleset.core.v1"
-        private val V1_RULESET_VERSION = SemVer.parse("1.0.0")
-        private val V1_RULESET_REF = ContractRef(V1_RULESET_ID, V1_RULESET_VERSION)
+        private val FALLBACK_RULESET_REF = ContractRef("ruleset.core.v1", SemVer.parse("1.0.0"))
     }
 
     /**
@@ -133,7 +131,7 @@ class FanoutWorkflow(
             val deduplicationKey = "$tenantId:$upstreamEntityType:${upstreamEntityKey.value}"
             val lastFanoutTime = deduplicationCache[deduplicationKey]
             val now = System.currentTimeMillis()
-            if (lastFanoutTime != null && (now - lastFanoutTime) < effectiveConfig.deduplicationWindow.inWholeMilliseconds) {
+            if (lastFanoutTime != null && now - lastFanoutTime < effectiveConfig.deduplicationWindow.inWholeMilliseconds) {
                 log.debug("Duplicate fanout within dedup window, skipping: {}", deduplicationKey)
                 return@withSpanSuspend Result.Ok(FanoutResult.skipped("Duplicate within deduplication window"))
             }
@@ -194,58 +192,48 @@ class FanoutWorkflow(
     /**
      * RuleSet에서 fanout 의존성 추론
      *
-     * RuleSet의 joins를 분석하여 어떤 downstream 엔티티가 upstream을 참조하는지 파악.
+     * IndexSpec.references를 분석하여 어떤 downstream 엔티티가 upstream을 참조하는지 파악.
+     * Contract is Law: indexes가 의존성 정의의 SSOT.
      */
     suspend fun inferDependencies(upstreamEntityType: String): Result<List<FanoutDependency>> {
-        // 모든 활성 RuleSet 조회
-        val ruleSets = when (val r = contractRegistry.loadRuleSetContract(V1_RULESET_REF)) {
-            is Result.Ok -> listOf(r.value)
-            is Result.Err -> return Result.Err(r.error)
+        // Contract is Law: 등록된 모든 RuleSet을 동적으로 로드하여 의존성 추론
+        val ruleSetRefs = contractResolver?.getAllRuleSetRefs()?.values?.toList()
+            ?: listOf(FALLBACK_RULESET_REF)
+
+        val ruleSets = mutableListOf<RuleSetContract>()
+        var lastError: DomainError? = null
+        for (ref in ruleSetRefs) {
+            when (val r = contractRegistry.loadRuleSetContract(ref)) {
+                is Result.Ok -> ruleSets.add(r.value)
+                is Result.Err -> {
+                    log.warn("Failed to load RuleSet {}: {}", ref.id, r.error)
+                    lastError = r.error
+                }
+            }
+        }
+
+        // 모든 RuleSet 로드 실패 시 에러 전파
+        if (ruleSets.isEmpty() && lastError != null) {
+            return Result.Err(lastError)
         }
 
         val dependencies = mutableListOf<FanoutDependency>()
 
         for (ruleSet in ruleSets) {
-            // RuleSet의 joins에서 upstreamEntityType을 참조하는 것 찾기
-            val relevantJoins = ruleSet.joins.filter { join ->
-                join.targetEntity.equals(upstreamEntityType, ignoreCase = true)
-            }
-
-            for (join in relevantJoins) {
-                // 영향받는 슬라이스 타입 결정
-                val affectedSliceTypes = ruleSet.slices
-                    .filter { slice -> slice.joins.any { it.targetEntityType.equals(upstreamEntityType, ignoreCase = true) } }
-                    .map { it.type }
-                    .toSet()
-
-                dependencies.add(
-                    FanoutDependency(
-                        upstreamEntityType = upstreamEntityType,
-                        downstreamEntityType = ruleSet.entityType,
-                        indexType = "${ruleSet.entityType.lowercase()}_by_${upstreamEntityType.lowercase()}",
-                        joinPath = join.joinPath,
-                        affectedSliceTypes = affectedSliceTypes,
-                    )
-                )
-            }
-
-            // RFC-IMPL-013: indexes.references를 통해 upstream 참조 체크
-            // references 필드가 upstreamEntityType과 일치하는 인덱스 찾기
+            // indexes.references를 통해 upstream 참조 체크
             val relevantIndexes = ruleSet.indexes.filter { index ->
                 index.references?.equals(upstreamEntityType, ignoreCase = true) == true
             }
 
             for (index in relevantIndexes) {
-                // 이미 joins에서 추가했으면 스킵
-                val alreadyAdded = dependencies.any { dep ->
-                    dep.downstreamEntityType == ruleSet.entityType &&
-                        dep.upstreamEntityType == upstreamEntityType
-                }
-                if (alreadyAdded) continue
-
-                // RFC-IMPL-013: indexType은 "{entityType}_by_{references}" 형식
-                // InvertedIndexBuilder가 생성하는 역방향 인덱스와 일치해야 함
                 val reverseIndexType = "${ruleSet.entityType.lowercase()}_by_${index.references!!.lowercase()}"
+
+                // 영향받는 슬라이스 타입: slice-level joins에서 upstream을 참조하는 슬라이스
+                val affectedSliceTypes = ruleSet.slices
+                    .filter { slice -> slice.joins.any { it.targetEntityType.equals(upstreamEntityType, ignoreCase = true) } }
+                    .map { it.type }
+                    .toSet()
+                    .ifEmpty { ruleSet.slices.map { it.type }.toSet() }
 
                 dependencies.add(
                     FanoutDependency(
@@ -253,8 +241,8 @@ class FanoutWorkflow(
                         downstreamEntityType = ruleSet.entityType,
                         indexType = reverseIndexType,
                         joinPath = index.selector,
-                        affectedSliceTypes = ruleSet.slices.map { it.type }.toSet(),
-                        maxFanout = index.maxFanout, // IndexSpec.maxFanout 사용
+                        affectedSliceTypes = affectedSliceTypes,
+                        maxFanout = index.maxFanout,
                     )
                 )
             }
@@ -287,7 +275,7 @@ class FanoutWorkflow(
             // EntityKey 형식: {ENTITY_TYPE}#{tenantId}#{entityId}
             val entityIdPart = extractEntityId(upstreamEntityKey)
             val normalizedIndexValue = entityIdPart.lowercase()
-            
+
             // 1. 영향받는 엔티티 수 조회 (circuit breaker 체크용)
             val count = when (val r = invertedIndexRepo.countByIndexType(
                 tenantId = tenantId,
@@ -338,15 +326,19 @@ class FanoutWorkflow(
                         )
                     }
                     CircuitBreakerAction.ASYNC -> {
-                        // TODO: 비동기 큐로 전환 (별도 구현 필요)
-                        log.info("Circuit breaker: switching to async queue for {} targets", count)
+                        // ASYNC 큐 미구현 → SKIP fallback (데이터 유실 방지)
+                        log.warn(
+                            "Circuit breaker ASYNC not yet implemented, falling back to SKIP: {} targets for {}",
+                            count, dependency.indexType
+                        )
+                        skippedCount.incrementAndGet()
                         DependencyFanoutResult(
                             dependency = dependency,
                             processedCount = 0,
-                            skippedCount = 0,
+                            skippedCount = count.toInt(),
                             failedCount = 0,
-                            status = FanoutJobStatus.ASYNC_QUEUED,
-                            error = null,
+                            status = FanoutJobStatus.SKIPPED,
+                            error = "Circuit breaker ASYNC not implemented, skipped: $count targets",
                         )
                     }
                 }
@@ -533,11 +525,11 @@ class FanoutWorkflow(
     private fun cleanupDeduplicationCacheIfNeeded(now: Long, windowMs: Long) {
         if (deduplicationCache.size > maxCacheSize) {
             val expiredKeys = deduplicationCache.entries
-                .filter { (_, timestamp) -> (now - timestamp) > windowMs }
+                .filter { (_, timestamp) -> now - timestamp > windowMs }
                 .map { it.key }
-            
+
             expiredKeys.forEach { deduplicationCache.remove(it) }
-            
+
             if (expiredKeys.isNotEmpty()) {
                 log.debug("Cleaned up {} expired deduplication cache entries", expiredKeys.size)
             }
@@ -549,7 +541,7 @@ class FanoutWorkflow(
      *
      * EntityKey 형식: {ENTITY_TYPE}#{tenantId}#{entityId} (RFC-003 고정 포맷)
      * 예: "BRAND#tenant1#BR001" → "BR001"
-     * 
+     *
      * 엣지 케이스 처리:
      * - parts.size >= 3: parts[2] 사용 (표준)
      * - parts.size < 3: 전체 값을 반환 (비표준, 방어적 코딩)

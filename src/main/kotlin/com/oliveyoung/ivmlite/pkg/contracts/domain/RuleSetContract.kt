@@ -13,30 +13,9 @@ data class RuleSetContract(
     val meta: ContractMeta,
     val entityType: String,
     val impactMap: Map<SliceType, List<String>>,
-    val joins: List<JoinSpec>,
     val slices: List<SliceDefinition>,
     val indexes: List<IndexSpec> = emptyList(),
 )
-
-/**
- * 조인 사양
- */
-data class JoinSpec(
-    val sourceSlice: SliceType,
-    val targetEntity: String,
-    val joinPath: String,
-    val cardinality: JoinCardinality,
-)
-
-/**
- * 조인 카디널리티
- */
-enum class JoinCardinality {
-    ONE_TO_ONE,
-    ONE_TO_MANY,
-    MANY_TO_ONE,
-    MANY_TO_MANY,
-}
 
 /**
  * 슬라이스 정의 (RFC-IMPL-010 Phase D-4: joins 추가, RFC-IMPL-016: sliceKind 추가)

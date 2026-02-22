@@ -3,22 +3,26 @@ package com.oliveyoung.ivmlite.apps.admin.application
 import arrow.core.Either
 import arrow.core.raise.either
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
+import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
-import org.yaml.snakeyaml.Yaml
-import java.nio.file.Files
-import java.nio.file.Paths
+import kotlinx.coroutines.runBlocking
 import java.time.Instant
 
 /**
- * Contract Graph Service
+ * Contract Graph Service (RFC-022)
  *
- * Contract Dependency Graph를 빌드하고 쿼리하는 서비스.
- * Phase 0의 핵심 구현체.
+ * ContractRegistryPort + SinkRuleRegistryPort 기반 Contract Dependency Graph 빌드.
+ * DynamoDB/LocalYaml 모두 지원.
  *
  * @see RFC: contract-editor-ui-enhancement.md Phase 0
  */
-class ContractGraphService {
+class ContractGraphService(
+    private val contractRegistry: ContractRegistryPort,
+    private val sinkRuleRegistry: SinkRuleRegistryPort,
+) {
 
     /**
      * 전체 Contract Dependency Graph 빌드
@@ -224,100 +228,114 @@ class ContractGraphService {
         )
     }
 
-    @Suppress("UNCHECKED_CAST")
-    private fun loadDescriptorsInternal(): List<ContractDescriptor> {
+    private fun loadDescriptorsInternal(): List<ContractDescriptor> = runBlocking {
         val descriptors = mutableListOf<ContractDescriptor>()
-        val yaml = Yaml()
-        val resourcePath = "/contracts/v1"
+        val entityTypesSeen = mutableSetOf<String>()
 
-        try {
-            val resourceUrl = javaClass.getResource(resourcePath) ?: return descriptors
-            val uri = resourceUrl.toURI()
-
-            val files = if (uri.scheme == "jar") {
-                loadFileNamesFromJar(uri)
-            } else {
-                loadFileNamesFromFileSystem(uri)
-            }
-
-            for (fileName in files) {
-                try {
-                    val stream = javaClass.getResourceAsStream("$resourcePath/$fileName")
-                    if (stream != null) {
-                        val content = stream.bufferedReader().use { it.readText() }
-                        val map = yaml.load<Map<String, Any?>>(content) as? Map<String, Any?> ?: continue
-                        parseDescriptor(map, content, fileName)?.let { descriptors.add(it) }
+        // RuleSet
+        when (val r = contractRegistry.listContractRefs(ContractKind.RULESET, ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.forEach { ref ->
+                when (val load = contractRegistry.loadRuleSetContract(ref)) {
+                    is Result.Ok -> {
+                        val rs = load.value
+                        val map = buildMap<String, Any?> {
+                            put("kind", "RULESET")
+                            put("id", rs.meta.id)
+                            put("version", rs.meta.version.toString())
+                            put("status", rs.meta.status.name)
+                            put("entityType", rs.entityType)
+                            put("slices", rs.slices.map { mapOf("type" to it.type.name) })
+                        }
+                        descriptors.add(ContractDescriptor(
+                            kind = ContractKind.RULESET,
+                            id = rs.meta.id,
+                            version = rs.meta.version,
+                            filePath = "registry:${rs.meta.id}",
+                            rawYaml = map.toString(),
+                            parsed = map,
+                            semanticInfo = parseRuleSetSemantics(map),
+                            status = rs.meta.status
+                        ))
+                        entityTypesSeen.add(rs.entityType)
                     }
-                } catch (e: Exception) {
-                    // Skip invalid files
+                    is Result.Err -> {}
                 }
             }
-        } catch (e: Exception) {
-            // Return what we have
+            is Result.Err -> {}
         }
 
-        return descriptors
-    }
-
-    private fun loadFileNamesFromJar(uri: java.net.URI): List<String> {
-        return listOf(
-            "entity-product.v1.yaml",
-            "entity-brand.v1.yaml",
-            "entity-category.v1.yaml",
-            "ruleset.v1.yaml",
-            "ruleset-brand.v1.yaml",
-            "ruleset-product-doc001.v1.yaml",
-            "view-definition.v1.yaml",
-            "view-product-core.v1.yaml",
-            "view-product-detail.v1.yaml",
-            "view-product-search.v1.yaml",
-            "view-product-cart.v1.yaml",
-            "view-brand-detail.v1.yaml",
-            "sinkrule-opensearch-product.v1.yaml"
-        )
-    }
-
-    private fun loadFileNamesFromFileSystem(uri: java.net.URI): List<String> {
-        return try {
-            val path = Paths.get(uri)
-            if (Files.exists(path) && Files.isDirectory(path)) {
-                Files.list(path)
-                    .filter { it.toString().endsWith(".yaml") || it.toString().endsWith(".yml") }
-                    .map { it.fileName.toString() }
-                    .toList()
-            } else {
-                emptyList()
+        // ENTITY_SCHEMA (RuleSet에서 entityType 추출)
+        entityTypesSeen.forEach { entityType ->
+            val map = buildMap<String, Any?> {
+                put("kind", "ENTITY_SCHEMA")
+                put("id", "entity-$entityType.v1")
+                put("version", "1.0.0")
+                put("entityType", entityType)
+                put("fields", emptyList<Map<String, Any?>>())
             }
-        } catch (e: Exception) {
-            emptyList()
-        }
-    }
-
-    @Suppress("UNCHECKED_CAST")
-    private fun parseDescriptor(map: Map<String, Any?>, rawYaml: String, fileName: String): ContractDescriptor? {
-        val kindStr = map["kind"]?.toString() ?: return null
-        val kind = ContractKind.fromString(kindStr) ?: return null
-        val id = map["id"]?.toString() ?: return null
-        val versionStr = map["version"]?.toString() ?: "1.0.0"
-        val version = SemVer.parse(versionStr) ?: SemVer(1, 0, 0)
-
-        val semanticInfo = when (kind) {
-            ContractKind.ENTITY_SCHEMA -> parseEntitySchemaSemantics(map)
-            ContractKind.RULESET -> parseRuleSetSemantics(map)
-            ContractKind.VIEW_DEFINITION -> parseViewDefinitionSemantics(map)
-            ContractKind.SINK_RULE -> parseSinkRuleSemantics(map)
-            else -> SemanticInfo()
+            descriptors.add(ContractDescriptor(
+                kind = ContractKind.ENTITY_SCHEMA,
+                id = "entity-$entityType.v1",
+                version = SemVer(1, 0, 0),
+                filePath = "registry:entity-$entityType",
+                rawYaml = map.toString(),
+                parsed = map,
+                semanticInfo = parseEntitySchemaSemantics(map)
+            ))
         }
 
-        return ContractDescriptor(
-            kind = kind,
-            id = id,
-            version = version,
-            filePath = fileName,
-            rawYaml = rawYaml,
-            parsed = map,
-            semanticInfo = semanticInfo
-        )
+        // ViewDefinition
+        when (val r = contractRegistry.listViewDefinitions(ContractStatus.ACTIVE)) {
+            is Result.Ok -> r.value.forEach { vd ->
+                val map = buildMap<String, Any?> {
+                    put("kind", "VIEW_DEFINITION")
+                    put("id", vd.meta.id)
+                    put("version", vd.meta.version.toString())
+                    put("entityType", vd.entityType)
+                    put("viewName", vd.viewName)
+                    put("requiredSlices", vd.requiredSlices.map { it.name })
+                }
+                descriptors.add(ContractDescriptor(
+                    kind = ContractKind.VIEW_DEFINITION,
+                    id = vd.meta.id,
+                    version = vd.meta.version,
+                    filePath = "registry:${vd.meta.id}",
+                    rawYaml = map.toString(),
+                    parsed = map,
+                    semanticInfo = parseViewDefinitionSemantics(map),
+                    status = vd.meta.status
+                ))
+            }
+            is Result.Err -> {}
+        }
+
+        // SinkRule
+        when (val r = sinkRuleRegistry.findAllActive()) {
+            is Result.Ok -> r.value.forEach { sr ->
+                val map = buildMap<String, Any?> {
+                    put("kind", "SINK_RULE")
+                    put("id", sr.id)
+                    put("version", sr.version)
+                    put("input", mapOf(
+                        "entityTypes" to sr.input.entityTypes,
+                        "sliceTypes" to sr.input.sliceTypes.map { it.name }
+                    ))
+                    put("target", mapOf("type" to sr.target.type.name))
+                }
+                descriptors.add(ContractDescriptor(
+                    kind = ContractKind.SINK_RULE,
+                    id = sr.id,
+                    version = SemVer.parse(sr.version) ?: SemVer(1, 0, 0),
+                    filePath = "registry:${sr.id}",
+                    rawYaml = map.toString(),
+                    parsed = map,
+                    semanticInfo = parseSinkRuleSemantics(map)
+                ))
+            }
+            is Result.Err -> {}
+        }
+
+        descriptors
     }
 
     @Suppress("UNCHECKED_CAST")

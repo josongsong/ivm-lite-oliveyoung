@@ -1,111 +1,121 @@
 package com.oliveyoung.ivmlite.sdk.dsl.deploy
 
-import arrow.core.getOrElse
+import arrow.core.Either
+import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
+import com.oliveyoung.ivmlite.pkg.rawdata.application.IngestionOrchestrator
+import com.oliveyoung.ivmlite.pkg.rawdata.domain.IngestionWorkflow
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkEventRepository
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkRuleRegistry
+import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
+import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
+import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
+import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
+import com.oliveyoung.ivmlite.pkg.views.application.ViewComposer
 import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
 import com.oliveyoung.ivmlite.sdk.dsl.entity.ProductInput
-import com.oliveyoung.ivmlite.sdk.model.CompileMode
-import com.oliveyoung.ivmlite.sdk.model.CutoverMode
+import com.oliveyoung.ivmlite.sdk.execution.DeployExecutor
+import com.oliveyoung.ivmlite.sdk.execution.EntityContractResolver
 import com.oliveyoung.ivmlite.sdk.model.DeployState
-import com.oliveyoung.ivmlite.sdk.model.ShipMode
-import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertNotNull
-import kotlin.test.assertTrue
-import kotlin.test.fail
+import com.oliveyoung.ivmlite.shared.adapters.NoOpTransactionAdapter
+import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
+import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.types.shouldBeInstanceOf
+import org.junit.jupiter.api.assertThrows
 
-class DeployableContextTest {
+/**
+ * DeployableContext 테스트
+ *
+ * 커버리지 대상:
+ * - deploy(): executor 있을 때 성공, 없을 때 IllegalStateException
+ * - deployAsync(): executor 있을 때 Either.Right, 없을 때 Either.Left
+ */
+class DeployableContextTest : DescribeSpec({
 
-    private val testInput = ProductInput(
+    val rawDataRepo = InMemoryRawDataRepository()
+    val sliceRepo = InMemorySliceRepository()
+    val sinkEventRepo = InMemorySinkEventRepository()
+
+    val contractRegistry = LocalYamlContractRegistryAdapter("/contracts/v1")
+    val joinExecutor = JoinExecutor(rawDataRepo)
+    val slicingEngine = DefaultSlicingEngineAdapter(
+        SlicingEngine(contractRegistry, joinExecutor)
+    )
+    val viewComposer = ViewComposer()
+
+    val workflow = IngestionWorkflow(
+        rawDataRepo = rawDataRepo,
+        sliceRepo = sliceRepo,
+        slicingEngine = slicingEngine,
+        viewComposer = viewComposer
+    )
+
+    val orchestrator = IngestionOrchestrator(
+        workflow = workflow,
+        sinkEventRepo = sinkEventRepo,
+        transactionPort = NoOpTransactionAdapter(),
+        sinkRuleRegistry = InMemorySinkRuleRegistry()
+    )
+
+    val contractResolver = EntityContractResolver(LocalYamlContractRegistryAdapter("/contracts/v1"))
+    val executor = DeployExecutor(orchestrator, contractResolver)
+    val config = IvmClientConfig()
+
+    val productInput = ProductInput(
         tenantId = "test-tenant",
-        sku = "TEST-001",
-        name = "Test Product",
-        price = 10000
+        sku = "SKU-CTX",
+        name = "Context Test",
+        price = 15000
     )
 
-    private val testConfig = IvmClientConfig(
-        baseUrl = "http://localhost:8080",
-        tenantId = "test-tenant"
-    )
+    beforeEach {
+        rawDataRepo.clear()
+        sliceRepo.clear()
+        sinkEventRepo.clear()
+    }
 
-    @Test
-    fun `deploy - Full DSL with sync compile and async ship`() {
-        val context = DeployableContext(testInput, testConfig)
+    describe("deploy()") {
 
-        val result = context.deploy {
-            compile.sync()
-            ship.async {
-                opensearch {
-                    index("products")
-                }
-            }
-            cutover.ready()
+        it("executor 있을 때 정상 DeployResult 반환") {
+            val ctx = DeployableContext(productInput, config, executor)
+
+            val result = ctx.deploy()
+
+            result.success shouldBe true
+            result.entityKey shouldBe "product:SKU-CTX"
         }
 
-        assertTrue(result.success)
-        assertEquals("product:TEST-001", result.entityKey)
-        assertNotNull(result.version)
-        // TSID 기반 version은 Long 문자열 (예: "568920170376192001")
-        assertTrue(result.version.toLongOrNull() != null, "version should be a valid Long: ${result.version}")
+        it("executor 없을 때 IllegalStateException") {
+            val ctx = DeployableContext(productInput, config, null)
+
+            assertThrows<IllegalStateException> {
+                ctx.deploy()
+            }
+        }
     }
 
-    @Test
-    fun `deploy - Full DSL with async compile and async ship`() {
-        val context = DeployableContext(testInput, testConfig)
+    describe("deployAsync()") {
 
-        val result = context.deploy {
-            compile.async()
-            ship.async {
-                opensearch {
-                    index("products")
-                }
-            }
-            cutover.ready()
+        it("executor 있을 때 Either.Right 반환") {
+            val ctx = DeployableContext(productInput, config, executor)
+
+            val result = ctx.deployAsync()
+
+            result.shouldBeInstanceOf<Either.Right<*>>()
+            val job = (result as Either.Right).value
+            job.state shouldBe DeployState.DONE
+            job.entityKey shouldBe "product:SKU-CTX"
         }
 
-        assertTrue(result.success)
-        assertEquals("product:TEST-001", result.entityKey)
-        assertNotNull(result.version)
+        it("executor 없을 때 Either.Left(ConfigError) 반환") {
+            val ctx = DeployableContext(productInput, config, null)
+
+            val result = ctx.deployAsync()
+
+            result.shouldBeInstanceOf<Either.Left<DomainError>>()
+            val error = (result as Either.Left).value
+            error.shouldBeInstanceOf<DomainError.ConfigError>()
+        }
     }
-
-    @Test
-    fun `deployAsync - Type-safe async DSL`() {
-        val context = DeployableContext(testInput, testConfig)
-
-        val job = context.deployAsync {
-            compile.async()
-            ship.async {
-                opensearch {
-                    index("products")
-                }
-            }
-            cutover.ready()
-        }.getOrElse { fail("deployAsync failed: ${it.message}") }
-
-        assertEquals("product:TEST-001", job.entityKey)
-        assertNotNull(job.version)
-        assertNotNull(job.jobId)
-        assertTrue(job.jobId.startsWith("job-"))
-        assertEquals(DeployState.QUEUED, job.state)
-    }
-
-    @Test
-    fun `deployAsync - Multiple sinks`() {
-        val context = DeployableContext(testInput, testConfig)
-
-        val job = context.deployAsync {
-            compile.async()
-            ship.async {
-                opensearch {
-                    index("products")
-                }
-                personalize {
-                    dataset("product-interactions")
-                }
-            }
-            cutover.ready()
-        }.getOrElse { fail("deployAsync failed: ${it.message}") }
-
-        assertEquals("product:TEST-001", job.entityKey)
-        assertEquals(DeployState.QUEUED, job.state)
-    }
-}
+})

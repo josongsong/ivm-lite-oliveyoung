@@ -11,14 +11,14 @@ data class IvmClientConfig(
     companion object {
         /**
          * 전역 설정 (Ivm.configure()로 설정됨)
-         * 
+         *
          * ViewRef.query() 등에서 사용
          */
         @Volatile
         var global: IvmClientConfig = IvmClientConfig()
             internal set
     }
-    
+
     class Builder {
         private var baseUrl: String = "http://localhost:8080"
         private var tenantId: String? = null

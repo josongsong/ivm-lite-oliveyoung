@@ -163,10 +163,12 @@ class WorkflowCanvasService(
     }
 
     /**
-     * 최근 활동 조회 (placeholder - 실제 구현 필요)
+     * 최근 활동 조회
+     *
+     * 현재: 빈 리스트 반환 (Admin Canvas에서 활동 내역 미표시)
+     * 향후: Outbox/SinkEvent에서 최근 처리 이력 조회
      */
-    private suspend fun getRecentActivity(node: WorkflowNode): List<ActivityItem> {
-        // TODO: Outbox 또는 로그에서 실제 활동 조회
+    private suspend fun getRecentActivity(@Suppress("UNUSED_PARAMETER") node: WorkflowNode): List<ActivityItem> {
         return emptyList()
     }
 

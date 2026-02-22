@@ -1,37 +1,36 @@
 package com.oliveyoung.ivmlite.apps.admin.application
 
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerRepositoryPort
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkEventRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
-import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
 import com.oliveyoung.ivmlite.shared.domain.types.Result
-import org.jooq.DSLContext
-import org.jooq.impl.DSL
+import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import java.time.Instant
-import java.util.UUID
 
 /**
- * Admin Pipeline Service
+ * Admin Pipeline Service (SinkEvent 기반)
  *
- * Pipeline 모니터링 및 데이터 흐름 추적 서비스.
- * Routes에서 분리된 비즈니스 로직 담당.
- *
- * 데이터 흐름: RawData → Slice → View → Sink
+ * RawData/Slice: DynamoDB (ExplorerRepositoryPort)
+ * Sink: SinkEvent(DynamoDB). Outbox 제거됨.
  */
 class AdminPipelineService(
-    private val dsl: DSLContext,
-    private val contractRegistry: ContractRegistryPort? = null
+    private val contractRegistry: ContractRegistryPort? = null,
+    private val explorerRepo: ExplorerRepositoryPort? = null,
+    private val sinkEventRepo: SinkEventRepositoryPort? = null
 ) {
     // ==================== Public API ====================
 
     /**
      * 파이프라인 전체 개요 조회
      */
-    suspend fun getOverview(): Result<PipelineOverview> {
+    suspend fun getOverview(tenantId: String = "default"): Result<PipelineOverview> {
         return try {
-            val rawDataStats = getRawDataStatsInternal()
-            val sliceStats = getSliceStatsInternal()
-            val outboxStats = getOutboxPipelineStatsInternal()
-            val viewDefinitionCount = countContractsByKind("VIEW_DEFINITION")
+            val rawDataStats = getRawDataStatsInternal(tenantId)
+            val sliceStats = getSliceStatsInternal(tenantId)
+            val sinkEventStats = getSinkEventPipelineStatsInternal()
+            val viewDefinitionCount = countContractsByKind(ContractKind.VIEW_DEFINITION)
 
             Result.Ok(
                 PipelineOverview(
@@ -56,14 +55,14 @@ class AdminPipelineService(
                         ),
                         PipelineStage(
                             name = "Sink",
-                            description = "외부 시스템 전송",
-                            count = outboxStats.pending + outboxStats.processing + outboxStats.shipped,
-                            status = determineOutboxStatus(outboxStats)
+                            description = "외부 시스템 전송 (DynamoDB Streams)",
+                            count = sinkEventStats.pending + sinkEventStats.processing + sinkEventStats.shipped,
+                            status = determineSinkEventStatus(sinkEventStats)
                         )
                     ),
                     rawData = rawDataStats,
                     slices = sliceStats,
-                    outbox = outboxStats,
+                    sinkEvent = sinkEventStats,
                     timestamp = Instant.now()
                 )
             )
@@ -75,10 +74,10 @@ class AdminPipelineService(
     /**
      * RawData 상세 통계 조회
      */
-    suspend fun getRawDataStats(): Result<RawDataDetailStats> {
+    suspend fun getRawDataStats(tenantId: String = "default"): Result<RawDataDetailStats> {
         return try {
-            val stats = getRawDataStatsInternal()
-            val recent = getRecentRawDataInternal(20)
+            val stats = getRawDataStatsInternal(tenantId)
+            val recent = getRecentRawDataInternal(tenantId, 20)
             Result.Ok(RawDataDetailStats(stats = stats, recent = recent))
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to get rawdata stats: ${e.message}"))
@@ -88,11 +87,11 @@ class AdminPipelineService(
     /**
      * Slice 상세 통계 조회
      */
-    suspend fun getSliceStats(): Result<SliceDetailStats> {
+    suspend fun getSliceStats(tenantId: String = "default"): Result<SliceDetailStats> {
         return try {
-            val stats = getSliceStatsInternal()
-            val byType = getSlicesByTypeInternal()
-            val recent = getRecentSlicesInternal(20)
+            val stats = getSliceStatsInternal(tenantId)
+            val byType = getSlicesByTypeInternal(tenantId)
+            val recent = getRecentSlicesInternal(tenantId, 20)
             Result.Ok(SliceDetailStats(stats = stats, byType = byType, recent = recent))
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to get slice stats: ${e.message}"))
@@ -104,7 +103,7 @@ class AdminPipelineService(
      *
      * SQL Injection 방지: Prepared Statement 사용
      */
-    suspend fun getEntityFlow(entityKey: String): Result<EntityFlow> {
+    suspend fun getEntityFlow(entityKey: String, tenantId: String = "default"): Result<EntityFlow> {
         // 입력 검증
         if (entityKey.isBlank()) {
             return Result.Err(DomainError.ValidationError("entityKey", "entityKey cannot be blank"))
@@ -114,16 +113,16 @@ class AdminPipelineService(
         }
 
         return try {
-            val rawData = getRawDataByEntityKey(entityKey)
-            val slices = getSlicesByEntityKey(entityKey)
-            val outbox = getOutboxByEntityKey(entityKey)
+            val rawData = getRawDataByEntityKey(tenantId, entityKey)
+            val slices = getSlicesByEntityKey(tenantId, entityKey)
+            val sinkEvents = getSinkEventsByEntityKey(entityKey)
 
             Result.Ok(
                 EntityFlow(
                     entityKey = entityKey,
                     rawData = rawData,
                     slices = slices,
-                    outbox = outbox
+                    sinkEvent = sinkEvents
                 )
             )
         } catch (e: Exception) {
@@ -132,51 +131,49 @@ class AdminPipelineService(
     }
 
     /**
-     * 최근 파이프라인 처리 내역 조회
+     * 최근 파이프라인 처리 내역 조회 (SinkEvent 기반)
      */
     suspend fun getRecentItems(limit: Int): Result<List<PipelineItem>> {
         val safeLimit = limit.coerceIn(1, 200)
         return try {
-            val items = dsl.select()
-                .from(DSL.table("outbox"))
-                .orderBy(DSL.field("created_at").desc())
-                .limit(safeLimit)
-                .fetch()
-                .map { record ->
-                    val aggregateType = record.get("aggregatetype", String::class.java) ?: ""
-                    PipelineItem(
-                        id = record.get("id", UUID::class.java)?.toString() ?: "",
-                        aggregateId = record.get("aggregateid", String::class.java) ?: "",
-                        aggregateType = aggregateType,
-                        eventType = record.get("type", String::class.java) ?: "",
-                        stage = determineStage(aggregateType),
-                        status = record.get("status", String::class.java) ?: "",
-                        createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant(),
-                        processedAt = record.get("processed_at", java.time.OffsetDateTime::class.java)?.toInstant()
-                    )
+            val items = mutableListOf<PipelineItem>()
+            sinkEventRepo?.let { repo ->
+                listOf("PENDING", "PROCESSING", "COMPLETED").forEach { status ->
+                    (repo.findByStatus(status, safeLimit / 3) as? Result.Ok)?.value?.forEach { event ->
+                        items.add(
+                            PipelineItem(
+                                id = event.id.toString(),
+                                aggregateId = event.entityKey,
+                                aggregateType = "SINK_EVENT",
+                                eventType = event.viewType,
+                                stage = "SHIPPING",
+                                status = event.status.name,
+                                createdAt = event.createdAt,
+                                processedAt = event.processedAt
+                            )
+                        )
+                    }
                 }
-            Result.Ok(items)
+            }
+            Result.Ok(items.sortedByDescending { it.createdAt?.toEpochMilli() ?: 0L }.take(safeLimit))
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to get recent pipeline items: ${e.message}"))
         }
     }
 
     /**
-     * Inverted Index 통계 조회
+     * Inverted Index 통계 조회 (DynamoDB에서 조회)
      */
-    suspend fun getInvertedIndexStats(): Result<InvertedIndexStats> {
+    suspend fun getInvertedIndexStats(tenantId: String = "default"): Result<InvertedIndexStats> {
         return try {
-            val total = dsl.selectCount()
-                .from(DSL.table("inverted_index"))
-                .fetchOne(0, Long::class.java) ?: 0L
-
-            val byType = dsl.select(DSL.field("index_type"), DSL.count())
-                .from(DSL.table("inverted_index"))
-                .groupBy(DSL.field("index_type"))
-                .fetch()
-                .associate { (it.get(0, String::class.java) ?: "unknown") to (it.get(1, Long::class.java) ?: 0L) }
-
-            Result.Ok(InvertedIndexStats(total = total, byType = byType))
+            val stats = when (val result = explorerRepo?.getInvertedIndexStats(TenantId(tenantId))) {
+                null -> InvertedIndexStats(total = 0L, byType = emptyMap())
+                else -> result.fold(
+                    { raise -> return Result.Err(raise) },
+                    { s -> InvertedIndexStats(total = s.total, byType = s.byType) }
+                )
+            }
+            Result.Ok(stats)
         } catch (e: Exception) {
             Result.Err(DomainError.StorageError("Failed to get inverted index stats: ${e.message}"))
         }
@@ -184,190 +181,100 @@ class AdminPipelineService(
 
     // ==================== Private Helpers ====================
 
-    private fun getRawDataStatsInternal(): RawDataStats {
-        val total = dsl.selectCount()
-            .from(DSL.table("raw_data"))
-            .fetchOne(0, Long::class.java) ?: 0L
-
-        val byTenant = dsl.select(DSL.field("tenant_id"), DSL.count())
-            .from(DSL.table("raw_data"))
-            .groupBy(DSL.field("tenant_id"))
-            .fetch()
-            .associate { (it.get(0, String::class.java) ?: "unknown") to (it.get(1, Long::class.java) ?: 0L) }
-
-        val bySchema = dsl.select(DSL.field("schema_id"), DSL.count())
-            .from(DSL.table("raw_data"))
-            .groupBy(DSL.field("schema_id"))
-            .fetch()
-            .associate { (it.get(0, String::class.java) ?: "unknown") to (it.get(1, Long::class.java) ?: 0L) }
-
-        return RawDataStats(total = total, byTenant = byTenant, bySchema = bySchema)
+    private suspend fun getRawDataStatsInternal(tenantId: String): RawDataStats {
+        val tenant = TenantId(tenantId)
+        return explorerRepo?.getRawDataStats(tenant)?.fold(
+            { _ -> RawDataStats(total = 0L, byTenant = emptyMap(), bySchema = emptyMap()) },
+            { s -> RawDataStats(total = s.total, byTenant = s.byTenant, bySchema = s.bySchema) }
+        ) ?: RawDataStats(total = 0L, byTenant = emptyMap(), bySchema = emptyMap())
     }
 
-    private fun getSliceStatsInternal(): SliceStats {
-        val total = dsl.selectCount()
-            .from(DSL.table("slices"))
-            .fetchOne(0, Long::class.java) ?: 0L
-
-        val byType = dsl.select(DSL.field("slice_type"), DSL.count())
-            .from(DSL.table("slices"))
-            .groupBy(DSL.field("slice_type"))
-            .fetch()
-            .associate { (it.get(0, String::class.java) ?: "unknown") to (it.get(1, Long::class.java) ?: 0L) }
-
-        return SliceStats(total = total, byType = byType)
+    private suspend fun getSliceStatsInternal(tenantId: String): SliceStats {
+        val tenant = TenantId(tenantId)
+        return explorerRepo?.getSliceStats(tenant)?.fold(
+            { _ -> SliceStats(total = 0L, byType = emptyMap()) },
+            { s -> SliceStats(total = s.total, byType = s.byType) }
+        ) ?: SliceStats(total = 0L, byType = emptyMap())
     }
 
-    private fun getSlicesByTypeInternal(): List<SliceTypeStats> {
-        return dsl.select(DSL.field("slice_type"), DSL.count())
-            .from(DSL.table("slices"))
-            .groupBy(DSL.field("slice_type"))
-            .orderBy(DSL.count().desc())
-            .fetch()
-            .map { record ->
-                SliceTypeStats(
-                    type = record.get(0, String::class.java) ?: "UNKNOWN",
-                    count = record.get(1, Long::class.java) ?: 0L
-                )
+    private suspend fun getSlicesByTypeInternal(tenantId: String): List<SliceTypeStats> {
+        val tenant = TenantId(tenantId)
+        return explorerRepo?.getSlicesByTypeStats(tenant)?.fold(
+            { _ -> emptyList() },
+            { items -> items.map { SliceTypeStats(type = it.type, count = it.count) } }
+        ) ?: emptyList()
+    }
+
+    private suspend fun getSinkEventPipelineStatsInternal(): SinkEventPipelineStats {
+        return if (sinkEventRepo != null) {
+            val pending = (sinkEventRepo.findByStatus("PENDING", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+            val processing = (sinkEventRepo.findByStatus("PROCESSING", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+            val shipped = (sinkEventRepo.findByStatus("COMPLETED", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+            val failed = (sinkEventRepo.findByStatus("FAILED", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+            SinkEventPipelineStats(pending, processing, shipped, failed)
+        } else {
+            SinkEventPipelineStats(0, 0, 0, 0)
+        }
+    }
+
+    private suspend fun getRecentRawDataInternal(tenantId: String, limit: Int): List<RawDataItem> {
+        val tenant = TenantId(tenantId)
+        return explorerRepo?.getRecentRawData(tenant, limit)?.fold(
+            { _ -> emptyList() },
+            { items -> items.map { RawDataItem(tenantId = it.tenantId, entityKey = it.entityKey, version = it.version, schemaId = it.schemaId, createdAt = it.createdAt?.let { s -> java.time.Instant.parse(s) }) } }
+        ) ?: emptyList()
+    }
+
+    private suspend fun getRecentSlicesInternal(tenantId: String, limit: Int): List<SliceItem> {
+        val tenant = TenantId(tenantId)
+        return explorerRepo?.getRecentSlices(tenant, limit)?.fold(
+            { _ -> emptyList() },
+            { items -> items.map { SliceItem(tenantId = it.tenantId, entityKey = it.entityKey, version = it.version, sliceType = it.sliceType, hash = it.hash, createdAt = it.createdAt?.let { s -> java.time.Instant.parse(s) }) } }
+        ) ?: emptyList()
+    }
+
+    private suspend fun getRawDataByEntityKey(tenantId: String, entityKey: String): List<RawDataItem> {
+        val tenant = TenantId(tenantId)
+        return explorerRepo?.getRawDataByEntityKey(tenant, entityKey, 5)?.fold(
+            { _ -> emptyList() },
+            { items -> items.map { RawDataItem(tenantId = it.tenantId, entityKey = it.entityKey, version = it.version, schemaId = it.schemaId, createdAt = it.createdAt?.let { s -> java.time.Instant.parse(s) }) } }
+        ) ?: emptyList()
+    }
+
+    private suspend fun getSlicesByEntityKey(tenantId: String, entityKey: String): List<SliceItem> {
+        val tenant = TenantId(tenantId)
+        return explorerRepo?.getSlicesByEntityKey(tenant, entityKey, 20)?.fold(
+            { _ -> emptyList() },
+            { items -> items.map { SliceItem(tenantId = it.tenantId, entityKey = it.entityKey, version = it.version, sliceType = it.sliceType, hash = it.hash, createdAt = it.createdAt?.let { s -> java.time.Instant.parse(s) }) } }
+        ) ?: emptyList()
+    }
+
+    private suspend fun getSinkEventsByEntityKey(entityKey: String): List<SinkEventFlowItem> {
+        // SinkEvent: entityKey 필터링 (findByStatus로 조회 후 필터)
+        val items = mutableListOf<SinkEventFlowItem>()
+        sinkEventRepo?.let { repo ->
+            listOf("PENDING", "PROCESSING", "COMPLETED", "FAILED").forEach { status ->
+                (repo.findByStatus(status, 100) as? Result.Ok)?.value
+                    ?.filter { it.entityKey.contains(entityKey) }
+                    ?.take(10)
+                    ?.forEach { event ->
+                        items.add(
+                            SinkEventFlowItem(
+                                id = event.id.toString(),
+                                aggregateType = "SINK_EVENT",
+                                eventType = event.viewType,
+                                status = event.status.name,
+                                createdAt = event.createdAt,
+                                processedAt = event.processedAt
+                            )
+                        )
+                    }
             }
+        }
+        return items.sortedByDescending { it.createdAt?.toEpochMilli() ?: 0L }.take(10)
     }
 
-    private fun getOutboxPipelineStatsInternal(): OutboxPipelineStats {
-        val pending = countByStatus(OutboxStatus.PENDING)
-        val processing = countByStatus(OutboxStatus.PROCESSING)
-        val shipped = countByStatus(OutboxStatus.PROCESSED)
-        val failed = countByStatus(OutboxStatus.FAILED)
-
-        return OutboxPipelineStats(
-            pending = pending,
-            processing = processing,
-            shipped = shipped,
-            failed = failed
-        )
-    }
-
-    private fun countByStatus(status: OutboxStatus): Long {
-        return dsl.selectCount()
-            .from(DSL.table("outbox"))
-            .where(DSL.field("status").eq(status.name))
-            .fetchOne(0, Long::class.java) ?: 0L
-    }
-
-    private fun getRecentRawDataInternal(limit: Int): List<RawDataItem> {
-        return dsl.select()
-            .from(DSL.table("raw_data"))
-            .orderBy(DSL.field("created_at").desc())
-            .limit(limit)
-            .fetch()
-            .map { record ->
-                RawDataItem(
-                    tenantId = record.get("tenant_id", String::class.java) ?: "",
-                    entityKey = record.get("entity_key", String::class.java) ?: "",
-                    version = record.get("version", Long::class.java) ?: 0L,
-                    schemaId = record.get("schema_id", String::class.java) ?: "",
-                    createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant()
-                )
-            }
-    }
-
-    private fun getRecentSlicesInternal(limit: Int): List<SliceItem> {
-        return dsl.select()
-            .from(DSL.table("slices"))
-            .orderBy(DSL.field("created_at").desc())
-            .limit(limit)
-            .fetch()
-            .map { record ->
-                SliceItem(
-                    tenantId = record.get("tenant_id", String::class.java) ?: "",
-                    entityKey = record.get("entity_key", String::class.java) ?: "",
-                    version = record.get("slice_version", Long::class.java) ?: 0L,
-                    sliceType = record.get("slice_type", String::class.java) ?: "",
-                    hash = record.get("content_hash", String::class.java) ?: "",
-                    createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant()
-                )
-            }
-    }
-
-    /**
-     * SQL Injection 방지: Prepared Statement 사용
-     */
-    private fun getRawDataByEntityKey(entityKey: String): List<RawDataItem> {
-        return dsl.select()
-            .from(DSL.table("raw_data"))
-            .where(DSL.field("entity_key").eq(DSL.param("entityKey", entityKey)))
-            .orderBy(DSL.field("version").desc())
-            .limit(5)
-            .fetch()
-            .map { record ->
-                RawDataItem(
-                    tenantId = record.get("tenant_id", String::class.java) ?: "",
-                    entityKey = record.get("entity_key", String::class.java) ?: "",
-                    version = record.get("version", Long::class.java) ?: 0L,
-                    schemaId = record.get("schema_id", String::class.java) ?: "",
-                    createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant()
-                )
-            }
-    }
-
-    /**
-     * SQL Injection 방지: Prepared Statement 사용
-     */
-    private fun getSlicesByEntityKey(entityKey: String): List<SliceItem> {
-        return dsl.select()
-            .from(DSL.table("slices"))
-            .where(DSL.field("entity_key").eq(DSL.param("entityKey", entityKey)))
-            .orderBy(DSL.field("slice_version").desc(), DSL.field("slice_type"))
-            .limit(20)
-            .fetch()
-            .map { record ->
-                SliceItem(
-                    tenantId = record.get("tenant_id", String::class.java) ?: "",
-                    entityKey = record.get("entity_key", String::class.java) ?: "",
-                    version = record.get("slice_version", Long::class.java) ?: 0L,
-                    sliceType = record.get("slice_type", String::class.java) ?: "",
-                    hash = record.get("content_hash", String::class.java) ?: "",
-                    createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant()
-                )
-            }
-    }
-
-    /**
-     * SQL Injection 방지: Prepared Statement 사용
-     * LIKE 검색도 안전하게 처리
-     */
-    private fun getOutboxByEntityKey(entityKey: String): List<OutboxFlowItem> {
-        // Safe LIKE pattern: 특수문자 이스케이프 + Prepared Statement
-        val safePattern = "%${escapeLikePattern(entityKey)}%"
-
-        return dsl.select()
-            .from(DSL.table("outbox"))
-            .where(DSL.field("aggregateid").like(DSL.param("pattern", safePattern)))
-            .orderBy(DSL.field("created_at").desc())
-            .limit(10)
-            .fetch()
-            .map { record ->
-                OutboxFlowItem(
-                    id = record.get("id", UUID::class.java)?.toString() ?: "",
-                    aggregateType = record.get("aggregatetype", String::class.java) ?: "",
-                    eventType = record.get("type", String::class.java) ?: "",
-                    status = record.get("status", String::class.java) ?: "",
-                    createdAt = record.get("created_at", java.time.OffsetDateTime::class.java)?.toInstant(),
-                    processedAt = record.get("processed_at", java.time.OffsetDateTime::class.java)?.toInstant()
-                )
-            }
-    }
-
-    /**
-     * LIKE 패턴 특수문자 이스케이프
-     */
-    private fun escapeLikePattern(input: String): String {
-        return input
-            .replace("\\", "\\\\")
-            .replace("%", "\\%")
-            .replace("_", "\\_")
-    }
-
-    private suspend fun countContractsByKind(kind: String): Long {
+    private suspend fun countContractsByKind(kind: ContractKind): Long {
         // ContractRegistry가 주입된 경우 실제 개수 조회
         return contractRegistry?.let { registry ->
             try {
@@ -381,7 +288,7 @@ class AdminPipelineService(
         } ?: 0L
     }
 
-    private fun determineOutboxStatus(stats: OutboxPipelineStats): String {
+    private fun determineSinkEventStatus(stats: SinkEventPipelineStats): String {
         return when {
             stats.pending > 0 -> "PENDING"
             stats.processing > 0 -> "PROCESSING"
@@ -406,7 +313,7 @@ data class PipelineOverview(
     val stages: List<PipelineStage>,
     val rawData: RawDataStats,
     val slices: SliceStats,
-    val outbox: OutboxPipelineStats,
+    val sinkEvent: SinkEventPipelineStats,
     val timestamp: Instant
 )
 
@@ -433,7 +340,7 @@ data class SliceTypeStats(
     val count: Long
 )
 
-data class OutboxPipelineStats(
+data class SinkEventPipelineStats(
     val pending: Long,
     val processing: Long,
     val shipped: Long,
@@ -472,10 +379,10 @@ data class EntityFlow(
     val entityKey: String,
     val rawData: List<RawDataItem>,
     val slices: List<SliceItem>,
-    val outbox: List<OutboxFlowItem>
+    val sinkEvent: List<SinkEventFlowItem>
 )
 
-data class OutboxFlowItem(
+data class SinkEventFlowItem(
     val id: String,
     val aggregateType: String,
     val eventType: String,

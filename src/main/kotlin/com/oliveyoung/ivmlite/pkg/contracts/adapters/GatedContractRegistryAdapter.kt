@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.contracts.adapters
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.pkg.slices.domain.SliceExecutionPlanner
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 
@@ -42,7 +43,16 @@ class GatedContractRegistryAdapter(
     }
 
     override suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract> {
-        return gateCheck(delegate.loadRuleSetContract(ref)) { it.meta }
+        return when (val r = gateCheck(delegate.loadRuleSetContract(ref)) { it.meta }) {
+            is Result.Err -> r
+            is Result.Ok -> {
+                // RFC-018: RuleSet 로드 시점 DAG 검증 (cycle 감지 시 fail-closed)
+                when (val planResult = SliceExecutionPlanner.plan(r.value)) {
+                    is Result.Ok -> r
+                    is Result.Err -> Result.Err(planResult.error)
+                }
+            }
+        }
     }
 
     override suspend fun loadViewDefinitionContract(ref: ContractRef): Result<ViewDefinitionContract> {

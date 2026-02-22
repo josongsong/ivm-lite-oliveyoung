@@ -14,11 +14,11 @@ import java.net.URI
 
 /**
  * DynamoDB endpoint override 간단한 연결 테스트
- * 
+ *
  * - DynamoDB 연결 확인
  * - 테이블 생성
  * - 데이터 쓰기/읽기
- * 
+ *
  * Remote-only 정책: 기본 테스트에서는 실행되지 않도록 IntegrationTag + endpoint opt-in.
  */
 class DynamoDbSimpleTest : StringSpec(init@{
@@ -49,7 +49,7 @@ class DynamoDbSimpleTest : StringSpec(init@{
                 return@runBlocking null
             }
         }
-        
+
         println("✅ DynamoDB Local 연결 성공! 기존 테이블: $tables")
         tables shouldNotBe null
     }
@@ -70,9 +70,9 @@ class DynamoDbSimpleTest : StringSpec(init@{
                     )
                     it.billingMode(BillingMode.PAY_PER_REQUEST)
                 }.await()
-                
+
                 println("✅ 테이블 생성: $testTable")
-                
+
                 // 테이블 생성 대기
                 var retries = 0
                 while (retries < 10) {

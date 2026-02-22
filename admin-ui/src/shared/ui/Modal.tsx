@@ -48,7 +48,7 @@
  */
 import { AnimatePresence, motion } from 'framer-motion'
 import { X } from 'lucide-react'
-import { forwardRef, useEffect, useRef, type ReactNode } from 'react'
+import { forwardRef, type ReactNode, useEffect, useRef } from 'react'
 import { createPortal } from 'react-dom'
 import './Modal.css'
 

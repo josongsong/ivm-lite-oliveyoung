@@ -72,28 +72,4 @@ object InvertedIndexKeys {
         require(parts.size >= 3) { "Invalid entityKey: ${key.value}" }
         return Triple(parts[0], parts[1], parts[2])
     }
-
-    // ===== Deprecated: InvertedIndexContract 기반 메서드 (하위 호환성) =====
-
-    @Deprecated(
-        "Use refPk(tenantId, refEntityKey, refVersion) instead",
-        ReplaceWith("refPk(tenantId, refEntityKey, refVersion)")
-    )
-    @Suppress("DEPRECATION")
-    fun refPk(
-        contract: com.oliveyoung.ivmlite.pkg.contracts.domain.InvertedIndexContract,
-        tenantId: TenantId,
-        refEntityKey: EntityKey,
-        refVersion: Long,
-    ): String = refPk(tenantId, refEntityKey, refVersion, contract.padWidth, contract.separator)
-
-    @Deprecated(
-        "Use targetSk(targetEntityKey) instead",
-        ReplaceWith("targetSk(targetEntityKey)")
-    )
-    @Suppress("DEPRECATION")
-    fun targetSk(
-        contract: com.oliveyoung.ivmlite.pkg.contracts.domain.InvertedIndexContract,
-        targetEntityKey: EntityKey,
-    ): String = targetSk(targetEntityKey, contract.separator)
 }

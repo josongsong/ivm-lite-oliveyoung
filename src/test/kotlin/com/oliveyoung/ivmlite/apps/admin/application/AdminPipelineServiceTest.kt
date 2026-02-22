@@ -2,37 +2,24 @@ package com.oliveyoung.ivmlite.apps.admin.application
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.shared.domain.types.Result
-import org.jooq.DSLContext
-import org.junit.jupiter.api.Tag
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.BeforeEach
-import io.mockk.mockk
-import io.mockk.every
-import io.mockk.verify
 import kotlinx.coroutines.test.runTest
-import org.jooq.Result as JooqResult
-import org.jooq.Record
-import org.jooq.SelectSelectStep
-import org.jooq.SelectJoinStep
-import org.jooq.SelectConditionStep
-import org.jooq.SelectLimitStep
 import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 /**
  * AdminPipelineService 단위 테스트
  *
- * SOTA 리팩토링: Service 레이어 테스트
+ * DynamoDB 기반 (ExplorerRepositoryPort, SinkEventRepositoryPort)
  */
 class AdminPipelineServiceTest {
 
-    private lateinit var dsl: DSLContext
     private lateinit var service: AdminPipelineService
 
     @BeforeEach
     fun setup() {
-        dsl = mockk(relaxed = true)
-        service = AdminPipelineService(dsl)
+        service = AdminPipelineService(contractRegistry = null, explorerRepo = null, sinkEventRepo = null)
     }
 
     @Test
@@ -74,20 +61,6 @@ class AdminPipelineServiceTest {
     }
 
     @Test
-    fun `escapeLikePattern handles special characters`() {
-        // Given
-        val input = "test%_value\\special"
-
-        // When: private 함수 테스트를 위해 리플렉션 사용
-        val method = AdminPipelineService::class.java.getDeclaredMethod("escapeLikePattern", String::class.java)
-        method.isAccessible = true
-        val result = method.invoke(service, input) as String
-
-        // Then
-        assertEquals("test\\%\\_value\\\\special", result)
-    }
-
-    @Test
     fun `getRecentItems coerces limit to valid range`() = runTest {
         // Given
         val negativeLimit = -10
@@ -104,7 +77,7 @@ class AdminPipelineServiceTest {
 }
 
 /**
- * AdminContractService 단위 테스트
+ * AdminContractService 단위 테스트 (RFC-022: ContractRegistryPort 기반)
  */
 class AdminContractServiceTest {
 
@@ -112,7 +85,9 @@ class AdminContractServiceTest {
 
     @BeforeEach
     fun setup() {
-        service = AdminContractService()
+        val contractRegistry = com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter("/contracts/v1")
+        val sinkRuleRegistry = com.oliveyoung.ivmlite.pkg.sinks.adapters.LocalYamlSinkRuleRegistryAdapter("/contracts/v1")
+        service = AdminContractService(contractRegistry, sinkRuleRegistry)
     }
 
     @Test
@@ -157,25 +132,25 @@ class AdminContractServiceTest {
     }
 
     @Test
-    fun `ContractKind fromString handles valid values`() {
+    fun `ContractKind fromWireValue handles valid values`() {
         // When/Then
-        assertEquals(ContractKind.ENTITY_SCHEMA, ContractKind.fromString("ENTITY_SCHEMA"))
-        assertEquals(ContractKind.RULESET, ContractKind.fromString("RULESET"))
-        assertEquals(ContractKind.VIEW_DEFINITION, ContractKind.fromString("VIEW_DEFINITION"))
-        assertEquals(ContractKind.SINK_RULE, ContractKind.fromString("SINKRULE"))
+        assertEquals(ContractKind.ENTITY_SCHEMA, ContractKind.fromWireValue("ENTITY_SCHEMA"))
+        assertEquals(ContractKind.RULESET, ContractKind.fromWireValue("RULESET"))
+        assertEquals(ContractKind.VIEW_DEFINITION, ContractKind.fromWireValue("VIEW_DEFINITION"))
+        assertEquals(ContractKind.SINK_RULE, ContractKind.fromWireValue("SINKRULE"))
     }
 
     @Test
-    fun `ContractKind fromString handles invalid values`() {
+    fun `ContractKind fromWireValue handles invalid values`() {
         // When/Then
-        assertEquals(null, ContractKind.fromString("INVALID"))
-        assertEquals(null, ContractKind.fromString(""))
+        assertEquals(null, ContractKind.fromWireValue("INVALID"))
+        assertEquals(null, ContractKind.fromWireValue(""))
     }
 
     @Test
-    fun `ContractKind fromString is case insensitive`() {
+    fun `ContractKind fromWireValue is case insensitive`() {
         // When/Then
-        assertEquals(ContractKind.ENTITY_SCHEMA, ContractKind.fromString("entity_schema"))
-        assertEquals(ContractKind.RULESET, ContractKind.fromString("Ruleset"))
+        assertEquals(ContractKind.ENTITY_SCHEMA, ContractKind.fromWireValue("entity_schema"))
+        assertEquals(ContractKind.RULESET, ContractKind.fromWireValue("Ruleset"))
     }
 }

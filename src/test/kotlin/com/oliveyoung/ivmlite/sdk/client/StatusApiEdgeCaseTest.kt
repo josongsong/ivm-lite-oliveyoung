@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.client
 
+import com.oliveyoung.ivmlite.sdk.Ivm
 import kotlinx.coroutines.runBlocking
 import org.junit.jupiter.api.Test
 import org.junit.jupiter.api.assertThrows

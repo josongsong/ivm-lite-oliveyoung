@@ -1,45 +1,43 @@
 package com.oliveyoung.ivmlite.apps.admin.application
 
-import com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
-import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerRepositoryPort
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkEventRepositoryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
-import com.oliveyoung.ivmlite.shared.domain.types.OutboxStatus
 import com.oliveyoung.ivmlite.shared.domain.types.Result
-import org.jooq.DSLContext
-import org.jooq.impl.DSL
+import com.oliveyoung.ivmlite.shared.domain.types.TenantId
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 import org.slf4j.LoggerFactory
 import java.time.Instant
-import java.time.OffsetDateTime
 import java.util.UUID
 
 /**
- * Admin Dashboard Service
+ * Admin Dashboard Service (SinkEvent 기반)
  *
- * 대시보드 및 Outbox 통계 서비스.
- * AdminRoutes에서 분리된 비즈니스 로직 담당.
+ * RawData/Slice: DynamoDB (ExplorerRepositoryPort)
+ * SinkEvent: DynamoDB. Outbox 제거됨.
  */
 class AdminDashboardService(
-    private val outboxRepo: OutboxRepositoryPort,
-    private val worker: OutboxPollingWorker,
-    private val dsl: DSLContext
+    private val sinkEventRepo: SinkEventRepositoryPort,
+    private val explorerRepo: ExplorerRepositoryPort
 ) {
     private val logger = LoggerFactory.getLogger(AdminDashboardService::class.java)
 
-    // ==================== Public API ====================
-
-    /**
-     * 전체 대시보드 데이터 조회
-     */
     suspend fun getDashboard(): Result<DashboardData> {
         return try {
-            val outboxStats = getOutboxStatsInternal()
-            val workerStatus = getWorkerStatusInternal()
+            val sinkEventStats = getSinkEventStatsInternal()
             val dbStats = getDatabaseStatsInternal()
 
             Result.Ok(
                 DashboardData(
-                    outbox = outboxStats,
-                    worker = workerStatus,
+                    sinkEvent = sinkEventStats,
+                    worker = WorkerStatus(
+                        running = false,
+                        processed = 0,
+                        failed = 0,
+                        polls = 0,
+                        lastPollTime = null
+                    ),
                     database = dbStats,
                     timestamp = Instant.now()
                 )
@@ -50,33 +48,27 @@ class AdminDashboardService(
         }
     }
 
-    /**
-     * Outbox 통계 조회
-     */
-    suspend fun getOutboxStats(): Result<OutboxStats> {
-        return try {
-            Result.Ok(getOutboxStatsInternal())
-        } catch (e: Exception) {
-            logger.error("[OutboxStats] Failed to get outbox stats", e)
-            Result.Err(DomainError.StorageError("Failed to get outbox stats: ${e.message}"))
-        }
-    }
-
-    /**
-     * Worker 상태 조회
-     */
     suspend fun getWorkerStatus(): Result<WorkerStatus> {
+        return Result.Ok(
+            WorkerStatus(
+                running = false,
+                processed = 0,
+                failed = 0,
+                polls = 0,
+                lastPollTime = null
+            )
+        )
+    }
+
+    suspend fun getSinkEventStats(): Result<SinkEventStats> {
         return try {
-            Result.Ok(getWorkerStatusInternal())
+            Result.Ok(getSinkEventStatsInternal())
         } catch (e: Exception) {
-            logger.error("[WorkerStatus] Failed to get worker status", e)
-            Result.Err(DomainError.StorageError("Failed to get worker status: ${e.message}"))
+            logger.error("[SinkEventStats] Failed to get sink event stats", e)
+            Result.Err(DomainError.StorageError("Failed to get sink event stats: ${e.message}"))
         }
     }
 
-    /**
-     * 데이터베이스 통계 조회
-     */
     suspend fun getDatabaseStats(): Result<DatabaseStats> {
         return try {
             Result.Ok(getDatabaseStatsInternal())
@@ -86,387 +78,144 @@ class AdminDashboardService(
         }
     }
 
-    /**
-     * 최근 Outbox 엔트리 조회
-     */
-    suspend fun getRecentOutbox(limit: Int): Result<List<RecentOutboxItem>> {
+    suspend fun getRecentSinkEvents(limit: Int): Result<List<RecentSinkEventItem>> {
         val safeLimit = limit.coerceIn(1, 200)
         return try {
-            val entries = dsl.select()
-                .from(DSL.table("outbox"))
-                .orderBy(DSL.field("created_at").desc())
-                .limit(safeLimit)
-                .fetch()
-                .map { record ->
-                    RecentOutboxItem(
-                        id = record.get("id", UUID::class.java)?.toString() ?: "",
-                        aggregateType = record.get("aggregatetype", String::class.java) ?: "",
-                        aggregateId = record.get("aggregateid", String::class.java) ?: "",
-                        eventType = record.get("type", String::class.java) ?: "",
-                        status = record.get("status", String::class.java) ?: "",
-                        createdAt = record.get("created_at", OffsetDateTime::class.java)?.toInstant(),
-                        processedAt = record.get("processed_at", OffsetDateTime::class.java)?.toInstant(),
-                        retryCount = record.get("retry_count", Int::class.java) ?: 0
-                    )
+            val all = mutableListOf<RecentSinkEventItem>()
+            listOf("PENDING", "PROCESSING", "COMPLETED").forEach { status ->
+                when (val result = sinkEventRepo.findByStatus(status, safeLimit / 3)) {
+                    is Result.Ok -> all.addAll(result.value.map { it.toRecentItem() })
+                    is Result.Err -> logger.warn("Failed to get $status events: ${result.error}")
                 }
-            Result.Ok(entries)
+            }
+            Result.Ok(all.sortedByDescending { it.createdAt?.toEpochMilli() ?: 0L }.take(safeLimit))
         } catch (e: Exception) {
-            logger.error("[RecentOutbox] Failed to get recent outbox entries", e)
-            Result.Err(DomainError.StorageError("Failed to get recent outbox entries: ${e.message}"))
+            logger.error("[RecentSinkEvents] Failed", e)
+            Result.Err(DomainError.StorageError("Failed to get recent sink events: ${e.message}"))
         }
     }
 
-    /**
-     * 실패한 Outbox 엔트리 조회
-     */
-    suspend fun getFailedOutbox(limit: Int): Result<List<FailedOutboxItem>> {
+    suspend fun getFailedSinkEvents(limit: Int): Result<List<FailedSinkEventItem>> {
         val safeLimit = limit.coerceIn(1, 200)
         return try {
-            val entries = dsl.select()
-                .from(DSL.table("outbox"))
-                .where(DSL.field("status").eq(OutboxStatus.FAILED.name))
-                .orderBy(DSL.field("created_at").desc())
-                .limit(safeLimit)
-                .fetch()
-                .map { record ->
-                    FailedOutboxItem(
-                        id = record.get("id", UUID::class.java)?.toString() ?: "",
-                        aggregateType = record.get("aggregatetype", String::class.java) ?: "",
-                        aggregateId = record.get("aggregateid", String::class.java) ?: "",
-                        eventType = record.get("type", String::class.java) ?: "",
-                        createdAt = record.get("created_at", OffsetDateTime::class.java)?.toInstant(),
-                        retryCount = record.get("retry_count", Int::class.java) ?: 0,
-                        failureReason = record.get("failure_reason", String::class.java)
+            when (val result = sinkEventRepo.findByStatus("FAILED", safeLimit)) {
+                is Result.Ok -> Result.Ok(result.value.map { it.toFailedItem() })
+                is Result.Err -> Result.Err(result.error)
+            }
+        } catch (e: Exception) {
+            logger.error("[FailedSinkEvents] Failed", e)
+            Result.Err(DomainError.StorageError("Failed to get failed sink events: ${e.message}"))
+        }
+    }
+
+    suspend fun getDlq(limit: Int): Result<List<SinkEventEntryDetail>> =
+        Result.Ok(emptyList())  // DLQ 미지원 (SinkEvent 기반, Outbox 제거됨)
+
+    suspend fun replayDlq(id: UUID): Result<Boolean> =
+        Result.Err(DomainError.ValidationError("replay", "DLQ replay 미지원 (Outbox 제거됨)"))
+
+    suspend fun releaseStale(timeoutSeconds: Long): Result<Int> =
+        Result.Ok(0)  // Stale 미지원
+
+    suspend fun retryEntry(id: UUID): Result<SinkEventEntryDetail> =
+        Result.Err(DomainError.ValidationError("retry", "Retry 미지원 (SinkEvent는 Lambda 처리)"))
+
+    suspend fun retryAllFailed(limit: Int): Result<Int> =
+        Result.Ok(0)  // 미지원
+
+    suspend fun getHourlyStats(hours: Int): Result<HourlyStatsData> =
+        Result.Ok(HourlyStatsData(items = emptyList(), hours = hours))
+
+    suspend fun getStaleEntries(timeoutSeconds: Long): Result<List<StaleOutboxItem>> =
+        Result.Ok(emptyList())  // Stale 미지원
+
+    suspend fun getSinkEventEntry(id: UUID): Result<SinkEventEntryDetail> {
+        return when (val result = sinkEventRepo.findById(id)) {
+            is Result.Ok -> {
+                val event = result.value
+                if (event == null) {
+                    Result.Err(DomainError.ValidationError("id", "SinkEvent not found: $id"))
+                } else {
+                    Result.Ok(
+                        SinkEventEntryDetail(
+                            id = event.id.toString(),
+                            idempotencyKey = event.idempotencyKey,
+                            entityKey = event.entityKey,
+                            viewType = event.viewType,
+                            status = event.status.name,
+                            createdAt = event.createdAt,
+                            processedAt = event.processedAt,
+                            sinkTargets = event.sinkTargets
+                        )
                     )
                 }
-            Result.Ok(entries)
-        } catch (e: Exception) {
-            logger.error("[FailedOutbox] Failed to get failed outbox entries", e)
-            Result.Err(DomainError.StorageError("Failed to get failed outbox entries: ${e.message}"))
-        }
-    }
-
-    /**
-     * 시간대별 통계 조회
-     */
-    suspend fun getHourlyStats(hours: Int): Result<HourlyStatsData> {
-        val safeHours = hours.coerceIn(1, 168) // max 1 week
-        return try {
-            val stats = dsl.select(
-                DSL.field("date_trunc('hour', created_at)").`as`("hour"),
-                DSL.field("status"),
-                DSL.count().`as`("count")
-            )
-                .from(DSL.table("outbox"))
-                .where(
-                    DSL.field("created_at").greaterThan(
-                        DSL.field("NOW() - INTERVAL '$safeHours hours'")
-                    )
-                )
-                .groupBy(
-                    DSL.field("date_trunc('hour', created_at)"),
-                    DSL.field("status")
-                )
-                .orderBy(DSL.field("hour").asc())
-                .fetch()
-
-            val hourlyData = mutableMapOf<Instant, HourlyStatItem>()
-
-            stats.forEach { record ->
-                val hourOffset = record.get("hour", OffsetDateTime::class.java)
-                val hour = hourOffset?.toInstant() ?: return@forEach
-                val status = record.get("status", String::class.java) ?: return@forEach
-                val count = record.get("count", Long::class.java) ?: 0L
-
-                val item = hourlyData.getOrPut(hour) {
-                    HourlyStatItem(
-                        hour = hour,
-                        pending = 0L,
-                        processing = 0L,
-                        processed = 0L,
-                        failed = 0L,
-                        total = 0L
-                    )
-                }
-
-                hourlyData[hour] = when (OutboxStatus.fromDbValueOrNull(status)) {
-                    OutboxStatus.PENDING -> item.copy(pending = count, total = item.total + count)
-                    OutboxStatus.PROCESSING -> item.copy(processing = count, total = item.total + count)
-                    OutboxStatus.PROCESSED -> item.copy(processed = count, total = item.total + count)
-                    OutboxStatus.FAILED -> item.copy(failed = count, total = item.total + count)
-                    null -> item.copy(total = item.total + count)
-                }
-            }
-
-            Result.Ok(
-                HourlyStatsData(
-                    items = hourlyData.values.toList().sortedBy { it.hour },
-                    hours = safeHours
-                )
-            )
-        } catch (e: Exception) {
-            logger.error("[HourlyStats] Failed to get hourly stats", e)
-            Result.Err(DomainError.StorageError("Failed to get hourly stats: ${e.message}"))
-        }
-    }
-
-    /**
-     * Stale PROCESSING 엔트리 조회
-     */
-    suspend fun getStaleEntries(timeoutSeconds: Long): Result<List<StaleOutboxItem>> {
-        val safeTimeout = timeoutSeconds.coerceIn(60, 86400) // 1min ~ 1day
-        return try {
-            val staleEntries = dsl.select()
-                .from(DSL.table("outbox"))
-                .where(DSL.field("status").eq(OutboxStatus.PROCESSING.name))
-                .and(DSL.field("claimed_at").isNotNull)
-                .and(
-                    DSL.field("claimed_at").lessThan(
-                        DSL.field("NOW() - INTERVAL '$safeTimeout seconds'")
-                    )
-                )
-                .orderBy(DSL.field("claimed_at").asc())
-                .limit(100)
-                .fetch()
-
-            val items = staleEntries.map { record ->
-                val claimedAt = record.get("claimed_at", OffsetDateTime::class.java)
-                StaleOutboxItem(
-                    id = record.get("id", UUID::class.java)?.toString() ?: "",
-                    aggregateType = record.get("aggregatetype", String::class.java) ?: "",
-                    aggregateId = record.get("aggregateid", String::class.java) ?: "",
-                    eventType = record.get("type", String::class.java) ?: "",
-                    claimedAt = claimedAt?.toInstant(),
-                    claimedBy = record.get("claimed_by", String::class.java),
-                    ageSeconds = claimedAt?.let {
-                        java.time.Duration.between(it.toInstant(), Instant.now()).seconds
-                    } ?: 0L
-                )
-            }
-
-            Result.Ok(items)
-        } catch (e: Exception) {
-            logger.error("[StaleEntries] Failed to get stale entries", e)
-            Result.Err(DomainError.StorageError("Failed to get stale entries: ${e.message}"))
-        }
-    }
-
-    /**
-     * 특정 Outbox 엔트리 조회
-     */
-    suspend fun getOutboxEntry(id: UUID): Result<OutboxEntryDetail> {
-        return when (val result = outboxRepo.findById(id)) {
-            is Result.Ok -> {
-                val entry = result.value
-                Result.Ok(
-                    OutboxEntryDetail(
-                        id = entry.id.toString(),
-                        idempotencyKey = entry.idempotencyKey,
-                        aggregateType = entry.aggregateType.name,
-                        aggregateId = entry.aggregateId,
-                        eventType = entry.eventType,
-                        payload = entry.payload,
-                        status = entry.status.name,
-                        createdAt = entry.createdAt,
-                        processedAt = entry.processedAt,
-                        claimedAt = entry.claimedAt,
-                        claimedBy = entry.claimedBy,
-                        retryCount = entry.retryCount,
-                        failureReason = entry.failureReason,
-                        priority = entry.priority,
-                        entityVersion = entry.entityVersion
-                    )
-                )
             }
             is Result.Err -> Result.Err(result.error)
         }
     }
 
-    /**
-     * DLQ 조회
-     */
-    suspend fun getDlq(limit: Int): Result<List<OutboxEntryDetail>> {
-        val safeLimit = limit.coerceIn(1, 200)
-        return when (val result = outboxRepo.findDlq(safeLimit)) {
-            is Result.Ok -> {
-                Result.Ok(result.value.map { entry ->
-                    OutboxEntryDetail(
-                        id = entry.id.toString(),
-                        idempotencyKey = entry.idempotencyKey,
-                        aggregateType = entry.aggregateType.name,
-                        aggregateId = entry.aggregateId,
-                        eventType = entry.eventType,
-                        payload = entry.payload,
-                        status = entry.status.name,
-                        createdAt = entry.createdAt,
-                        processedAt = entry.processedAt,
-                        claimedAt = entry.claimedAt,
-                        claimedBy = entry.claimedBy,
-                        retryCount = entry.retryCount,
-                        failureReason = entry.failureReason,
-                        priority = entry.priority,
-                        entityVersion = entry.entityVersion
-                    )
-                })
-            }
-            is Result.Err -> Result.Err(result.error)
-        }
-    }
+    private suspend fun getSinkEventStatsInternal(): SinkEventStats {
+        val pending = (sinkEventRepo.findByStatus("PENDING", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+        val processing = (sinkEventRepo.findByStatus("PROCESSING", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+        val failed = (sinkEventRepo.findByStatus("FAILED", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+        val completed = (sinkEventRepo.findByStatus("COMPLETED", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
 
-    /**
-     * DLQ 재처리
-     */
-    suspend fun replayDlq(id: UUID): Result<Boolean> {
-        return when (val result = outboxRepo.replayFromDlq(id)) {
-            is Result.Ok -> Result.Ok(result.value)
-            is Result.Err -> Result.Err(result.error)
-        }
-    }
-
-    /**
-     * Stale 엔트리 release
-     */
-    suspend fun releaseStale(timeoutSeconds: Long): Result<Int> {
-        val safeTimeout = timeoutSeconds.coerceIn(60, 86400)
-        return when (val result = outboxRepo.releaseExpiredClaims(safeTimeout)) {
-            is Result.Ok -> Result.Ok(result.value)
-            is Result.Err -> Result.Err(result.error)
-        }
-    }
-
-    /**
-     * 실패한 엔트리 재시도
-     */
-    suspend fun retryEntry(id: UUID): Result<OutboxEntryDetail> {
-        return when (val result = outboxRepo.resetToPending(id)) {
-            is Result.Ok -> {
-                val entry = result.value
-                Result.Ok(
-                    OutboxEntryDetail(
-                        id = entry.id.toString(),
-                        idempotencyKey = entry.idempotencyKey,
-                        aggregateType = entry.aggregateType.name,
-                        aggregateId = entry.aggregateId,
-                        eventType = entry.eventType,
-                        payload = entry.payload,
-                        status = entry.status.name,
-                        createdAt = entry.createdAt,
-                        processedAt = entry.processedAt,
-                        claimedAt = entry.claimedAt,
-                        claimedBy = entry.claimedBy,
-                        retryCount = entry.retryCount,
-                        failureReason = entry.failureReason,
-                        priority = entry.priority,
-                        entityVersion = entry.entityVersion
-                    )
-                )
-            }
-            is Result.Err -> Result.Err(result.error)
-        }
-    }
-
-    /**
-     * 모든 실패 엔트리 재시도
-     */
-    suspend fun retryAllFailed(limit: Int): Result<Int> {
-        val safeLimit = limit.coerceIn(1, 1000)
-        return when (val result = outboxRepo.resetAllFailed(safeLimit)) {
-            is Result.Ok -> Result.Ok(result.value)
-            is Result.Err -> Result.Err(result.error)
-        }
-    }
-
-    // ==================== Private Helpers ====================
-
-    private fun getOutboxStatsInternal(): OutboxStats {
-        // outbox 테이블에서 직접 집계 (outbox_stats 뷰는 이미 집계된 데이터라 GROUP BY 불가)
-        val stats = dsl.select(
-            DSL.field("status", String::class.java),
-            DSL.field("aggregatetype", String::class.java),
-            DSL.count().`as`("count"),
-            DSL.min(DSL.field("created_at", OffsetDateTime::class.java)).`as`("oldest"),
-            DSL.max(DSL.field("created_at", OffsetDateTime::class.java)).`as`("newest"),
-            DSL.field("AVG(EXTRACT(EPOCH FROM (COALESCE(processed_at, NOW()) - created_at)))", Double::class.java).`as`("avg_latency_sec")
+        val byStatus = mapOf(
+            "PENDING" to pending,
+            "PROCESSING" to processing,
+            "FAILED" to failed,
+            "COMPLETED" to completed
         )
-            .from(DSL.table("outbox"))
-            .groupBy(DSL.field("status"), DSL.field("aggregatetype"))
-            .orderBy(DSL.field("status"), DSL.field("aggregatetype"))
-            .fetch()
 
-        val byStatus = mutableMapOf<String, Long>()
-        val byType = mutableMapOf<String, Long>()
-        val details = mutableListOf<OutboxStatDetail>()
+        val details = listOf(
+            SinkEventStatDetail("PENDING", "SINK_EVENT", pending, null, null),
+            SinkEventStatDetail("PROCESSING", "SINK_EVENT", processing, null, null),
+            SinkEventStatDetail("FAILED", "SINK_EVENT", failed, null, null),
+            SinkEventStatDetail("COMPLETED", "SINK_EVENT", completed, null, null)
+        )
 
-        stats.forEach { record ->
-            val status = record.get("status", String::class.java) ?: "UNKNOWN"
-            val type = record.get("aggregatetype", String::class.java) ?: "UNKNOWN"
-            val count = record.get("count", Long::class.java) ?: 0L
-            val oldest = record.get("oldest", OffsetDateTime::class.java)
-            val newest = record.get("newest", OffsetDateTime::class.java)
-            val avgLatency = record.get("avg_latency_sec", Double::class.java)
-
-            byStatus[status] = (byStatus[status] ?: 0L) + count
-            byType[type] = (byType[type] ?: 0L) + count
-
-            details.add(
-                OutboxStatDetail(
-                    status = status,
-                    aggregateType = type,
-                    count = count,
-                    oldest = oldest?.toInstant(),
-                    newest = newest?.toInstant(),
-                    avgLatencySeconds = avgLatency
-                )
-            )
-        }
-
-        val totalPending = countByStatus(OutboxStatus.PENDING)
-        val totalProcessing = countByStatus(OutboxStatus.PROCESSING)
-        val totalFailed = countByStatus(OutboxStatus.FAILED)
-        val totalProcessed = countByStatus(OutboxStatus.PROCESSED)
-
-        return OutboxStats(
-            total = OutboxTotalStats(
-                pending = totalPending,
-                processing = totalProcessing,
-                failed = totalFailed,
-                processed = totalProcessed
-            ),
+        return SinkEventStats(
+            total = SinkEventTotalStats(pending, processing, failed, completed),
             byStatus = byStatus,
-            byType = byType,
             details = details
         )
     }
 
-    private fun countByStatus(status: OutboxStatus): Long {
-        return dsl.selectCount()
-            .from(DSL.table("outbox"))
-            .where(DSL.field("status").eq(status.name))
-            .fetchOne(0, Long::class.java) ?: 0L
-    }
+    private suspend fun getDatabaseStatsInternal(): DatabaseStats = withContext(Dispatchers.IO) {
+        val rawDataCount = explorerRepo?.getRawDataStats(TenantId("oliveyoung"))?.fold(
+            { _ -> 0L },
+            { it.total }
+        ) ?: 0L
 
-    private fun getWorkerStatusInternal(): WorkerStatus {
-        val metrics = worker.getMetrics()
-        return WorkerStatus(
-            running = worker.isRunning(),
-            processed = metrics.processed,
-            failed = metrics.failed,
-            polls = metrics.polls,
-            lastPollTime = null
-        )
-    }
+        val sinkEventCount = run {
+            val p = (sinkEventRepo.findByStatus("PENDING", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+            val pr = (sinkEventRepo.findByStatus("PROCESSING", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+            val f = (sinkEventRepo.findByStatus("FAILED", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+            val c = (sinkEventRepo.findByStatus("COMPLETED", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
+            p + pr + f + c
+        }
 
-    private fun getDatabaseStatsInternal(): DatabaseStats {
-        val rawDataCount = dsl.selectCount()
-            .from(DSL.table("raw_data"))
-            .fetchOne(0, Long::class.java) ?: 0L
-
-        return DatabaseStats(
+        DatabaseStats(
             rawDataCount = rawDataCount,
-            outboxCount = 0L,
-            note = "DynamoDB stats require separate query"
+            sinkEventCount = sinkEventCount,
+            contractsCount = 0L,
+            note = "RawData/Slice/SinkEvent는 DynamoDB에서 조회"
         )
     }
 }
 
-// Domain Models are defined in AdminDashboardDtos.kt
+private fun com.oliveyoung.ivmlite.pkg.sinks.domain.SinkEvent.toRecentItem() = RecentSinkEventItem(
+    id = id.toString(),
+    entityKey = entityKey,
+    viewType = viewType,
+    status = status.name,
+    createdAt = createdAt,
+    processedAt = processedAt
+)
+
+private fun com.oliveyoung.ivmlite.pkg.sinks.domain.SinkEvent.toFailedItem() = FailedSinkEventItem(
+    id = id.toString(),
+    entityKey = entityKey,
+    viewType = viewType,
+    createdAt = createdAt
+)

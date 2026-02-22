@@ -1,7 +1,6 @@
 package com.oliveyoung.ivmlite.sdk.schema
 
-import com.oliveyoung.ivmlite.sdk.client.Ivm
-import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
+import com.oliveyoung.ivmlite.sdk.Ivm
 import org.junit.jupiter.api.BeforeEach
 import org.junit.jupiter.api.Test
 import kotlin.test.assertEquals
@@ -10,7 +9,7 @@ import kotlin.test.assertTrue
 
 /**
  * EntityRef & EntityBuilder 테스트
- * 
+ *
  * 코드젠으로 생성되는 엔티티 빌더 패턴 검증
  */
 class EntityRefTest {

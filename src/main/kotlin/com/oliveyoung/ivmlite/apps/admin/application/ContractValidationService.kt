@@ -5,7 +5,6 @@ import arrow.core.raise.either
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import org.yaml.snakeyaml.Yaml
-import org.yaml.snakeyaml.error.MarkedYAMLException
 import org.yaml.snakeyaml.error.YAMLException
 
 /**
@@ -120,7 +119,7 @@ class ContractValidationService(
         }
 
         // Kind별 추가 필수 필드
-        val kind = ContractKind.fromString(parsed["kind"]?.toString() ?: "")
+        val kind = ContractKind.fromWireValue(parsed["kind"]?.toString() ?: "")
         when (kind) {
             ContractKind.ENTITY_SCHEMA -> {
                 if (!parsed.containsKey("entityType")) {
@@ -161,7 +160,7 @@ class ContractValidationService(
     @Suppress("UNCHECKED_CAST")
     private fun validateL2Semantic(parsed: Map<String, Any?>, yamlContent: String): List<ValidationError> {
         val errors = mutableListOf<ValidationError>()
-        val kind = ContractKind.fromString(parsed["kind"]?.toString() ?: "") ?: return errors
+        val kind = ContractKind.fromWireValue(parsed["kind"]?.toString() ?: "") ?: return errors
 
         when (kind) {
             ContractKind.ENTITY_SCHEMA -> {
@@ -253,7 +252,7 @@ class ContractValidationService(
     @Suppress("UNCHECKED_CAST")
     private fun validateL3CrossRef(parsed: Map<String, Any?>, yamlContent: String): List<ValidationError> {
         val errors = mutableListOf<ValidationError>()
-        val kind = ContractKind.fromString(parsed["kind"]?.toString() ?: "") ?: return errors
+        val kind = ContractKind.fromWireValue(parsed["kind"]?.toString() ?: "") ?: return errors
 
         // 모든 계약 로드
         val allDescriptors = graphService.loadAllDescriptors().getOrNull() ?: return errors

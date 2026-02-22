@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.changeset
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.changeset.adapters.InMemoryChangeSetRepository

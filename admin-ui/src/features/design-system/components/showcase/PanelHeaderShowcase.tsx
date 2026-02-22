@@ -1,8 +1,8 @@
 /**
  * PanelHeader Showcase - PanelHeader 컴포넌트 전시
  */
-import { PanelHeader, Button } from '@/shared/ui'
-import { Inbox, ArrowRight } from 'lucide-react'
+import { Button, PanelHeader } from '@/shared/ui'
+import { ArrowRight, Inbox } from 'lucide-react'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

@@ -1,5 +1,6 @@
 package com.oliveyoung.ivmlite.tooling.codegen
 
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ViewDefinitionContract
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
@@ -11,9 +12,9 @@ import java.io.File
 
 /**
  * View Contract → Kotlin 코드 생성기
- * 
+ *
  * Contract YAML 파일 또는 DynamoDB에서 ViewRef 및 데이터 클래스를 자동 생성합니다.
- * 
+ *
  * @example 실행
  * ```bash
  * ./gradlew generateViews
@@ -23,7 +24,7 @@ import java.io.File
  *     outputDir = File("build/generated/kotlin")
  * )
  * ```
- * 
+ *
  * @example 생성 결과
  * ```kotlin
  * // build/generated/kotlin/com/oliveyoung/ivmlite/sdk/schema/GeneratedViews.kt
@@ -40,10 +41,10 @@ import java.io.File
  */
 object ViewCodeGen {
     private val yaml = Yaml()
-    
+
     /**
      * Contract YAML에서 View 코드 생성
-     * 
+     *
      * @param contractsDir Contract YAML 파일 디렉토리
      * @param outputDir 생성된 Kotlin 파일 출력 디렉토리
      * @param packageName 생성될 패키지명
@@ -61,13 +62,13 @@ object ViewCodeGen {
                 generatedFiles = emptyList()
             )
         }
-        
+
         return generateFromInfoList(viewContracts, outputDir, packageName, "YAML files")
     }
-    
+
     /**
      * DynamoDB Contract Registry에서 View 코드 생성
-     * 
+     *
      * @param registry DynamoDB ContractRegistryPort
      * @param outputDir 생성된 Kotlin 파일 출력 디렉토리
      * @param packageName 생성될 패키지명
@@ -78,7 +79,7 @@ object ViewCodeGen {
         packageName: String = "com.oliveyoung.ivmlite.sdk.schema.generated"
     ): GenerationResult = runBlocking {
         val result = registry.listViewDefinitions(ContractStatus.ACTIVE)
-        
+
         when (result) {
             is Result.Err -> {
                 GenerationResult(
@@ -96,16 +97,16 @@ object ViewCodeGen {
                         generatedFiles = emptyList()
                     )
                 }
-                
+
                 val viewInfos = contracts.map { contract ->
                     viewDefinitionToInfo(contract)
                 }
-                
+
                 generateFromInfoList(viewInfos, outputDir, packageName, "DynamoDB")
             }
         }
     }
-    
+
     /**
      * ViewDefinitionContract → ViewContractInfo 변환
      */
@@ -114,7 +115,7 @@ object ViewCodeGen {
         val parts = contract.meta.id.removePrefix("view.").split(".")
         val domain = parts.getOrNull(0) ?: "default"
         val viewName = parts.getOrNull(1) ?: contract.meta.id
-        
+
         return ViewContractInfo(
             id = contract.meta.id,
             domain = domain,
@@ -126,7 +127,7 @@ object ViewCodeGen {
             sourceFile = "DynamoDB:${contract.meta.id}"
         )
     }
-    
+
     /**
      * 공통 생성 로직
      */
@@ -137,14 +138,14 @@ object ViewCodeGen {
         source: String
     ): GenerationResult {
         val generatedFiles = mutableListOf<File>()
-        
+
         // 1. GeneratedViews.kt 생성
         val viewsCode = generateViewsObject(viewContracts, packageName)
         val viewsFile = File(outputDir, packageName.replace('.', '/') + "/GeneratedViews.kt")
         viewsFile.parentFile.mkdirs()
         viewsFile.writeText(viewsCode)
         generatedFiles.add(viewsFile)
-        
+
         // 2. 각 도메인별 데이터 클래스 생성 (선택)
         val groupedByDomain = viewContracts.groupBy { it.domain }
         groupedByDomain.forEach { (domain, contracts) ->
@@ -153,26 +154,26 @@ object ViewCodeGen {
             dataFile.writeText(dataClassesCode)
             generatedFiles.add(dataFile)
         }
-        
+
         return GenerationResult(
             success = true,
             message = "Generated ${generatedFiles.size} files from ${viewContracts.size} contracts ($source)",
             generatedFiles = generatedFiles
         )
     }
-    
+
     /**
      * Contract 디렉토리 스캔하여 VIEW_DEFINITION 계약 추출
      */
     private fun scanViewContracts(dir: File): List<ViewContractInfo> {
         if (!dir.exists()) return emptyList()
-        
+
         return dir.walkTopDown()
             .filter { it.isFile && (it.extension == "yaml" || it.extension == "yml") }
             .mapNotNull { file -> parseViewContract(file) }
             .toList()
     }
-    
+
     /**
      * 단일 YAML 파일 파싱
      */
@@ -182,29 +183,29 @@ object ViewCodeGen {
         } catch (e: Exception) {
             throw DomainError.ContractError("Failed to parse YAML file ${file.path}: ${e.message}")
         }
-        
+
         val kind = content["kind"] as? String
-        if (kind == null || kind != "VIEW_DEFINITION") {
+        if (kind == null || ContractKind.fromWireValue(kind) != ContractKind.VIEW_DEFINITION) {
             return null  // VIEW_DEFINITION이 아닌 파일은 무시 (다른 계약 타입)
         }
-        
+
         val id = content["id"] as? String
             ?: throw DomainError.ContractError("Missing 'id' field in ${file.path}")
-        
+
         val version = content["version"]?.toString() ?: "1.0.0"  // 기본값 허용 (코드 생성 도구)
         val status = content["status"] as? String ?: "ACTIVE"  // 기본값 허용 (코드 생성 도구)
-        
+
         @Suppress("UNCHECKED_CAST")
-        val requiredSlices = (content["requiredSlices"] as? List<String>)
+        val requiredSlices = content["requiredSlices"] as? List<String>
             ?: throw DomainError.ContractError("Missing required field 'requiredSlices' in ${file.path}")
         @Suppress("UNCHECKED_CAST")
-        val optionalSlices = (content["optionalSlices"] as? List<String>) ?: emptyList()  // optionalSlices는 빈 리스트 허용
-        
+        val optionalSlices = content["optionalSlices"] as? List<String> ?: emptyList()  // optionalSlices는 빈 리스트 허용
+
         // id에서 domain과 viewName 추출: "view.product.pdp.v1" → domain=product, viewName=pdp
         val parts = id.removePrefix("view.").split(".")
         val domain = parts.getOrNull(0) ?: "default"
         val viewName = parts.getOrNull(1) ?: id
-        
+
         return ViewContractInfo(
             id = id,
             domain = domain,
@@ -216,15 +217,15 @@ object ViewCodeGen {
             sourceFile = file.path
         )
     }
-    
+
     /**
      * GeneratedViews.kt 파일 내용 생성
-     * 
+     *
      * 모든 View는 대문자로 시작하며 타입 세이프한 결과를 반환합니다.
      */
     private fun generateViewsObject(contracts: List<ViewContractInfo>, packageName: String): String {
         val groupedByDomain = contracts.groupBy { it.domain }
-        
+
         return buildString {
             appendLine("// AUTO-GENERATED FILE - DO NOT EDIT")
             appendLine("// Generated by ViewCodeGen from Contract YAML files")
@@ -252,15 +253,15 @@ object ViewCodeGen {
             appendLine(" */")
             appendLine("object GeneratedViews {")
             appendLine()
-            
+
             groupedByDomain.forEach { (domain, domainContracts) ->
                 appendLine("    object ${domain.capitalize()} {")
-                
+
                 domainContracts.forEach { contract ->
                     val slicesLiteral = contract.allSlices.joinToString(", ") { "\"$it\"" }
                     val viewClassName = contract.viewName.capitalize()
                     val dataClassName = "${domain.capitalize()}${viewClassName}Data"
-                    
+
                     appendLine("        /**")
                     appendLine("         * $viewClassName View")
                     appendLine("         * ")
@@ -277,11 +278,11 @@ object ViewCodeGen {
                     appendLine("        )")
                     appendLine()
                 }
-                
+
                 appendLine("    }")
                 appendLine()
             }
-            
+
             // all views list
             appendLine("    /** All generated view references */")
             appendLine("    val all: List<ViewRef<*>> = listOf(")
@@ -291,19 +292,19 @@ object ViewCodeGen {
             }
             appendLine("    )")
             appendLine()
-            
+
             // find function
             appendLine("    /** Find view by ID */")
             appendLine("    fun find(viewId: String): ViewRef<*>? = all.find { it.viewId == viewId }")
             appendLine("}")
         }
     }
-    
+
     /**
      * 도메인별 데이터 클래스 생성
      */
-    private fun generateDataClasses(domain: String, contracts: List<ViewContractInfo>, packageName: String): String {
-        return buildString {
+    private fun generateDataClasses(domain: String, contracts: List<ViewContractInfo>, packageName: String): String =
+        buildString {
             appendLine("// AUTO-GENERATED FILE - DO NOT EDIT")
             appendLine("// Generated by ViewCodeGen")
             appendLine()
@@ -312,10 +313,10 @@ object ViewCodeGen {
             appendLine("import kotlinx.serialization.Serializable")
             appendLine("import kotlinx.serialization.json.*")
             appendLine()
-            
+
             contracts.forEach { contract ->
                 val className = "${domain.capitalize()}${contract.viewName.capitalize()}Data"
-                
+
                 appendLine("/**")
                 appendLine(" * Data class for ${contract.viewName} view")
                 appendLine(" * ")
@@ -329,26 +330,26 @@ object ViewCodeGen {
                 appendLine("@Serializable")
                 appendLine("data class $className(")
                 appendLine("    val entityKey: String,")
-                
+
                 // 각 슬라이스에 대한 필드 생성
                 contract.allSlices.forEachIndexed { index, slice ->
                     val fieldName = slice.lowercase()
                     val comma = if (index < contract.allSlices.size - 1) "," else ""
                     appendLine("    val $fieldName: JsonObject? = null$comma")
                 }
-                
+
                 appendLine(") {")
                 appendLine("    companion object {")
                 appendLine("        fun fromJson(json: JsonObject): $className {")
                 appendLine("            return $className(")
                 appendLine("                entityKey = json[\"entityKey\"]?.jsonPrimitive?.content ?: \"\",")
-                
+
                 contract.allSlices.forEachIndexed { index, slice ->
                     val fieldName = slice.lowercase()
                     val comma = if (index < contract.allSlices.size - 1) "," else ""
                     appendLine("                $fieldName = json[\"$fieldName\"]?.jsonObject$comma")
                 }
-                
+
                 appendLine("            )")
                 appendLine("        }")
                 appendLine("    }")
@@ -356,9 +357,8 @@ object ViewCodeGen {
                 appendLine()
             }
         }
-    }
-    
-    private fun String.capitalize(): String = 
+
+    private fun String.capitalize(): String =
         replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }
 
@@ -391,7 +391,7 @@ data class GenerationResult(
 
 /**
  * CLI로 실행 가능
- * 
+ *
  * ```bash
  * java -cp app.jar com.oliveyoung.ivmlite.tooling.codegen.ViewCodeGenKt \
  *   --contracts src/main/resources/contracts \
@@ -402,20 +402,20 @@ fun main(args: Array<String>) {
     val contractsDir = args.findArg("--contracts") ?: "src/main/resources/contracts"
     val outputDir = args.findArg("--output") ?: "build/generated/kotlin"
     val packageName = args.findArg("--package") ?: "com.oliveyoung.ivmlite.sdk.schema.generated"
-    
+
     println("ViewCodeGen - Contract → Kotlin Code Generator")
     println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     println("Contracts: $contractsDir")
     println("Output:    $outputDir")
     println("Package:   $packageName")
     println()
-    
+
     val result = ViewCodeGen.generate(
         contractsDir = File(contractsDir),
         outputDir = File(outputDir),
         packageName = packageName
     )
-    
+
     if (result.success) {
         println("✅ ${result.message}")
         result.generatedFiles.forEach { println("   → ${it.path}") }

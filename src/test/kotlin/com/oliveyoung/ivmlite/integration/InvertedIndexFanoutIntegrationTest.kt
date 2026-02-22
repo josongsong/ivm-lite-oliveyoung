@@ -1,12 +1,10 @@
 package com.oliveyoung.ivmlite.integration
 
 import com.oliveyoung.ivmlite.shared.domain.types.Result
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
-import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.IndexSpec
-import com.oliveyoung.ivmlite.pkg.contracts.domain.JoinCardinality
-import com.oliveyoung.ivmlite.pkg.contracts.domain.JoinSpec as ContractJoinSpec
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
 import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceBuildRules
 import com.oliveyoung.ivmlite.pkg.contracts.domain.SliceDefinition
@@ -133,7 +131,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
                 ruleSetRef = any(),
             )
         }
-        
+
         // 다른 엔티티는 호출되지 않았는지 검증
         coVerify(exactly = 0) {
             slicingWorkflow.execute(
@@ -232,7 +230,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
                 )
             }
         }
-        
+
         // 총 3번 호출되었는지 검증
         coVerify(exactly = 3) {
             slicingWorkflow.execute(any(), any(), any(), any())
@@ -367,7 +365,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
                 ruleSetRef = any(),
             )
         }
-        
+
         // 다른 엔티티는 호출되지 않았는지 검증
         coVerify(exactly = 0) {
             slicingWorkflow.execute(
@@ -398,7 +396,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // indexes에서 references="BRAND" 발견
         dependencies.size shouldBe 1
         dependencies[0].indexType shouldBe "product_by_brand"
-        
+
         // RFC-IMPL-013: maxFanout이 IndexSpec에서 FanoutDependency로 전달되는지 검증
         // createMockContractRegistryWithIndexesOnly()에서 maxFanout = 10000 설정
         dependencies[0].maxFanout shouldBe 10000
@@ -408,7 +406,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // ===== Step 1: maxFanout보다 많은 Product 생성 =====
         val maxFanout = 5  // 작은 값으로 설정
         val productCount = 10  // maxFanout 초과
-        
+
         val products = (1..productCount).map { i ->
             SliceRecord(
                 tenantId = tenantId,
@@ -460,24 +458,24 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // ===== Step 3: 검증 - Circuit Breaker 발동으로 SKIP됨 =====
         result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
         val fanoutResult = (result as Result.Ok<FanoutResult>).value
-        
+
         // SKIP 상태 확인
         fanoutResult.totalAffected shouldBe productCount
         fanoutResult.processedCount shouldBe 0
         fanoutResult.skippedCount shouldBe productCount
         fanoutResult.failedCount shouldBe 0
-        
+
         // Dependency 결과 확인 (모든 dependency가 SKIPPED면 전체도 SKIPPED)
         fanoutResult.dependencyResults.isNotEmpty() shouldBe true
         val dependencyResult = fanoutResult.dependencyResults.first()
         dependencyResult.status shouldBe com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutJobStatus.SKIPPED
         dependencyResult.skippedCount shouldBe productCount
         dependencyResult.processedCount shouldBe 0
-        
+
         // 전체 결과 상태는 SUCCESS (failedCount가 0이면 SUCCESS)
         // SKIPPED는 전체가 0일 때만 사용되므로, 여기서는 SUCCESS
         fanoutResult.status shouldBe FanoutResultStatus.SUCCESS
-        
+
         // SlicingWorkflow는 호출되지 않아야 함 (SKIP)
         coVerify(exactly = 0) {
             slicingWorkflow.execute(any(), any(), any(), any())
@@ -488,7 +486,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // ===== Step 1: maxFanout보다 많은 Product 생성 =====
         val maxFanout = 3
         val productCount = 5
-        
+
         val products = (1..productCount).map { i ->
             SliceRecord(
                 tenantId = tenantId,
@@ -540,24 +538,24 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // ===== Step 3: 검증 - Circuit Breaker 발동으로 FAILED됨 =====
         result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
         val fanoutResult = (result as Result.Ok<FanoutResult>).value
-        
+
         // FAILED 상태 확인
         fanoutResult.totalAffected shouldBe productCount
         fanoutResult.processedCount shouldBe 0
         fanoutResult.failedCount shouldBe productCount
         fanoutResult.skippedCount shouldBe 0
-        
+
         // Dependency 결과 확인
         fanoutResult.dependencyResults.isNotEmpty() shouldBe true
         val dependencyResult = fanoutResult.dependencyResults.first()
         dependencyResult.status shouldBe com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutJobStatus.FAILED
         dependencyResult.failedCount shouldBe productCount
         dependencyResult.processedCount shouldBe 0
-        
+
         // 전체 결과 상태는 PARTIAL_FAILURE 또는 FAILED (totalFailed > 0이면 PARTIAL_FAILURE)
         // 모든 dependency가 FAILED면 PARTIAL_FAILURE
         (fanoutResult.status == FanoutResultStatus.FAILED || fanoutResult.status == FanoutResultStatus.PARTIAL_FAILURE) shouldBe true
-        
+
         // SlicingWorkflow는 호출되지 않아야 함 (FAILED)
         coVerify(exactly = 0) {
             slicingWorkflow.execute(any(), any(), any(), any())
@@ -612,7 +610,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 0
         fanoutResult.processedCount shouldBe 0
-        
+
         // SlicingWorkflow 호출 없음
         coVerify(exactly = 0) {
             slicingWorkflow.execute(any(), any(), any(), any())
@@ -623,7 +621,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // ===== Step 1: tenant1의 Product 생성 =====
         val tenant1 = TenantId("tenant1")
         val tenant2 = TenantId("tenant2")
-        
+
         val productSlice = SliceRecord(
             tenantId = tenant1,
             entityKey = EntityKey("PRODUCT#tenant1#P001"),
@@ -669,7 +667,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         result.shouldBeInstanceOf<Result.Ok<FanoutResult>>()
         val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 0  // 다른 tenant이므로 영향 없음
-        
+
         // SlicingWorkflow 호출 없음
         coVerify(exactly = 0) {
             slicingWorkflow.execute(any(), any(), any(), any())
@@ -687,21 +685,13 @@ private fun createMockContractRegistryWithReferences(): ContractRegistryPort {
 
     val ruleSet = RuleSetContract(
         meta = ContractMeta(
-            kind = "RULESET",
+            kind = ContractKind.RULESET,
             id = "ruleset.core.v1",
             version = SemVer.parse("1.0.0"),
             status = ContractStatus.ACTIVE,
         ),
         entityType = "PRODUCT",
         impactMap = mapOf(SliceType.CORE to listOf("/brandId", "/title")),
-        joins = listOf(
-            ContractJoinSpec(
-                sourceSlice = SliceType.CORE,
-                targetEntity = "BRAND",
-                joinPath = "/brandId",
-                cardinality = JoinCardinality.MANY_TO_ONE,
-            ),
-        ),
         slices = listOf(
             SliceDefinition(
                 type = SliceType.CORE,
@@ -731,14 +721,13 @@ private fun createMockContractRegistryWithTagOnly(): ContractRegistryPort {
 
     val ruleSet = RuleSetContract(
         meta = ContractMeta(
-            kind = "RULESET",
+            kind = ContractKind.RULESET,
             id = "ruleset.core.v1",
             version = SemVer.parse("1.0.0"),
             status = ContractStatus.ACTIVE,
         ),
         entityType = "PRODUCT",
         impactMap = mapOf(SliceType.CORE to listOf("/tag")),
-        joins = emptyList(),
         slices = listOf(
             SliceDefinition(
                 type = SliceType.CORE,
@@ -763,14 +752,13 @@ private fun createMockContractRegistryWithIndexesOnly(): ContractRegistryPort {
 
     val ruleSet = RuleSetContract(
         meta = ContractMeta(
-            kind = "RULESET",
+            kind = ContractKind.RULESET,
             id = "ruleset.core.v1",
             version = SemVer.parse("1.0.0"),
             status = ContractStatus.ACTIVE,
         ),
         entityType = "PRODUCT",
         impactMap = mapOf(SliceType.CORE to listOf("/brandId")),
-        joins = emptyList(),  // joins 없음 → indexes만 사용
         slices = listOf(
             SliceDefinition(
                 type = SliceType.CORE,
@@ -800,14 +788,13 @@ private fun createMockContractRegistryWithMaxFanout(maxFanout: Int): ContractReg
 
     val ruleSet = RuleSetContract(
         meta = ContractMeta(
-            kind = "RULESET",
+            kind = ContractKind.RULESET,
             id = "ruleset.core.v1",
             version = SemVer.parse("1.0.0"),
             status = ContractStatus.ACTIVE,
         ),
         entityType = "PRODUCT",
         impactMap = mapOf(SliceType.CORE to listOf("/brandId")),
-        joins = emptyList(),
         slices = listOf(
             SliceDefinition(
                 type = SliceType.CORE,
@@ -836,14 +823,13 @@ private fun createMockContractRegistryWithCategory(): ContractRegistryPort {
 
     val ruleSet = RuleSetContract(
         meta = ContractMeta(
-            kind = "RULESET",
+            kind = ContractKind.RULESET,
             id = "ruleset.core.v1",
             version = SemVer.parse("1.0.0"),
             status = ContractStatus.ACTIVE,
         ),
         entityType = "PRODUCT",
         impactMap = mapOf(SliceType.CORE to listOf("/categoryIds")),
-        joins = emptyList(),
         slices = listOf(
             SliceDefinition(
                 type = SliceType.CORE,

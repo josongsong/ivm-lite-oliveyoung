@@ -10,8 +10,6 @@ import com.oliveyoung.ivmlite.pkg.fanout.domain.RetryConfig
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
-import io.kotest.matchers.doubles.shouldBeGreaterThan
-import io.kotest.matchers.doubles.shouldBeLessThan
 import io.kotest.matchers.shouldBe
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.minutes

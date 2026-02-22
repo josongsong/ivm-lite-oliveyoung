@@ -1,15 +1,15 @@
 package com.oliveyoung.ivmlite.apps.admin.wiring
 
-import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.adapterModule
+import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.domainServiceModule
 import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.infraModule
-import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.jooqAdapterModule
+import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.productionAdapterModule
 import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.tracingModule
+import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.viewModule
 import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.workflowModule
-import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.workerModule
 
 // Alerts
 import com.oliveyoung.ivmlite.pkg.alerts.adapters.DefaultAlertRuleLoader
-import com.oliveyoung.ivmlite.pkg.alerts.adapters.InMemoryAlertRepository
+import com.oliveyoung.ivmlite.pkg.alerts.adapters.ExposedAlertRepository
 import com.oliveyoung.ivmlite.pkg.alerts.adapters.SlackNotifier
 import com.oliveyoung.ivmlite.pkg.alerts.application.AlertEngine
 import com.oliveyoung.ivmlite.pkg.alerts.application.AlertEngineConfig
@@ -20,16 +20,15 @@ import com.oliveyoung.ivmlite.pkg.alerts.ports.NotifierPort
 
 // Backfill
 import com.oliveyoung.ivmlite.pkg.backfill.adapters.DefaultBackfillExecutor
-import com.oliveyoung.ivmlite.pkg.backfill.adapters.InMemoryBackfillJobRepository
+import com.oliveyoung.ivmlite.pkg.backfill.adapters.ExposedBackfillJobRepository
 import com.oliveyoung.ivmlite.pkg.backfill.application.BackfillService
 import com.oliveyoung.ivmlite.pkg.backfill.application.BackfillServiceConfig
 import com.oliveyoung.ivmlite.pkg.backfill.ports.BackfillExecutorPort
 import com.oliveyoung.ivmlite.pkg.backfill.ports.BackfillJobRepositoryPort
 
 // Health
-import com.oliveyoung.ivmlite.pkg.health.adapters.OutboxHealthCheck
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkEventRepositoryPort
 import com.oliveyoung.ivmlite.pkg.health.adapters.PostgresHealthCheck
-import com.oliveyoung.ivmlite.pkg.health.adapters.WorkerHealthCheck
 import com.oliveyoung.ivmlite.pkg.health.application.HealthService
 import com.oliveyoung.ivmlite.pkg.health.ports.HealthCheckPort
 
@@ -38,12 +37,13 @@ import com.oliveyoung.ivmlite.pkg.observability.adapters.PipelineMetricsCollecto
 import com.oliveyoung.ivmlite.pkg.observability.application.ObservabilityService
 import com.oliveyoung.ivmlite.pkg.observability.ports.MetricsCollectorPort
 
-import com.oliveyoung.ivmlite.pkg.orchestration.application.OutboxPollingWorker
+import com.oliveyoung.ivmlite.apps.admin.adapters.DynamoDbExplorerAdapter
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerRepositoryPort
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
-import com.oliveyoung.ivmlite.pkg.rawdata.ports.OutboxRepositoryPort
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.shared.config.AppConfig
 import com.oliveyoung.ivmlite.shared.config.ConfigLoader
+import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
 
 // Workflow Canvas (RFC-IMPL-015)
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.adapters.WorkflowGraphBuilder
@@ -54,13 +54,19 @@ import com.oliveyoung.ivmlite.pkg.workflow.canvas.application.WorkflowCanvasServ
 import com.oliveyoung.ivmlite.apps.admin.application.AdminDashboardService
 import com.oliveyoung.ivmlite.apps.admin.application.AdminPipelineService
 import com.oliveyoung.ivmlite.apps.admin.application.AdminContractService
+import com.oliveyoung.ivmlite.apps.admin.application.ContractGraphService
+import com.oliveyoung.ivmlite.apps.admin.application.ContractValidationService
+import com.oliveyoung.ivmlite.apps.admin.application.ContractCursorService
+import com.oliveyoung.ivmlite.apps.admin.application.WhyEngineService
+import com.oliveyoung.ivmlite.apps.admin.application.SemanticDiffService
+import com.oliveyoung.ivmlite.apps.admin.application.PlaygroundService
+import com.oliveyoung.ivmlite.apps.admin.application.GitOutputService
 import com.oliveyoung.ivmlite.apps.admin.application.ExplorerService
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
-import com.oliveyoung.ivmlite.pkg.orchestration.application.IngestWorkflow
 
-import org.jooq.DSLContext
+import org.jetbrains.exposed.sql.Database
 import org.koin.dsl.module
 
 /**
@@ -69,8 +75,7 @@ import org.koin.dsl.module
  * Admin 앱 전용 DI 모듈.
  * runtimeapi와 독립적으로 동작하도록 별도 모듈 구성.
  *
- * ⚠️ 주의: Admin 앱은 모니터링/관리 전용이므로 Worker를 시작하지 않습니다.
- *          Worker는 runtimeapi에서만 실행됩니다.
+ * Admin 앱은 모니터링/관리 전용.
  */
 val adminAppModule = module {
     // Config (Hoplite)
@@ -79,33 +84,64 @@ val adminAppModule = module {
     // Admin Services (SOTA Refactoring)
     single {
         AdminDashboardService(
-            outboxRepo = get(),
-            worker = get(),
-            dsl = get()
+            sinkEventRepo = get<SinkEventRepositoryPort>(),
+            explorerRepo = get<ExplorerRepositoryPort>()
         )
     }
 
     single {
         AdminPipelineService(
-            dsl = get(),
-            contractRegistry = getOrNull<ContractRegistryPort>()
+            contractRegistry = getOrNull<ContractRegistryPort>(),
+            explorerRepo = get<ExplorerRepositoryPort>(),
+            sinkEventRepo = getOrNull<SinkEventRepositoryPort>()
+        )
+    }
+
+    // ExplorerRepositoryPort (DynamoDB - productionAdapterModule과 함께 사용)
+    single<ExplorerRepositoryPort> {
+        val config: AppConfig = get()
+        DynamoDbExplorerAdapter(
+            dynamoClient = get<DynamoDbAsyncClient>(),
+            tableName = config.dynamodb.dataTableName
         )
     }
 
     single {
-        AdminContractService()
+        AdminContractService(
+            contractRegistry = get(),
+            sinkRuleRegistry = get()
+        )
     }
 
-    // ExplorerService - Data Explorer 기능
+    // Contract Graph / Playground (RFC-022: ContractRegistryPort 기반)
+    single {
+        ContractGraphService(
+            contractRegistry = get(),
+            sinkRuleRegistry = get()
+        )
+    }
+    single { ContractValidationService(get()) }
+    single { ContractCursorService(get()) }
+    single { WhyEngineService(get()) }
+    single { SemanticDiffService(get()) }
+    single { GitOutputService(get()) }
+    single {
+        PlaygroundService(
+            contractRegistry = get(),
+            contractService = get(),
+            rawDataRepo = get()
+        )
+    }
+
+    // ExplorerService - Data Explorer 기능 (DynamoDB via ExplorerRepositoryPort)
     single {
         ExplorerService(
             rawDataRepo = get<RawDataRepositoryPort>(),
             sliceRepo = get<SliceRepositoryPort>(),
+            explorerRepo = get<ExplorerRepositoryPort>(),
             queryViewWorkflow = getOrNull<QueryViewWorkflow>(),
             contractRegistry = getOrNull<ContractRegistryPort>(),
-            ingestWorkflow = getOrNull<IngestWorkflow>(),
-            slicingWorkflow = getOrNull<SlicingWorkflow>(),
-            dsl = get<DSLContext>()
+            slicingWorkflow = getOrNull<SlicingWorkflow>()
         )
     }
 }
@@ -114,8 +150,8 @@ val adminAppModule = module {
  * Alerts 도메인 모듈
  */
 val alertsModule = module {
-    // Repository (In-Memory for now, can be replaced with JOOQ adapter)
-    single<AlertRepositoryPort> { InMemoryAlertRepository() }
+    // Repository (Exposed - PostgreSQL)
+    single<AlertRepositoryPort> { ExposedAlertRepository(get<Database>()) }
 
     // Rule Loader
     single<AlertRuleLoaderPort> { DefaultAlertRuleLoader() }
@@ -125,16 +161,14 @@ val alertsModule = module {
         val config = get<AppConfig>()
         listOf(
             SlackNotifier(config.admin?.slackWebhookUrl)
-            // Add more notifiers here: EmailNotifier, WebhookNotifier, etc.
         )
     }
 
     // Metric Collector
     single {
         MetricCollector(
-            dsl = get<DSLContext>(),
-            worker = getOrNull<OutboxPollingWorker>(),
-            outboxRepo = getOrNull<OutboxRepositoryPort>()
+            database = get<Database>(),
+            sinkEventRepo = getOrNull<SinkEventRepositoryPort>()
         )
     }
 
@@ -156,15 +190,14 @@ val alertsModule = module {
  * Backfill 도메인 모듈
  */
 val backfillModule = module {
-    // Repository (In-Memory for now)
-    single<BackfillJobRepositoryPort> { InMemoryBackfillJobRepository() }
+    // Repository (Exposed - PostgreSQL)
+    single<BackfillJobRepositoryPort> { ExposedBackfillJobRepository(get<Database>()) }
 
     // Executor
     single<BackfillExecutorPort> {
         DefaultBackfillExecutor(
-            dsl = get<DSLContext>(),
+            explorerRepo = get<ExplorerRepositoryPort>(),
             rawDataRepo = get<RawDataRepositoryPort>(),
-            outboxRepo = get<OutboxRepositoryPort>(),
             slicingWorkflow = get<SlicingWorkflow>()
         )
     }
@@ -188,9 +221,7 @@ val healthModule = module {
     // Health Checks
     single<List<HealthCheckPort>> {
         listOf(
-            PostgresHealthCheck(get<DSLContext>()),
-            WorkerHealthCheck(getOrNull<OutboxPollingWorker>()),
-            OutboxHealthCheck(get<DSLContext>())
+            PostgresHealthCheck(get<Database>())
         )
     }
 
@@ -206,11 +237,10 @@ val healthModule = module {
  * Observability 도메인 모듈
  */
 val observabilityModule = module {
-    // Metrics Collector
+    // Metrics Collector (SinkEvent 기반)
     single<MetricsCollectorPort> {
         PipelineMetricsCollector(
-            dsl = get<DSLContext>(),
-            worker = getOrNull<OutboxPollingWorker>()
+            sinkEventRepo = getOrNull<SinkEventRepositoryPort>()
         )
     }
 
@@ -230,8 +260,13 @@ val observabilityModule = module {
  * - CanvasService: 실시간 통계 주입 및 그래프 조회
  */
 val workflowCanvasModule = module {
-    // Graph Builder (Port binding)
-    single<WorkflowGraphBuilderPort> { WorkflowGraphBuilder() }
+    // Graph Builder (RFC-022: ContractRegistryPort + SinkRuleRegistryPort 기반)
+    single<WorkflowGraphBuilderPort> {
+        WorkflowGraphBuilder(
+            contractRegistry = get(),
+            sinkRuleRegistry = get()
+        )
+    }
 
     // Canvas Service
     single {
@@ -257,10 +292,10 @@ val adminAllModules = listOf(
     adminAppModule,
     tracingModule,
     infraModule,
-    jooqAdapterModule,
-    adapterModule,  // SlicingEnginePort 등 Port 바인딩
+    productionAdapterModule,  // DynamoDB: RawData, Slice, InvertedIndex, Contract, SinkEvent / PostgreSQL: ChangeSet, View
+    domainServiceModule,  // SlicingEnginePort, ChangeSetBuilderPort, ImpactCalculatorPort
+    viewModule,  // ViewComposer (IngestionWorkflow 의존성)
     workflowModule,
-    workerModule,  // Worker는 주입만 받고 시작 안 함
     // 새로운 Admin 전용 모듈들
     alertsModule,
     backfillModule,

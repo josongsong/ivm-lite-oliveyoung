@@ -7,11 +7,9 @@ import com.oliveyoung.ivmlite.pkg.slices.domain.Projection
 import com.oliveyoung.ivmlite.pkg.slices.domain.ProjectionMode
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
-import io.kotest.matchers.shouldNotBe
 import io.kotest.property.Arb
 import io.kotest.property.arbitrary.string
 import io.kotest.property.checkAll
-import io.kotest.property.arbitrary.int
 import io.kotest.property.arbitrary.list
 import io.kotest.property.arbitrary.map
 
@@ -207,7 +205,7 @@ class JoinExecutorProjectionPropertyTest : StringSpec({
             "booleanField":true,
             "arrayField":[1,2,3],
             "objectField":{"nested":"value"}
-        }"""
+        }""".trimIndent()
 
         val projection = Projection(
             mode = ProjectionMode.COPY_FIELDS,
@@ -237,7 +235,7 @@ class JoinExecutorProjectionPropertyTest : StringSpec({
         val targetPayload = """{
             "simple":"value1",
             "nested":{"field":"value2"}
-        }"""
+        }""".trimIndent()
 
         val projection = Projection(
             mode = ProjectionMode.COPY_FIELDS,
@@ -278,7 +276,7 @@ class JoinExecutorProjectionPropertyTest : StringSpec({
             "nullValue":null,
             "specialChars":"~!@#$%^&*()",
             "unicode":"한글🚀"
-        }"""
+        }""".trimIndent()
 
         val projection = Projection(
             mode = ProjectionMode.COPY_FIELDS,

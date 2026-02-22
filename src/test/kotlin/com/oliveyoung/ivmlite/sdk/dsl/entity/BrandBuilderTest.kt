@@ -1,7 +1,5 @@
 package com.oliveyoung.ivmlite.sdk.dsl.entity
 
-import com.oliveyoung.ivmlite.sdk.client.Ivm
-import com.oliveyoung.ivmlite.sdk.dsl.deploy.DeployableContext
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -90,29 +88,4 @@ class BrandBuilderTest : StringSpec({
         input.entityType shouldBe "brand"
     }
 
-    "IngestContext.brand - 확장 함수로 DeployableContext 반환" {
-        val context = Ivm.client().ingest().brand {
-            tenantId("tenant-1")
-            brandId("BRAND-001")
-            name("올리브영")
-        }
-
-        context.shouldBeInstanceOf<DeployableContext>()
-    }
-
-    "IngestContext.brand - DSL 체이닝" {
-        val context = Ivm.client()
-            .ingest()
-            .brand {
-                tenantId("tenant-1")
-                brandId("BRAND-001")
-                name("라네즈")
-                logoUrl("https://cdn.example.com/laneige.png")
-                description("수분 전문 브랜드")
-                country("KR")
-                attribute("category", "skincare")
-            }
-
-        context.shouldBeInstanceOf<DeployableContext>()
-    }
 })

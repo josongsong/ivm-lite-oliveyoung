@@ -29,9 +29,9 @@
     <!-- Koin loggers -->
     <logger name="org.koin" level="INFO"/>
     
-    <!-- jOOQ loggers -->
-    <logger name="org.jooq" level="WARN"/>
-    
+    <!-- Exposed loggers -->
+    <logger name="Exposed" level="INFO"/>
+
     <!-- HikariCP loggers -->
     <logger name="com.zaxxer.hikari" level="INFO"/>
     

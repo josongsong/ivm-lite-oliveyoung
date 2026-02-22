@@ -2,7 +2,6 @@ package com.oliveyoung.ivmlite.pkg.contracts.adapters
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
-import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractError
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
@@ -47,17 +46,13 @@ class LocalYamlContractRegistryAdapter(
     }
 
     override suspend fun loadRuleSetContract(ref: ContractRef): Result<RuleSetContract> {
-        // ID 기반 파일 찾기: ruleset.product.doc001.v1 -> ruleset-product-doc001.v1.yaml
-        // fallback: ruleset.v1.yaml
-        val filename = when {
-            ref.id != "ruleset.core.v1" -> {
-                // ruleset.product.doc001.v1 -> ruleset-product-doc001.v1.yaml
-                val idPart = ref.id.replace(".v1", "").replace(".", "-")
-                "$idPart.v1.yaml"
-            }
-            else -> "ruleset.v1.yaml"
+        // ID → filename: ContractFileRegistry SSOT 우선, 없으면 일반 규칙 적용
+        val filename = ContractFileRegistry.RULESET_ID_TO_FILE[ref.id] ?: run {
+            val withoutVersion = ref.id.removeSuffix(".v1")
+            val idPart = withoutVersion.replace(".", "-")
+            "$idPart.v1.yaml"
         }
-        val map = loadYaml(filename) ?: loadYaml("ruleset.v1.yaml") ?: return err("ruleset contract not found: $filename or ruleset.v1.yaml")
+        val map = loadYaml(filename) ?: return err("ruleset contract not found: $filename")
         val parsed = parseRuleSet(map)
         // ID 검증 (fail-closed)
         if (parsed is Result.Ok && parsed.value.meta.id != ref.id) {
@@ -67,15 +62,10 @@ class LocalYamlContractRegistryAdapter(
     }
 
     override suspend fun loadViewDefinitionContract(ref: ContractRef): Result<ViewDefinitionContract> {
-        // ID 기반 파일 찾기: view.product.core.v1 -> view-product-core.v1.yaml
-        // fallback: view-definition.v1.yaml
-        val filename = when {
-            ref.id != "view.product.pdp.v1" -> {
-                // view.product.core.v1 -> view-product-core.v1.yaml
-                val idPart = ref.id.replace(".v1", "").replace(".", "-")
-                "$idPart.v1.yaml"
-            }
-            else -> "view-definition.v1.yaml"
+        // ID → filename: ContractFileRegistry SSOT 우선, 없으면 일반 규칙 적용
+        val filename = ContractFileRegistry.VIEWDEF_ID_TO_FILE[ref.id] ?: run {
+            val idPart = ref.id.replace(".v1", "").replace(".", "-")
+            "$idPart.v1.yaml"
         }
         val map = loadYaml(filename) ?: loadYaml("view-definition.v1.yaml") ?: return err("view definition contract not found: $filename or view-definition.v1.yaml")
         val parsed = parseViewDefinition(map)
@@ -86,6 +76,40 @@ class LocalYamlContractRegistryAdapter(
         return parsed
     }
 
+    override suspend fun listContractRefs(kind: ContractKind, status: ContractStatus?): Result<List<ContractRef>> {
+        val allFiles = when (kind) {
+            ContractKind.VIEW_DEFINITION -> ContractFileRegistry.VIEW_DEFINITION_FILES
+            ContractKind.RULESET -> ContractFileRegistry.RULESET_FILES
+            else -> return Result.Ok(emptyList())
+        }
+
+        val refs = allFiles.mapNotNull { filename ->
+            loadYaml(filename)?.let { map ->
+                val meta = (parseMeta(map) as? Result.Ok)?.value
+                if (status == null || meta?.status == status) {
+                    meta?.let { ContractRef(it.id, it.version) }
+                } else null
+            }
+        }
+        return Result.Ok(refs)
+    }
+
+    override suspend fun listViewDefinitions(status: ContractStatus?): Result<List<ViewDefinitionContract>> {
+        val refsResult = listContractRefs(ContractKind.VIEW_DEFINITION, status)
+        if (refsResult is Result.Err) {
+            return Result.Err(refsResult.error)
+        }
+
+        val refs = (refsResult as Result.Ok).value
+        val contracts = refs.mapNotNull { ref ->
+            when (val result = loadViewDefinitionContract(ref)) {
+                is Result.Ok -> result.value
+                is Result.Err -> null
+            }
+        }
+        return Result.Ok(contracts)
+    }
+
     private fun loadYaml(filename: String): Map<String, Any?>? {
         val path = resourceRoot.trimEnd('/') + "/" + filename
         val stream: InputStream = javaClass.getResourceAsStream(path) ?: return null
@@ -94,7 +118,9 @@ class LocalYamlContractRegistryAdapter(
     }
 
     private fun parseMeta(map: Map<String, Any?>): Result<ContractMeta> {
-        val kind = map["kind"]?.toString() ?: return err("missing kind")
+        val kindStr = map["kind"]?.toString() ?: return err("missing kind")
+        val kind = ContractKind.fromWireValue(kindStr)
+            ?: return err("unknown contract kind: $kindStr")
         val id = map["id"]?.toString() ?: return err("missing id")
         val version = map["version"]?.toString()?.let(SemVer::parse) ?: return err("missing version")
         val status = map["status"]?.toString()?.let { ContractStatus.valueOf(it) } ?: return err("missing status")
@@ -116,7 +142,7 @@ class LocalYamlContractRegistryAdapter(
         val separator = keySpec["separator"]?.toString() ?: "#"
 
         val guards = map["guards"] as? Map<*, *>
-        val maxTargetsPerRef = guards?.get("maxTargetsPerRef")?.toString()?.toIntOrNull() ?: 500000
+        val maxTargetsPerRef = guards?.get("maxTargetsPerRef")?.toString()?.toIntOrNull() ?: 500_000
 
         return Result.Ok(
             InvertedIndexContract(
@@ -138,17 +164,13 @@ class LocalYamlContractRegistryAdapter(
 
         val fanout = map["fanout"] as? Map<*, *> ?: return err("missing fanout")
         val inverted = fanout["invertedIndex"] as? Map<*, *> ?: return err("missing fanout.invertedIndex")
-        val maxFanout = inverted["maxFanout"]?.toString()?.toIntOrNull() ?: 10000
-        val contractRef = inverted["contractRef"] as? Map<*, *> ?: return err("missing invertedIndex.contractRef")
-        val refId = contractRef["id"]?.toString() ?: return err("missing invertedIndex.contractRef.id")
-        val refVer = contractRef["version"]?.toString()?.let(SemVer::parse) ?: return err("missing invertedIndex.contractRef.version")
+        val maxFanout = inverted["maxFanout"]?.toString()?.toIntOrNull() ?: 10_000
 
         return Result.Ok(
             JoinSpecContract(
                 meta = meta,
                 maxJoinDepth = maxJoinDepth,
                 maxFanout = maxFanout,
-                invertedIndexRef = ContractRef(refId, refVer),
             )
         )
     }
@@ -161,7 +183,7 @@ class LocalYamlContractRegistryAdapter(
 
         val payload = map["payload"] as? Map<*, *> ?: return err("missing payload")
         val ext = payload["externalizationPolicy"] as? Map<*, *>
-        val threshold = ext?.get("thresholdBytes")?.toString()?.toIntOrNull() ?: 100000
+        val threshold = ext?.get("thresholdBytes")?.toString()?.toIntOrNull() ?: 100_000
 
         val fanout = map["fanout"] as? Map<*, *>
         val enabled = fanout?.get("enabled")?.toString()?.toBooleanStrictOrNull() ?: false
@@ -192,38 +214,6 @@ class LocalYamlContractRegistryAdapter(
             impactMapRaw.mapKeys { (k, _) -> SliceType.valueOf(k.uppercase()) }
         } catch (e: IllegalArgumentException) {
             return err("invalid SliceType in impactMap: ${e.message}")
-        }
-
-        @Suppress("UNCHECKED_CAST")
-        val joinsRaw = map["joins"] as? List<Map<String, Any?>> ?: emptyList()
-        val joins = try {
-            joinsRaw.map { j ->
-                val sourceSliceStr = j["sourceSlice"]?.toString()?.uppercase()
-                    ?: return err("missing sourceSlice in join")
-                val sourceSlice = try {
-                    SliceType.valueOf(sourceSliceStr)
-                } catch (e: IllegalArgumentException) {
-                    return err("invalid SliceType '$sourceSliceStr' in join")
-                }
-                val targetEntity = j["targetEntity"]?.toString()
-                    ?: return err("missing targetEntity in join")
-                val joinPath = j["joinPath"]?.toString()
-                    ?: return err("missing joinPath in join")
-                val cardinalityStr = j["cardinality"]?.toString()?.uppercase()?.replace("-", "_") ?: "ONE_TO_ONE"
-                val cardinality = try {
-                    JoinCardinality.valueOf(cardinalityStr)
-                } catch (e: IllegalArgumentException) {
-                    return err("invalid cardinality '$cardinalityStr' in join")
-                }
-                JoinSpec(
-                    sourceSlice = sourceSlice,
-                    targetEntity = targetEntity,
-                    joinPath = joinPath,
-                    cardinality = cardinality,
-                )
-            }
-        } catch (e: IllegalArgumentException) {
-            return err("invalid JoinSpec: ${e.message}")
         }
 
         @Suppress("UNCHECKED_CAST")
@@ -299,6 +289,15 @@ class LocalYamlContractRegistryAdapter(
                         targetEntityType = j["targetEntityType"]?.toString() ?: return err("missing targetEntityType in slice join"),
                         targetKeyPattern = j["targetKeyPattern"]?.toString() ?: return err("missing targetKeyPattern in slice join"),
                         required = j["required"]?.toString()?.toBooleanStrictOrNull() ?: true,  // default: fail-closed
+                        projection = parseProjection(j["projection"]),
+                        targetSliceType = j["targetSliceType"]?.toString(),
+                        missingPolicy = try {
+                            j["missingPolicy"]?.toString()?.let { policy ->
+                                com.oliveyoung.ivmlite.pkg.slices.domain.MissingPolicy.valueOf(policy)
+                            } ?: com.oliveyoung.ivmlite.pkg.slices.domain.MissingPolicy.FAIL_CLOSED
+                        } catch (e: IllegalArgumentException) {
+                            return err("invalid MissingPolicy in slice join: ${j["missingPolicy"]}")
+                        }
                     )
                 }
 
@@ -341,7 +340,6 @@ class LocalYamlContractRegistryAdapter(
                 meta = meta,
                 entityType = entityType,
                 impactMap = impactMap,
-                joins = joins,
                 slices = slices,
                 indexes = indexes,
             )
@@ -355,6 +353,12 @@ class LocalYamlContractRegistryAdapter(
         if (meta.status != ContractStatus.ACTIVE) {
             return err("ViewDefinition contract must be ACTIVE, got ${meta.status}")
         }
+
+        // viewName 파싱 (선택)
+        val viewName = map["viewName"]?.toString()
+
+        // entityType 파싱 (선택)
+        val entityType = map["entityType"]?.toString()
 
         // requiredSlices 파싱
         @Suppress("UNCHECKED_CAST")
@@ -418,6 +422,8 @@ class LocalYamlContractRegistryAdapter(
         return Result.Ok(
             ViewDefinitionContract(
                 meta = meta,
+                viewName = viewName,
+                entityType = entityType,
                 requiredSlices = requiredSlices,
                 optionalSlices = optionalSlices,
                 missingPolicy = missingPolicy,
@@ -426,6 +432,24 @@ class LocalYamlContractRegistryAdapter(
                 ruleSetRef = ruleSetRef,
             )
         )
+    }
+
+    @Suppress("UNCHECKED_CAST")
+    private fun parseProjection(raw: Any?): com.oliveyoung.ivmlite.pkg.slices.domain.Projection? {
+        val projMap = raw as? Map<String, Any?> ?: return null
+        val mode = try {
+            com.oliveyoung.ivmlite.pkg.slices.domain.ProjectionMode.valueOf(
+                projMap["mode"]?.toString()?.uppercase() ?: "COPY_FIELDS"
+            )
+        } catch (_: IllegalArgumentException) {
+            com.oliveyoung.ivmlite.pkg.slices.domain.ProjectionMode.COPY_FIELDS
+        }
+        val fields = (projMap["fields"] as? List<Map<String, Any?>>)?.mapNotNull { fm ->
+            val from = fm["from"]?.toString() ?: fm["fromTargetPath"]?.toString() ?: return@mapNotNull null
+            val to = fm["to"]?.toString() ?: fm["toOutputPath"]?.toString() ?: return@mapNotNull null
+            com.oliveyoung.ivmlite.pkg.slices.domain.FieldMapping(fromTargetPath = from, toOutputPath = to)
+        } ?: emptyList()
+        return com.oliveyoung.ivmlite.pkg.slices.domain.Projection(mode = mode, fields = fields)
     }
 
     private fun err(msg: String): Result.Err =

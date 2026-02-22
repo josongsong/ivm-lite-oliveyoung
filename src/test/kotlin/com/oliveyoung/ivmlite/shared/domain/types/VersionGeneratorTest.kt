@@ -66,7 +66,7 @@ class VersionGeneratorTest : StringSpec({
 
     "동시에 100000개 요청 시 모두 고유한 version 생성 (SOTA 성능 테스트)" {
         val versions = ConcurrentHashMap.newKeySet<Long>()
-        val count = 100000
+        val count = 100_000
 
         runBlocking(Dispatchers.Default) {
             (1..count).map {
@@ -83,7 +83,7 @@ class VersionGeneratorTest : StringSpec({
     "toTsidString() 변환 테스트" {
         val version = VersionGenerator.generate()
         val tsidString = VersionGenerator.toTsidString(version)
-        
+
         // TSID는 13자 문자열
         tsidString.length shouldBe 13
     }
@@ -92,17 +92,17 @@ class VersionGeneratorTest : StringSpec({
         val before = System.currentTimeMillis()
         val version = VersionGenerator.generate()
         val after = System.currentTimeMillis()
-        
+
         val extracted = VersionGenerator.extractTimestamp(version)
-        
-        extracted shouldBeGreaterThan (before - 1)
-        (after + 1) shouldBeGreaterThan extracted
+
+        extracted shouldBeGreaterThan before - 1
+        after + 1 shouldBeGreaterThan extracted
     }
 
     "toReadable() 테스트" {
         val version = VersionGenerator.generate()
         val readable = VersionGenerator.toReadable(version)
-        
+
         readable shouldContain "node="
         readable shouldContain "seq="
     }
@@ -110,7 +110,7 @@ class VersionGeneratorTest : StringSpec({
     "extractNodeId() 범위 테스트 (0-1023)" {
         val version = VersionGenerator.generate()
         val nodeId = VersionGenerator.extractNodeId(version)
-        
+
         (nodeId >= 0) shouldBe true
         (nodeId <= 1023) shouldBe true
     }
@@ -118,7 +118,7 @@ class VersionGeneratorTest : StringSpec({
     "extractCounter() 범위 테스트 (0-4095)" {
         val version = VersionGenerator.generate()
         val counter = VersionGenerator.extractCounter(version)
-        
+
         (counter >= 0) shouldBe true
         (counter <= 4095) shouldBe true
     }

@@ -1,198 +1,181 @@
 package com.oliveyoung.ivmlite.sdk
 
-import com.oliveyoung.ivmlite.shared.config.KafkaConfig
-import com.oliveyoung.ivmlite.shared.config.WorkerConfig
-import org.junit.jupiter.api.Test
-import kotlin.test.assertEquals
-import kotlin.test.assertFalse
-import kotlin.test.assertNotNull
-import kotlin.test.assertNull
-import kotlin.test.assertTrue
-import kotlin.test.assertFailsWith
+import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
+import com.oliveyoung.ivmlite.sdk.client.IvmClientConfig
+import com.oliveyoung.ivmlite.sdk.execution.DeployExecutor
+import io.kotest.assertions.throwables.shouldThrow
+import io.kotest.core.spec.style.DescribeSpec
+import io.kotest.matchers.shouldBe
+import io.kotest.matchers.shouldNotBe
+import io.kotest.matchers.string.shouldContain
+import io.mockk.mockk
 
 /**
  * IvmContext 단위 테스트
  *
- * Builder 패턴, 기본값, 검증 헬퍼 테스트
+ * 커버리지:
+ * - Builder 패턴 (config, executor, queryWorkflow)
+ * - EMPTY 상수
+ * - canDeploy / canQuery 헬퍼
+ * - requireExecutor / requireQueryWorkflow (fail-fast)
+ * - data class equality
  */
-class IvmContextTest {
+class IvmContextTest : DescribeSpec({
 
-    @Test
-    fun `EMPTY context는 모든 의존성이 null`() {
-        val ctx = IvmContext.EMPTY
+    describe("Builder") {
 
-        assertNull(ctx.executor)
-        assertNull(ctx.queryWorkflow)
-        assertNull(ctx.worker)
-        assertNull(ctx.outboxRepository)
-        assertNull(ctx.slicingWorkflow)
-        assertNull(ctx.shipWorkflow)
-        assertNull(ctx.sliceRepository)
-    }
+        it("기본 빌드 → 모든 필드 null/default") {
+            val ctx = IvmContext.builder().build()
 
-    @Test
-    fun `builder로 빈 context 생성 가능`() {
-        val ctx = IvmContext.builder().build()
-
-        assertNotNull(ctx)
-        assertNotNull(ctx.config)
-        assertNotNull(ctx.kafkaConfig)
-        assertNotNull(ctx.workerConfig)
-    }
-
-    @Test
-    fun `kafkaConfig 설정 가능`() {
-        val kafka = KafkaConfig(topicPrefix = "custom-prefix")
-        val ctx = IvmContext.builder()
-            .kafkaConfig(kafka)
-            .build()
-
-        assertEquals("custom-prefix", ctx.kafkaConfig.topicPrefix)
-    }
-
-    @Test
-    fun `workerConfig 설정 가능`() {
-        val worker = WorkerConfig(batchSize = 100)
-        val ctx = IvmContext.builder()
-            .workerConfig(worker)
-            .build()
-
-        assertEquals(100, ctx.workerConfig.batchSize)
-    }
-
-    @Test
-    fun `canDeploy는 executor가 없으면 false`() {
-        val ctx = IvmContext.builder().build()
-
-        assertFalse(ctx.canDeploy)
-    }
-
-    @Test
-    fun `canQuery는 queryWorkflow가 없으면 false`() {
-        val ctx = IvmContext.builder().build()
-
-        assertFalse(ctx.canQuery)
-    }
-
-    @Test
-    fun `canControlWorker는 worker가 없으면 false`() {
-        val ctx = IvmContext.builder().build()
-
-        assertFalse(ctx.canControlWorker)
-    }
-
-    @Test
-    fun `canConsume는 outboxRepository가 없으면 false`() {
-        val ctx = IvmContext.builder().build()
-
-        assertFalse(ctx.canConsume)
-    }
-
-    @Test
-    fun `canOps는 slicingWorkflow, shipWorkflow, sliceRepository 모두 필요`() {
-        val ctx = IvmContext.builder().build()
-
-        assertFalse(ctx.canOps)
-    }
-
-    @Test
-    fun `requireExecutor는 executor가 없으면 예외 발생`() {
-        val ctx = IvmContext.builder().build()
-
-        val exception = assertFailsWith<IllegalStateException> {
-            ctx.requireExecutor()
+            ctx.executor shouldBe null
+            ctx.queryWorkflow shouldBe null
+            ctx.config shouldNotBe null
         }
 
-        assertTrue(exception.message!!.contains("DeployExecutor not configured"))
-    }
+        it("executor 설정") {
+            val executor = mockk<DeployExecutor>()
+            val ctx = IvmContext.builder()
+                .executor(executor)
+                .build()
 
-    @Test
-    fun `requireQueryWorkflow는 queryWorkflow가 없으면 예외 발생`() {
-        val ctx = IvmContext.builder().build()
-
-        val exception = assertFailsWith<IllegalStateException> {
-            ctx.requireQueryWorkflow()
+            ctx.executor shouldBe executor
         }
 
-        assertTrue(exception.message!!.contains("QueryViewWorkflow not configured"))
-    }
+        it("queryWorkflow 설정") {
+            val workflow = mockk<QueryViewWorkflow>()
+            val ctx = IvmContext.builder()
+                .queryWorkflow(workflow)
+                .build()
 
-    @Test
-    fun `requireWorker는 worker가 없으면 예외 발생`() {
-        val ctx = IvmContext.builder().build()
-
-        val exception = assertFailsWith<IllegalStateException> {
-            ctx.requireWorker()
+            ctx.queryWorkflow shouldBe workflow
         }
 
-        assertTrue(exception.message!!.contains("OutboxPollingWorker not configured"))
-    }
+        it("config(IvmClientConfig) 설정") {
+            val config = IvmClientConfig.Builder().apply {
+                baseUrl("http://custom:8080")
+            }.build()
 
-    @Test
-    fun `requireOutboxRepository는 outboxRepository가 없으면 예외 발생`() {
-        val ctx = IvmContext.builder().build()
+            val ctx = IvmContext.builder()
+                .config(config)
+                .build()
 
-        val exception = assertFailsWith<IllegalStateException> {
-            ctx.requireOutboxRepository()
+            ctx.config.baseUrl shouldBe "http://custom:8080"
         }
 
-        assertTrue(exception.message!!.contains("OutboxRepository not configured"))
-    }
+        it("config DSL 설정") {
+            val ctx = IvmContext.builder()
+                .config {
+                    baseUrl("http://dsl:8080")
+                }
+                .build()
 
-    @Test
-    fun `requireSlicingWorkflow는 slicingWorkflow가 없으면 예외 발생`() {
-        val ctx = IvmContext.builder().build()
-
-        val exception = assertFailsWith<IllegalStateException> {
-            ctx.requireSlicingWorkflow()
+            ctx.config.baseUrl shouldBe "http://dsl:8080"
         }
 
-        assertTrue(exception.message!!.contains("SlicingWorkflow not configured"))
+        it("모든 필드 설정") {
+            val executor = mockk<DeployExecutor>()
+            val workflow = mockk<QueryViewWorkflow>()
+
+            val ctx = IvmContext.builder()
+                .executor(executor)
+                .queryWorkflow(workflow)
+                .config {
+                    baseUrl("http://full:8080")
+                }
+                .build()
+
+            ctx.executor shouldBe executor
+            ctx.queryWorkflow shouldBe workflow
+            ctx.config.baseUrl shouldBe "http://full:8080"
+        }
     }
 
-    @Test
-    fun `requireShipWorkflow는 shipWorkflow가 없으면 예외 발생`() {
-        val ctx = IvmContext.builder().build()
+    describe("EMPTY") {
 
-        val exception = assertFailsWith<IllegalStateException> {
-            ctx.requireShipWorkflow()
+        it("EMPTY → 모든 필드 null/default") {
+            val empty = IvmContext.EMPTY
+
+            empty.executor shouldBe null
+            empty.queryWorkflow shouldBe null
+            empty.canDeploy shouldBe false
+            empty.canQuery shouldBe false
+        }
+    }
+
+    describe("canDeploy / canQuery") {
+
+        it("executor 있으면 canDeploy=true") {
+            val ctx = IvmContext.builder()
+                .executor(mockk<DeployExecutor>())
+                .build()
+
+            ctx.canDeploy shouldBe true
+            ctx.canQuery shouldBe false
         }
 
-        assertTrue(exception.message!!.contains("ShipWorkflow not configured"))
-    }
+        it("queryWorkflow 있으면 canQuery=true") {
+            val ctx = IvmContext.builder()
+                .queryWorkflow(mockk<QueryViewWorkflow>())
+                .build()
 
-    @Test
-    fun `requireSliceRepository는 sliceRepository가 없으면 예외 발생`() {
-        val ctx = IvmContext.builder().build()
-
-        val exception = assertFailsWith<IllegalStateException> {
-            ctx.requireSliceRepository()
+            ctx.canDeploy shouldBe false
+            ctx.canQuery shouldBe true
         }
 
-        assertTrue(exception.message!!.contains("SliceRepository not configured"))
+        it("둘 다 설정 → 둘 다 true") {
+            val ctx = IvmContext.builder()
+                .executor(mockk<DeployExecutor>())
+                .queryWorkflow(mockk<QueryViewWorkflow>())
+                .build()
+
+            ctx.canDeploy shouldBe true
+            ctx.canQuery shouldBe true
+        }
     }
 
-    @Test
-    fun `IvmContext는 data class라서 equals 동작`() {
-        val ctx1 = IvmContext.builder()
-            .kafkaConfig(KafkaConfig(topicPrefix = "test"))
-            .build()
-        val ctx2 = IvmContext.builder()
-            .kafkaConfig(KafkaConfig(topicPrefix = "test"))
-            .build()
+    describe("requireExecutor / requireQueryWorkflow") {
 
-        assertEquals(ctx1, ctx2)
+        it("executor 없으면 → ISE") {
+            val ctx = IvmContext.builder().build()
+
+            val ex = shouldThrow<IllegalStateException> {
+                ctx.requireExecutor()
+            }
+            ex.message shouldContain "DeployExecutor not configured"
+        }
+
+        it("executor 있으면 → 반환") {
+            val executor = mockk<DeployExecutor>()
+            val ctx = IvmContext.builder().executor(executor).build()
+
+            ctx.requireExecutor() shouldBe executor
+        }
+
+        it("queryWorkflow 없으면 → ISE") {
+            val ctx = IvmContext.builder().build()
+
+            val ex = shouldThrow<IllegalStateException> {
+                ctx.requireQueryWorkflow()
+            }
+            ex.message shouldContain "QueryViewWorkflow not configured"
+        }
+
+        it("queryWorkflow 있으면 → 반환") {
+            val workflow = mockk<QueryViewWorkflow>()
+            val ctx = IvmContext.builder().queryWorkflow(workflow).build()
+
+            ctx.requireQueryWorkflow() shouldBe workflow
+        }
     }
 
-    @Test
-    fun `IvmContext는 immutable - 변경 불가`() {
-        val ctx = IvmContext.builder().build()
+    describe("data class equality") {
 
-        // data class라서 copy로만 변경 가능
-        val newCtx = ctx.copy(kafkaConfig = KafkaConfig(topicPrefix = "new"))
+        it("같은 설정 → 동일") {
+            val executor = mockk<DeployExecutor>()
+            val ctx1 = IvmContext.builder().executor(executor).build()
+            val ctx2 = IvmContext.builder().executor(executor).build()
 
-        // 원본 불변 (기본값 "ivm")
-        assertEquals("ivm", ctx.kafkaConfig.topicPrefix)
-        assertEquals("new", newCtx.kafkaConfig.topicPrefix)
+            ctx1 shouldBe ctx2
+        }
     }
-}
+})

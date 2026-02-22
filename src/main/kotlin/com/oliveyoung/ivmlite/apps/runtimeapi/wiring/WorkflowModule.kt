@@ -2,41 +2,65 @@ package com.oliveyoung.ivmlite.apps.runtimeapi.wiring
 
 import com.oliveyoung.ivmlite.pkg.changeset.ports.ChangeSetBuilderPort
 import com.oliveyoung.ivmlite.pkg.changeset.ports.ImpactCalculatorPort
-import com.oliveyoung.ivmlite.pkg.fanout.application.FanoutEventHandler
 import com.oliveyoung.ivmlite.pkg.fanout.application.FanoutWorkflow
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutConfig
-import com.oliveyoung.ivmlite.pkg.orchestration.adapters.InMemoryDeployJobRepository
-import com.oliveyoung.ivmlite.pkg.orchestration.adapters.InMemoryDeployPlanRepository
-import com.oliveyoung.ivmlite.pkg.orchestration.application.*
-import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPort
+import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
+import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
+import com.oliveyoung.ivmlite.pkg.rawdata.application.IngestionOrchestrator
+import com.oliveyoung.ivmlite.pkg.rawdata.domain.IngestionWorkflow
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
 import com.oliveyoung.ivmlite.pkg.slices.ports.SlicingEnginePort
+import com.oliveyoung.ivmlite.shared.adapters.ExposedTransactionAdapter
+import com.oliveyoung.ivmlite.shared.ports.TransactionPort
 import io.opentelemetry.api.trace.Tracer
+import org.jetbrains.exposed.sql.Database
 import org.koin.dsl.module
 
 /**
- * Workflow Module (RFC-IMPL-009, RFC-IMPL-011 Wave 6)
+ * Workflow Module (SOTA - DynamoDB Streams)
  *
- * Orchestration Workflow 바인딩.
- * 모든 외부 진입점은 Workflow를 통해서만 접근 (RFC-V4-010)
- *
- * RFC-IMPL-010: 도메인 서비스는 Port를 통해 주입 (SOLID DIP 준수)
- * - SlicingEnginePort, ChangeSetBuilderPort, ImpactCalculatorPort는 AdapterModule에서 바인딩
+ * Runtime API + Admin 공유 Workflow 바인딩.
+ * 제거된 레거시: RawDataIngestionService, TransactionManager,
+ * DeployJobRepository, DeployPlanRepository, EventHandler
+ * Ship은 DynamoDB Streams → Lambda (SinkStreamHandler)가 자동 처리
  */
 val workflowModule = module {
 
-    // Ingest Workflow (RFC-IMPL-003)
-    // Transactional Outbox: IngestUnitOfWork로 RawData + Outbox 원자성 보장
-    // RFC-IMPL-009: OpenTelemetry tracing 지원
+    // ===== Infrastructure =====
+
+    // TransactionPort (IngestionOrchestrator에서 사용)
+    single<TransactionPort> {
+        ExposedTransactionAdapter(database = get<Database>())
+    }
+
+    // ===== Domain Layer =====
+
+    // IngestionWorkflow (순수 비즈니스 로직: RawData → Slice → View)
+    // View는 SinkEvent payload로 전달, 별도 저장 없음
     single {
-        IngestWorkflow(
-            unitOfWork = get(),
-            tracer = get<Tracer>(),
+        IngestionWorkflow(
+            rawDataRepo = get(),
+            sliceRepo = get(),
+            slicingEngine = get<SlicingEnginePort>(),
+            viewComposer = get()
         )
     }
 
-    // Slicing Workflow (RFC-IMPL-004, RFC-IMPL-010 D-3, D-8, D-9)
-    // RFC-IMPL-009: OpenTelemetry tracing 지원
-    // RFC-IMPL-010: Port를 통한 도메인 서비스 주입 (SOLID DIP)
+    // ===== Application Layer =====
+
+    // IngestionOrchestrator (트랜잭션 + SinkEvent 발행)
+    // SOTA: RawData → Slicing → View → SinkEvent (단일 트랜잭션)
+    single {
+        IngestionOrchestrator(
+            workflow = get(),
+            sinkEventRepo = get(),
+            transactionPort = get(),
+            sinkRuleRegistry = get<SinkRuleRegistryPort>()
+        )
+    }
+
+    // SlicingWorkflow (RFC-IMPL-004, /api/v1/slice 엔드포인트)
+    // Contract is Law: EntityContractResolver로 entityType별 RuleSet 동적 해석
     single {
         SlicingWorkflow(
             rawRepo = get(),
@@ -46,55 +70,21 @@ val workflowModule = module {
             changeSetBuilder = get<ChangeSetBuilderPort>(),
             impactCalculator = get<ImpactCalculatorPort>(),
             contractRegistry = get(),
+            contractResolver = get(),
             tracer = get<Tracer>(),
         )
     }
 
-    // QueryView Workflow (RFC-IMPL-005, RFC-IMPL-010 GAP-D: ViewDefinition 기반)
-    // Contract is Law: ViewDefinition이 조회 정책의 SSOT
-    // RFC-IMPL-009: OpenTelemetry tracing 지원
+    // QueryViewWorkflow (RFC-IMPL-005, /api/v1/query, /api/v2/query 엔드포인트)
     single {
         QueryViewWorkflow(
             sliceRepo = get(),
-            contractRegistry = get(),  // GAP-D 해결: ViewDefinitionContract 로드용
+            contractRegistry = get(),
             tracer = get<Tracer>(),
         )
     }
 
-    // ===== RFC-IMPL-011 Wave 6: Ship & Status =====
-
-    // Ship Workflow (RFC-IMPL-011 Wave 6)
-    single {
-        ShipWorkflow(
-            sliceRepository = get(),
-            sinks = getAll<SinkPort>().associateBy { it.sinkType }
-        )
-    }
-
-    // DeployJob Repository (상태 추적용)
-    single<DeployJobRepositoryPort> {
-        InMemoryDeployJobRepository()
-    }
-
-    // DeployPlan Repository (Plan 설명용)
-    single {
-        InMemoryDeployPlanRepository()
-    }
-
-    // Ship Event Handler (Outbox 이벤트 처리)
-    single<OutboxPollingWorker.EventHandler>(qualifier = org.koin.core.qualifier.named("ship")) {
-        ShipEventHandler(
-            shipWorkflow = get(),
-            slicingWorkflow = get(),
-            deployJobRepository = get()
-        )
-    }
-
-    // ===== RFC-IMPL-012: Fanout =====
-
-    // Fanout Workflow (RFC-IMPL-012)
-    // Contract is Law: RuleSet join에서 의존성 자동 추론
-    // SOTA: batching, circuit breaker, deduplication
+    // FanoutWorkflow (RFC-IMPL-012)
     single {
         FanoutWorkflow(
             contractRegistry = get(),
@@ -102,15 +92,7 @@ val workflowModule = module {
             slicingWorkflow = get(),
             config = FanoutConfig.DEFAULT,
             tracer = get<Tracer>(),
-        )
-    }
-
-    // Fanout Event Handler (RFC-IMPL-012)
-    // EntityUpdated, EntityCreated, EntityDeleted 이벤트 처리
-    single<OutboxPollingWorker.EventHandler>(qualifier = org.koin.core.qualifier.named("fanout")) {
-        FanoutEventHandler(
-            fanoutWorkflow = get(),
-            defaultConfig = FanoutConfig.DEFAULT,
+            contractResolver = get(),
         )
     }
 }

@@ -1,7 +1,5 @@
 package com.oliveyoung.ivmlite.sdk.dsl.entity
 
-import com.oliveyoung.ivmlite.sdk.client.Ivm
-import com.oliveyoung.ivmlite.sdk.dsl.deploy.DeployableContext
 import io.kotest.assertions.throwables.shouldThrow
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
@@ -106,34 +104,6 @@ class ProductBuilderTest : StringSpec({
         input.shouldBeInstanceOf<EntityInput>()
         input.tenantId shouldBe "t1"
         input.entityType shouldBe "product"
-    }
-
-    "IngestContext.product - 확장 함수로 DeployableContext 반환" {
-        val context = Ivm.client().ingest().product {
-            tenantId("tenant-1")
-            sku("SKU-001")
-            name("Test Product")
-            price(10000)
-        }
-
-        context.shouldBeInstanceOf<DeployableContext>()
-    }
-
-    "IngestContext.product - DSL 체이닝" {
-        val context = Ivm.client()
-            .ingest()
-            .product {
-                tenantId("tenant-1")
-                sku("SKU-001")
-                name("Cream")
-                price(19000)
-                currency("KRW")
-                category("SKINCARE")
-                brand("OLIVEYOUNG")
-                attribute("volume", "50ml")
-            }
-
-        context.shouldBeInstanceOf<DeployableContext>()
     }
 
     "ProductBuilder - attribute 여러 개 추가" {

@@ -11,23 +11,23 @@ import java.util.concurrent.ConcurrentHashMap
  * InMemory DeployJob Repository (테스트/개발용)
  */
 class InMemoryDeployJobRepository : DeployJobRepositoryPort, HealthCheckable {
-    
+
     override val healthName: String = "deploy-job-repo"
-    
+
     private val storage = ConcurrentHashMap<String, DeployJobRecord>()
-    
+
     override suspend fun save(job: DeployJobRecord): Result<DeployJobRecord> {
         storage[job.jobId] = job
         return Result.Ok(job)
     }
-    
+
     override suspend fun get(jobId: String): Result<DeployJobRecord?> {
         return Result.Ok(storage[jobId])
     }
-    
+
     override suspend fun updateState(
-        jobId: String, 
-        state: String, 
+        jobId: String,
+        state: String,
         error: String?
     ): Result<Unit> {
         val existing = storage[jobId]
@@ -40,15 +40,15 @@ class InMemoryDeployJobRepository : DeployJobRepositoryPort, HealthCheckable {
         }
         return Result.Ok(Unit)
     }
-    
+
     override suspend fun healthCheck(): Boolean = true
-    
+
     // ===== 테스트 헬퍼 =====
-    
+
     fun getAll(): List<DeployJobRecord> = storage.values.toList()
-    
-    fun findByState(state: String): List<DeployJobRecord> = 
+
+    fun findByState(state: String): List<DeployJobRecord> =
         storage.values.filter { it.state == state }
-    
+
     fun clear() = storage.clear()
 }

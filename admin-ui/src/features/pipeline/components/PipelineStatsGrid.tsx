@@ -118,10 +118,10 @@ function OutboxStatsCard({ overview }: { overview: PipelineOverviewResponse | un
       </div>
       <div className="stats-content">
         <div className="outbox-stats-grid">
-          <OutboxStat label="Pending" value={overview?.outbox?.pending ?? 0} status="pending" />
-          <OutboxStat label="Processing" value={overview?.outbox?.processing ?? 0} status="processing" />
-          <OutboxStat label="Shipped" value={overview?.outbox?.shipped ?? 0} status="shipped" />
-          <OutboxStat label="Failed" value={overview?.outbox?.failed ?? 0} status="failed" />
+          <OutboxStat label="Pending" value={overview?.sinkEvent?.pending ?? 0} status="pending" />
+          <OutboxStat label="Processing" value={overview?.sinkEvent?.processing ?? 0} status="processing" />
+          <OutboxStat label="Shipped" value={overview?.sinkEvent?.shipped ?? 0} status="shipped" />
+          <OutboxStat label="Failed" value={overview?.sinkEvent?.failed ?? 0} status="failed" />
         </div>
       </div>
     </motion.div>

@@ -69,7 +69,7 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
             val parts = it.split("|")
             if (parts.size >= 2) Pair(parts[0], parts[1].toLongOrNull() ?: 0L) else null
         }
-        
+
         val filtered = store.values
             .filter { it.tenantId == tenantId }
             .filter { it.entityKey.value.startsWith(keyPrefix) }
@@ -78,26 +78,26 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
             .sortedWith(compareBy({ it.entityKey.value }, { it.version }))
             .let { list ->
                 if (startKey != null) {
-                    list.dropWhile { 
-                        it.entityKey.value < startKey.first || 
-                        (it.entityKey.value == startKey.first && it.version <= startKey.second) 
+                    list.dropWhile {
+                        it.entityKey.value < startKey.first ||
+                        it.entityKey.value == startKey.first && it.version <= startKey.second
                     }
                 } else {
                     list
                 }
             }
-        
+
         val items = filtered.take(limit + 1)
         val hasMore = items.size > limit
         val resultItems = if (hasMore) items.dropLast(1) else items
-        
+
         val nextCursor = if (hasMore && resultItems.isNotEmpty()) {
             val last = resultItems.last()
             "${last.entityKey.value}|${last.version}"
         } else {
             null
         }
-        
+
         return Result.Ok(SliceRepositoryPort.RangeQueryResult(
             items = resultItems,
             nextCursor = nextCursor,
@@ -117,7 +117,7 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
             .filter { !it.isDeleted }
             .count()
             .toLong()
-        
+
         return Result.Ok(count)
     }
 
@@ -130,14 +130,14 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
             .filter { it.tenantId == tenantId && it.entityKey == entityKey }
             .filter { sliceType == null || it.sliceType == sliceType }
             .filter { !it.isDeleted }
-        
+
         if (allSlices.isEmpty()) {
             return Result.Ok(emptyList())
         }
-        
+
         val latestVersion = allSlices.maxOf { it.version }
         val result = allSlices.filter { it.version == latestVersion }
-        
+
         return Result.Ok(result)
     }
 
@@ -151,7 +151,7 @@ class InMemorySliceRepository : SliceRepositoryPort, HealthCheckable {
     }
 
     fun size(): Int = store.size
-    
+
     fun getAllByTenant(tenantId: TenantId): List<SliceRecord> =
         store.values.filter { it.tenantId == tenantId }
 }

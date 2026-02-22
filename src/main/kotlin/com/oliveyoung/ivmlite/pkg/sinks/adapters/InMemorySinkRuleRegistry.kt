@@ -1,4 +1,5 @@
 package com.oliveyoung.ivmlite.pkg.sinks.adapters
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.sinks.domain.*
@@ -32,7 +33,7 @@ class InMemorySinkRuleRegistry : SinkRuleRegistryPort {
             ),
             target = SinkRuleTarget(
                 type = SinkTargetType.OPENSEARCH,
-                endpoint = System.getenv("OPENSEARCH_ENDPOINT") ?: "http://localhost:9200",
+                endpoint = "test://opensearch:9200",
                 indexPattern = "ivm-products-{tenantId}",
                 auth = AuthSpec(
                     type = AuthType.BASIC,
@@ -49,9 +50,10 @@ class InMemorySinkRuleRegistry : SinkRuleRegistryPort {
         entityType: String,
         sliceType: SliceType
     ): Result<List<SinkRule>> {
+        val upper = entityType.uppercase()
         val matched = rules.values.filter { rule ->
             rule.status == SinkRuleStatus.ACTIVE &&
-                rule.input.entityTypes.contains(entityType) &&
+                rule.input.entityTypes.any { it.equals(upper, ignoreCase = true) } &&
                 rule.input.sliceTypes.contains(sliceType)
         }
         return Result.Ok(matched)
@@ -60,7 +62,7 @@ class InMemorySinkRuleRegistry : SinkRuleRegistryPort {
     override suspend fun findByEntityType(entityType: String): Result<List<SinkRule>> {
         val matched = rules.values.filter { rule ->
             rule.status == SinkRuleStatus.ACTIVE &&
-                rule.input.entityTypes.contains(entityType)
+                rule.input.entityTypes.any { it.equals(entityType, ignoreCase = true) }
         }
         return Result.Ok(matched)
     }

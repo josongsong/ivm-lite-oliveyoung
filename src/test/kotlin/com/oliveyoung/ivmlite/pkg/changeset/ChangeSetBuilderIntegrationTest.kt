@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.pkg.changeset
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeSetBuilder
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ChangeType
 import com.oliveyoung.ivmlite.pkg.changeset.domain.ImpactCalculator
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractMeta
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractStatus
 import com.oliveyoung.ivmlite.pkg.contracts.domain.RuleSetContract
@@ -30,7 +31,7 @@ class ChangeSetBuilderIntegrationTest {
         val toPayload = """{"title":"New Title","price":2000}"""
         val ruleSet = RuleSetContract(
             meta = ContractMeta(
-                kind = "RuleSet",
+                kind = ContractKind.RULESET,
                 id = "rs-1",
                 version = SemVer(1, 0, 0),
                 status = ContractStatus.ACTIVE,
@@ -40,7 +41,6 @@ class ChangeSetBuilderIntegrationTest {
                 SliceType.CORE to listOf("/title"),
                 SliceType.PRICE to listOf("/price"),
             ),
-            joins = emptyList(),
             slices = emptyList(),
         )
 
@@ -103,6 +103,68 @@ class ChangeSetBuilderIntegrationTest {
         // then
         assertEquals(ChangeType.CREATE, changeSet.changeType)
         assertTrue(changeSet.changedPaths.isEmpty())
+    }
+
+    @Test
+    fun `배열 diff - index 기반 경로만 사용 (RFC6901 JSON Pointer)`() {
+        // given: options 배열 내 price 변경
+        val fromPayload = """{"options":[{"price":12000},{"price":15000}],"title":"상품A"}"""
+        val toPayload = """{"options":[{"price":10000},{"price":15000}],"title":"상품A"}"""
+
+        // when
+        val changeSet = builder.build(
+            tenantId = TenantId("t1"),
+            entityType = "Product",
+            entityKey = EntityKey("p1"),
+            fromVersion = 1,
+            toVersion = 2,
+            fromPayload = fromPayload,
+            toPayload = toPayload,
+            impactedSliceTypes = emptySet(),
+            impactMap = emptyMap(),
+        )
+
+        // then: index 기반 경로만 사용 (/options/0/price, /options/1은 변경 없음)
+        val paths = changeSet.changedPaths.map { it.path }.sorted()
+        assertEquals(listOf("/options/0/price"), paths)
+    }
+
+    @Test
+    fun `배열 diff - index 기반 경로로 ImpactCalculator 매칭`() {
+        // given: options 배열 변경, impactMap에 /options (prefix로 배열 전체 커버)
+        val fromPayload = """{"options":[{"price":12000}],"title":"상품A"}"""
+        val toPayload = """{"options":[{"price":10000}],"title":"상품A"}"""
+        val ruleSet = RuleSetContract(
+            meta = ContractMeta(
+                kind = ContractKind.RULESET,
+                id = "rs-1",
+                version = SemVer(1, 0, 0),
+                status = ContractStatus.ACTIVE,
+            ),
+            entityType = "Product",
+            impactMap = mapOf(
+                SliceType.PRICE to listOf("/options"),
+            ),
+            slices = emptyList(),
+        )
+
+        // when
+        val tempChangeSet = builder.build(
+            tenantId = TenantId("t1"),
+            entityType = "Product",
+            entityKey = EntityKey("p1"),
+            fromVersion = 1,
+            toVersion = 2,
+            fromPayload = fromPayload,
+            toPayload = toPayload,
+            impactedSliceTypes = emptySet(),
+            impactMap = emptyMap(),
+        )
+        val impactMap = calculator.calculate(tempChangeSet, ruleSet)
+
+        // then: /options/0/price가 /options prefix에 매칭 → PRICE 영향
+        assertTrue(impactMap.containsKey("PRICE"))
+        assertEquals(listOf("/options/0/price"), impactMap["PRICE"]?.paths)
     }
 
     @Test

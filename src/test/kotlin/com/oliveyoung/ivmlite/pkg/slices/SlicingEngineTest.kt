@@ -656,6 +656,89 @@ class SlicingEngineTest : StringSpec({
         ids.contains("\"ids\":[1,2,") shouldBe true
         ids.contains(",99,100]") shouldBe true
     }
+
+    // ==================== RFC-018: slicePartial (의존성 closure) ====================
+
+    "slicePartial - ENRICHED만 impacted면 CORE 포함하여 실행" {
+        val rawData = createRawData(payload = """{"name":"product","price":1000}""")
+        val ruleSet = createRuleSet(
+            slices = listOf(
+                SliceDefinition(
+                    type = SharedSliceType.CORE,
+                    buildRules = SliceBuildRules.PassThrough(fields = listOf("*")),
+                ),
+                SliceDefinition(
+                    type = SharedSliceType.ENRICHED,
+                    buildRules = SliceBuildRules.PassThrough(fields = listOf("name")),
+                    sliceKind = com.oliveyoung.ivmlite.shared.domain.types.SliceKind.ENRICHMENT,
+                ),
+            ),
+        )
+        val registry = MockContractRegistry(ruleSet)
+        val engine = SlicingEngine(registry)
+
+        val result = runBlocking {
+            engine.slicePartial(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0")), setOf(SharedSliceType.ENRICHED))
+        }
+
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        val slices = (result as Result.Ok<SlicingEngine.SlicingResult>).value.slices
+        slices.map { it.sliceType }.toSet() shouldBe setOf(SharedSliceType.CORE, SharedSliceType.ENRICHED)
+    }
+
+    "slicePartial - 전체 slice와 동일 sliceType 집합 (의존성 순서 보장)" {
+        val rawData = createRawData(payload = """{"name":"x","price":100,"stock":10}""")
+        val ruleSet = createRuleSet(
+            slices = listOf(
+                SliceDefinition(
+                    type = SharedSliceType.CORE,
+                    buildRules = SliceBuildRules.PassThrough(fields = listOf("*")),
+                ),
+                SliceDefinition(
+                    type = SharedSliceType.PRICE,
+                    buildRules = SliceBuildRules.PassThrough(fields = listOf("price")),
+                ),
+                SliceDefinition(
+                    type = SharedSliceType.INDEX,
+                    buildRules = SliceBuildRules.PassThrough(fields = listOf("*")),
+                ),
+            ),
+        )
+        val registry = MockContractRegistry(ruleSet)
+        val engine = SlicingEngine(registry)
+
+        val fullResult = runBlocking { engine.slice(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0"))) }
+        val partialResult = runBlocking {
+            engine.slicePartial(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0")), setOf(SharedSliceType.PRICE))
+        }
+
+        fullResult.shouldBeInstanceOf<Result.Ok<*>>()
+        partialResult.shouldBeInstanceOf<Result.Ok<*>>()
+        val partialSlices = (partialResult as Result.Ok).value.slices
+        partialSlices.map { it.sliceType }.toSet() shouldBe setOf(SharedSliceType.PRICE)
+        partialSlices[0].data shouldBe """{"price":100}"""
+    }
+
+    "slicePartial - 빈 impactedTypes → 빈 slices" {
+        val rawData = createRawData(payload = """{"name":"x"}""")
+        val ruleSet = createRuleSet(
+            slices = listOf(
+                SliceDefinition(
+                    type = SharedSliceType.CORE,
+                    buildRules = SliceBuildRules.PassThrough(fields = listOf("*")),
+                ),
+            ),
+        )
+        val registry = MockContractRegistry(ruleSet)
+        val engine = SlicingEngine(registry)
+
+        val result = runBlocking {
+            engine.slicePartial(rawData, ContractRef("ruleset.v1", SemVer.parse("1.0.0")), emptySet())
+        }
+
+        result.shouldBeInstanceOf<Result.Ok<*>>()
+        (result as Result.Ok).value.slices shouldBe emptyList()
+    }
 })
 
 // ==================== Helper Functions ====================
@@ -686,14 +769,13 @@ private fun createRuleSet(
 ): RuleSetContract {
     return RuleSetContract(
         meta = ContractMeta(
-            kind = "RuleSet",
+            kind = ContractKind.RULESET,
             id = id,
             version = SemVer.parse(version),
             status = ContractStatus.ACTIVE,
         ),
         entityType = entityType,
         impactMap = emptyMap(),
-        joins = emptyList(),
         slices = slices,
     )
 }

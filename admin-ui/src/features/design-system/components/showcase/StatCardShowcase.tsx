@@ -2,7 +2,7 @@
  * StatCard Showcase - StatCard 컴포넌트 전시
  */
 import { StatCard } from '@/shared/ui'
-import { Activity, Clock, CheckCircle2, AlertTriangle } from 'lucide-react'
+import { Activity, AlertTriangle, CheckCircle2, Clock } from 'lucide-react'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

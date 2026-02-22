@@ -7,10 +7,11 @@ import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 /**
  * SinkRuleRegistry Port - SinkRule 조회 (RFC-007, RFC-IMPL-013)
  *
- * Slice 생성 시 자동으로 SinkRule을 조회하여 ShipRequested outbox 생성에 사용.
+ * Slice 생성 시 자동으로 SinkRule을 조회하여 SinkEvent 생성에 사용 (DynamoDB Streams).
  *
  * 구현체:
- * - ContractRegistrySinkRuleAdapter: Contract YAML에서 로드
+ * - LocalYamlSinkRuleRegistryAdapter: Contract YAML에서 로드 (개발/테스트)
+ * - DynamoDBSinkRuleRegistryAdapter: DynamoDB contract_registry에서 로드 (프로덕션, RFC-022 Phase 2)
  * - InMemorySinkRuleRegistry: 테스트용
  */
 interface SinkRuleRegistryPort {

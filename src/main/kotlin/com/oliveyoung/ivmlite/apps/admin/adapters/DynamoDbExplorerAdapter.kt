@@ -14,6 +14,12 @@ import com.oliveyoung.ivmlite.apps.admin.ports.SliceTypeInfo
 import com.oliveyoung.ivmlite.apps.admin.ports.EntitySearchResult
 import com.oliveyoung.ivmlite.apps.admin.ports.EntitySearchItem
 import com.oliveyoung.ivmlite.apps.admin.ports.VersionHistoryItem
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerRawDataStats
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerSliceStats
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerInvertedIndexStats
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerEntityFlowRawDataItem
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerEntityFlowSliceItem
+import com.oliveyoung.ivmlite.apps.admin.ports.ExplorerSliceTypeStats
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import software.amazon.awssdk.services.dynamodb.model.QueryRequest
@@ -54,7 +60,10 @@ class DynamoDbExplorerAdapter(
         private const val PREFIX_TENANT = "TENANT#"
         private const val PREFIX_RAWDATA = "RAWDATA#"
         private const val PREFIX_SLICE = "SLICE#"
+        private const val PREFIX_INDEX = "INDEX#"
         private const val SUFFIX_DELIMITER = "#"
+        private const val ATTR_TENANT_ID = "tenant_id"
+        private const val ATTR_HASH = "hash"
 
         private const val TYPE_RAWDATA = "rawdata"
         private const val TYPE_SLICE = "slice"
@@ -414,6 +423,269 @@ class DynamoDbExplorerAdapter(
                 payloadHash = payloadHash
             )
         }
+    }
+
+    override suspend fun getRawDataStats(tenantId: TenantId): Either<DomainError, ExplorerRawDataStats> = either {
+        val scanRequest = ScanRequest.builder()
+            .tableName(tableName)
+            .filterExpression(FILTER_PK_BEGINS_WITH)
+            .expressionAttributeValues(
+                mapOf(EXPR_VAR_PK_PREFIX to attr(tenantPkPrefix(tenantId)))
+            )
+            .build()
+
+        val response = runCatching { dynamoClient.scan(scanRequest).await() }
+            .getOrElse { e ->
+                logger.error("Failed to scan RawData stats: ${e.message}", e)
+                raise(DomainError.StorageError("Failed to get RawData stats: ${e.message}"))
+            }
+
+        var total = 0L
+        val byTenant = mutableMapOf<String, Long>()
+        val bySchema = mutableMapOf<String, Long>()
+        val seenEntities = mutableSetOf<String>()
+
+        for (item in response.items()) {
+            val sk = item[ATTR_SK]?.s() ?: continue
+            if (!sk.startsWith("${PREFIX_RAWDATA}v")) continue
+
+            val entityKey = item[ATTR_ENTITY_KEY]?.s() ?: continue
+            val tenantIdVal = item[ATTR_TENANT_ID]?.s() ?: tenantId.value
+            val schemaId = item[ATTR_SCHEMA_ID]?.s() ?: "unknown"
+
+            val dedupKey = "$entityKey#$sk"
+            if (dedupKey !in seenEntities) {
+                seenEntities.add(dedupKey)
+                total++
+                byTenant[tenantIdVal] = (byTenant[tenantIdVal] ?: 0L) + 1L
+                bySchema[schemaId] = (bySchema[schemaId] ?: 0L) + 1L
+            }
+        }
+
+        ExplorerRawDataStats(
+            total = total,
+            byTenant = byTenant,
+            bySchema = bySchema
+        )
+    }
+
+    override suspend fun getSliceStats(tenantId: TenantId): Either<DomainError, ExplorerSliceStats> = either {
+        val scanRequest = ScanRequest.builder()
+            .tableName(tableName)
+            .filterExpression(FILTER_PK_SK_BEGINS_WITH)
+            .expressionAttributeValues(
+                mapOf(
+                    EXPR_VAR_PK_PREFIX to attr(tenantPkPrefix(tenantId)),
+                    EXPR_VAR_SK_PREFIX to attr(PREFIX_SLICE)
+                )
+            )
+            .build()
+
+        val response = runCatching { dynamoClient.scan(scanRequest).await() }
+            .getOrElse { e ->
+                logger.error("Failed to scan Slice stats: ${e.message}", e)
+                raise(DomainError.StorageError("Failed to get Slice stats: ${e.message}"))
+            }
+
+        var total = 0L
+        val byType = mutableMapOf<String, Long>()
+        val seenEntities = mutableSetOf<String>()
+
+        for (item in response.items()) {
+            val sliceType = item[ATTR_SLICE_TYPE]?.s() ?: "unknown"
+            val entityKey = item[ATTR_ENTITY_KEY]?.s() ?: continue
+            val sk = item[ATTR_SK]?.s() ?: continue
+
+            val dedupKey = "$entityKey#$sliceType#$sk"
+            if (dedupKey !in seenEntities) {
+                seenEntities.add(dedupKey)
+                total++
+                byType[sliceType] = (byType[sliceType] ?: 0L) + 1L
+            }
+        }
+
+        ExplorerSliceStats(total = total, byType = byType)
+    }
+
+    override suspend fun getInvertedIndexStats(tenantId: TenantId): Either<DomainError, ExplorerInvertedIndexStats> = either {
+        val indexPrefix = "${tenantPkPrefix(tenantId)}$PREFIX_INDEX"
+        val scanRequest = ScanRequest.builder()
+            .tableName(tableName)
+            .filterExpression("begins_with($ATTR_PK, :pkPrefix)")
+            .expressionAttributeValues(
+                mapOf(":pkPrefix" to attr(indexPrefix))
+            )
+            .build()
+
+        val response = runCatching { dynamoClient.scan(scanRequest).await() }
+            .getOrElse { e ->
+                logger.error("Failed to scan InvertedIndex stats: ${e.message}", e)
+                raise(DomainError.StorageError("Failed to get InvertedIndex stats: ${e.message}"))
+            }
+
+        var total = 0L
+        val byType = mutableMapOf<String, Long>()
+
+        for (item in response.items()) {
+            val indexType = item["index_type"]?.s() ?: "unknown"
+            total++
+            byType[indexType] = (byType[indexType] ?: 0L) + 1L
+        }
+
+        ExplorerInvertedIndexStats(total = total, byType = byType)
+    }
+
+    override suspend fun getRawDataByEntityKey(
+        tenantId: TenantId,
+        entityKey: String,
+        limit: Int
+    ): Either<DomainError, List<ExplorerEntityFlowRawDataItem>> = either {
+        val pk = "TENANT#${tenantId.value}#ENTITY#$entityKey"
+        val skPrefix = PREFIX_RAWDATA
+
+        val queryRequest = QueryRequest.builder()
+            .tableName(tableName)
+            .keyConditionExpression("$ATTR_PK = :pk AND begins_with($ATTR_SK, :skPrefix)")
+            .expressionAttributeValues(
+                mapOf(
+                    ":pk" to attr(pk),
+                    ":skPrefix" to attr(skPrefix)
+                )
+            )
+            .scanIndexForward(false)
+            .limit(limit)
+            .build()
+
+        val response = runCatching { dynamoClient.query(queryRequest).await() }
+            .getOrElse { e ->
+                logger.error("Failed to query RawData by entityKey: ${e.message}", e)
+                raise(DomainError.StorageError("Failed to get RawData by entityKey: ${e.message}"))
+            }
+
+        response.items().mapNotNull { item ->
+            val version = item[ATTR_VERSION]?.n()?.toLongOrNull() ?: return@mapNotNull null
+            ExplorerEntityFlowRawDataItem(
+                tenantId = item[ATTR_TENANT_ID]?.s() ?: tenantId.value,
+                entityKey = item[ATTR_ENTITY_KEY]?.s() ?: entityKey,
+                version = version,
+                schemaId = item[ATTR_SCHEMA_ID]?.s() ?: "",
+                createdAt = item[ATTR_CREATED_AT]?.s()
+            )
+        }
+    }
+
+    override suspend fun getSlicesByEntityKey(
+        tenantId: TenantId,
+        entityKey: String,
+        limit: Int
+    ): Either<DomainError, List<ExplorerEntityFlowSliceItem>> = either {
+        val pk = "TENANT#${tenantId.value}#ENTITY#$entityKey"
+        val skPrefix = PREFIX_SLICE
+
+        val queryRequest = QueryRequest.builder()
+            .tableName(tableName)
+            .keyConditionExpression("$ATTR_PK = :pk AND begins_with($ATTR_SK, :skPrefix)")
+            .expressionAttributeValues(
+                mapOf(
+                    ":pk" to attr(pk),
+                    ":skPrefix" to attr(skPrefix)
+                )
+            )
+            .scanIndexForward(false)
+            .limit(limit)
+            .build()
+
+        val response = runCatching { dynamoClient.query(queryRequest).await() }
+            .getOrElse { e ->
+                logger.error("Failed to query Slices by entityKey: ${e.message}", e)
+                raise(DomainError.StorageError("Failed to get Slices by entityKey: ${e.message}"))
+            }
+
+        response.items().mapNotNull { item ->
+            val version = item[ATTR_SLICE_VERSION]?.n()?.toLongOrNull() ?: item[ATTR_VERSION]?.n()?.toLongOrNull() ?: return@mapNotNull null
+            ExplorerEntityFlowSliceItem(
+                tenantId = item[ATTR_TENANT_ID]?.s() ?: tenantId.value,
+                entityKey = item[ATTR_ENTITY_KEY]?.s() ?: entityKey,
+                version = version,
+                sliceType = item[ATTR_SLICE_TYPE]?.s() ?: "",
+                hash = item[ATTR_HASH]?.s() ?: "",
+                createdAt = item[ATTR_CREATED_AT]?.s()
+            )
+        }
+    }
+
+    override suspend fun getRecentRawData(tenantId: TenantId, limit: Int): Either<DomainError, List<ExplorerEntityFlowRawDataItem>> = either {
+        val scanRequest = ScanRequest.builder()
+            .tableName(tableName)
+            .limit(limit * 5)
+            .filterExpression(FILTER_PK_BEGINS_WITH)
+            .expressionAttributeValues(
+                mapOf(EXPR_VAR_PK_PREFIX to attr(tenantPkPrefix(tenantId)))
+            )
+            .build()
+
+        val response = runCatching { dynamoClient.scan(scanRequest).await() }
+            .getOrElse { e ->
+                logger.error("Failed to scan recent RawData: ${e.message}", e)
+                raise(DomainError.StorageError("Failed to get recent RawData: ${e.message}"))
+            }
+
+        val items = response.items()
+            .filter { (it[ATTR_SK]?.s() ?: "").startsWith("${PREFIX_RAWDATA}v") }
+            .sortedByDescending { it[ATTR_CREATED_AT]?.s() ?: "" }
+            .take(limit)
+            .mapNotNull { item ->
+                val version = item[ATTR_VERSION]?.n()?.toLongOrNull() ?: return@mapNotNull null
+                ExplorerEntityFlowRawDataItem(
+                    tenantId = item[ATTR_TENANT_ID]?.s() ?: tenantId.value,
+                    entityKey = item[ATTR_ENTITY_KEY]?.s() ?: "",
+                    version = version,
+                    schemaId = item[ATTR_SCHEMA_ID]?.s() ?: "",
+                    createdAt = item[ATTR_CREATED_AT]?.s()
+                )
+            }
+        items
+    }
+
+    override suspend fun getRecentSlices(tenantId: TenantId, limit: Int): Either<DomainError, List<ExplorerEntityFlowSliceItem>> = either {
+        val scanRequest = ScanRequest.builder()
+            .tableName(tableName)
+            .limit(limit * 5)
+            .filterExpression(FILTER_PK_SK_BEGINS_WITH)
+            .expressionAttributeValues(
+                mapOf(
+                    EXPR_VAR_PK_PREFIX to attr(tenantPkPrefix(tenantId)),
+                    EXPR_VAR_SK_PREFIX to attr(PREFIX_SLICE)
+                )
+            )
+            .build()
+
+        val response = runCatching { dynamoClient.scan(scanRequest).await() }
+            .getOrElse { e ->
+                logger.error("Failed to scan recent Slices: ${e.message}", e)
+                raise(DomainError.StorageError("Failed to get recent Slices: ${e.message}"))
+            }
+
+        val items = response.items()
+            .sortedByDescending { it[ATTR_CREATED_AT]?.s() ?: "" }
+            .take(limit)
+            .mapNotNull { item ->
+                val version = item[ATTR_SLICE_VERSION]?.n()?.toLongOrNull() ?: item[ATTR_VERSION]?.n()?.toLongOrNull() ?: return@mapNotNull null
+                ExplorerEntityFlowSliceItem(
+                    tenantId = item[ATTR_TENANT_ID]?.s() ?: tenantId.value,
+                    entityKey = item[ATTR_ENTITY_KEY]?.s() ?: "",
+                    version = version,
+                    sliceType = item[ATTR_SLICE_TYPE]?.s() ?: "",
+                    hash = item[ATTR_HASH]?.s() ?: "",
+                    createdAt = item[ATTR_CREATED_AT]?.s()
+                )
+            }
+        items
+    }
+
+    override suspend fun getSlicesByTypeStats(tenantId: TenantId): Either<DomainError, List<ExplorerSliceTypeStats>> = either {
+        val sliceTypes = getSliceTypes(tenantId).bind()
+        sliceTypes.map { ExplorerSliceTypeStats(type = it.sliceType, count = it.count.toLong()) }
     }
 
     private fun attr(value: String): AttributeValue =

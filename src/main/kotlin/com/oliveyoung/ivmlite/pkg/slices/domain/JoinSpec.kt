@@ -8,9 +8,21 @@ data class JoinSpec(
   val targetKeyPattern: String,
   val required: Boolean,
   val projection: Projection? = null,
+  val targetSliceType: String? = null,  // ENRICHED 슬라이스에서 JOIN 대상 SliceType 지정
+  val missingPolicy: MissingPolicy = MissingPolicy.FAIL_CLOSED,  // JOIN 실패 시 정책
 )
 
 enum class JoinType { LOOKUP }
+
+/**
+ * JOIN 실패 시 정책
+ */
+enum class MissingPolicy {
+    /** JOIN 실패 시 전체 실패 */
+    FAIL_CLOSED,
+    /** JOIN 실패해도 부분 허용 */
+    PARTIAL_ALLOWED
+}
 
 /**
  * Projection 모드

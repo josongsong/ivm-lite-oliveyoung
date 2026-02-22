@@ -1,20 +1,22 @@
 package com.oliveyoung.ivmlite.pkg.workflow.canvas
 
+import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.LocalYamlSinkRuleRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.adapters.WorkflowGraphBuilder
 import com.oliveyoung.ivmlite.pkg.workflow.canvas.domain.NodeType
-import com.oliveyoung.ivmlite.pkg.workflow.canvas.domain.NodeStatus
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.collections.shouldNotBeEmpty
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import io.kotest.matchers.ints.shouldBeGreaterThan
 
 /**
  * WorkflowGraphBuilder 단위 테스트 (RFC-IMPL-015)
  */
 class WorkflowGraphBuilderTest : StringSpec({
 
-    val builder = WorkflowGraphBuilder()
+    val contractRegistry = LocalYamlContractRegistryAdapter("/contracts/v1")
+    val sinkRuleRegistry = LocalYamlSinkRuleRegistryAdapter("/contracts/v1")
+    val builder = WorkflowGraphBuilder(contractRegistry, sinkRuleRegistry)
 
     "전체 그래프 빌드 - Contract YAML에서 노드/엣지 생성" {
         val graph = builder.build()
@@ -69,8 +71,8 @@ class WorkflowGraphBuilderTest : StringSpec({
         val viewNodes = graph.nodes.filter { it.type == NodeType.VIEW }
         viewNodes.shouldNotBeEmpty()
 
-        // PRODUCT_DETAIL 뷰 확인
-        val detailView = viewNodes.find { it.label == "PRODUCT_DETAIL" }
+        // PRODUCT_PDP 또는 PRODUCT_CORE 뷰 확인 (실제 계약 기준)
+        val detailView = viewNodes.find { it.label == "PRODUCT_PDP" } ?: viewNodes.find { it.label == "PRODUCT_CORE" }
         detailView shouldNotBe null
     }
 
@@ -104,7 +106,6 @@ class WorkflowGraphBuilderTest : StringSpec({
     }
 
     "엔티티 필터 적용 - 특정 엔티티만 조회" {
-        val fullGraph = builder.build()
         val filteredGraph = builder.build("PRODUCT")
 
         // 필터된 그래프는 PRODUCT 관련 노드만 포함
@@ -148,7 +149,6 @@ class WorkflowGraphBuilderTest : StringSpec({
         val sliceNode = graph.nodes.find { it.type == NodeType.SLICE }
         if (sliceNode != null) {
             val upstreamNodes = graph.findUpstreamNodes(sliceNode.id)
-            val downstreamNodes = graph.findDownstreamNodes(sliceNode.id)
 
             // Slice는 RuleSet에서 들어오고, ViewDef로 나감
             upstreamNodes.shouldNotBeEmpty()

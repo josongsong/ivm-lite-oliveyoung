@@ -3,7 +3,7 @@ package com.oliveyoung.ivmlite.apps.runtimeapi.wiring
 import com.oliveyoung.ivmlite.shared.adapters.DatabaseConfig
 import com.oliveyoung.ivmlite.shared.config.AppConfig
 import com.zaxxer.hikari.HikariDataSource
-import org.jooq.DSLContext
+import org.jetbrains.exposed.sql.Database
 import org.koin.dsl.module
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
@@ -14,12 +14,12 @@ import java.net.URI
 
 /**
  * Infrastructure Module (RFC-IMPL-009)
- * 
+ *
  * DB 커넥션, AWS 클라이언트 등 인프라 의존성.
  * wiring 위치: apps/runtimeapi/wiring/ (RFC-IMPL-009 P0)
  */
 val infraModule = module {
-    
+
     // HikariCP DataSource
     single<HikariDataSource> {
         val config: AppConfig = get()
@@ -33,19 +33,19 @@ val infraModule = module {
             )
         )
     }
-    
-    // jOOQ DSLContext
-    single<DSLContext> {
+
+    // Exposed Database
+    single<Database> {
         val dataSource: HikariDataSource = get()
-        DatabaseConfig.createDSLContext(dataSource)
+        DatabaseConfig.connectDatabase(dataSource)
     }
-    
+
     // DynamoDB Async Client
     single<DynamoDbAsyncClient> {
         val config: AppConfig = get()
         val builder = DynamoDbAsyncClient.builder()
             .region(Region.of(config.dynamodb.region))
-        
+
         // 자격 증명 설정 (환경 변수 우선, 없으면 설정 파일)
         val credentialsProvider = when {
             // 환경 변수 또는 설정 파일에 명시적 자격 증명이 있으면 사용
@@ -61,12 +61,12 @@ val infraModule = module {
             else -> DefaultCredentialsProvider.create()
         }
         builder.credentialsProvider(credentialsProvider)
-        
+
         // endpoint override는 opt-in (기본은 AWS 엔드포인트 사용)
         config.dynamodb.endpoint
             ?.takeIf { it.isNotBlank() }
             ?.let { endpoint -> builder.endpointOverride(URI.create(endpoint)) }
-        
+
         builder.build()
     }
 }

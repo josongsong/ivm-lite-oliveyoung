@@ -10,6 +10,7 @@ import com.oliveyoung.ivmlite.pkg.slices.domain.Tombstone
 import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.pkg.slices.ports.SlicingEnginePort
+import com.oliveyoung.ivmlite.sdk.execution.EntityContractResolver
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
@@ -19,6 +20,7 @@ import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import io.opentelemetry.api.OpenTelemetry
 import io.opentelemetry.api.trace.Tracer
+import org.slf4j.LoggerFactory
 
 /**
  * Cross-domain orchestration workflow: 여러 도메인(rawdata 읽기 + slices 저장)을 조율.
@@ -40,12 +42,35 @@ class SlicingWorkflow(
     private val impactCalculator: ImpactCalculatorPort,
     private val contractRegistry: ContractRegistryPort,
     private val tracer: Tracer = OpenTelemetry.noop().getTracer("slicing"),
+    private val contractResolver: EntityContractResolver? = null,
 ) {
+    private val logger = LoggerFactory.getLogger(SlicingWorkflow::class.java)
+
     companion object {
-        // RFC-IMPL-004 (v1): ruleSet은 외부 파라미터로 받지 않고 v1 고정값을 사용
-        private const val V1_RULESET_ID = "ruleset.core.v1"
-        private val V1_RULESET_VERSION = SemVer.parse("1.0.0")
-        private val V1_RULESET_REF = ContractRef(V1_RULESET_ID, V1_RULESET_VERSION)
+        // 폴백용 기본값 (contractResolver 미주입 시 하위 호환)
+        private val FALLBACK_RULESET_REF = ContractRef("ruleset.core.v1", SemVer.parse("1.0.0"))
+    }
+
+    /**
+     * entityKey에서 entityType을 추출하여 동적으로 RuleSetRef 해석
+     *
+     * Contract is Law: EntityContractResolver가 주입되었으면 YAML 기반 동적 해석.
+     * 미주입이면 FALLBACK_RULESET_REF 사용 (하위 호환).
+     */
+    private fun resolveRuleSetRef(entityKey: EntityKey): ContractRef {
+        val resolver = contractResolver ?: return FALLBACK_RULESET_REF
+        val entityType = entityKey.value.substringBefore(":")
+        if (entityType.isBlank() || !entityKey.value.contains(":")) {
+            logger.warn("Cannot extract entityType from entityKey: {}, using fallback", entityKey.value)
+            return FALLBACK_RULESET_REF
+        }
+        return when (val result = resolver.resolveRuleSetRef(entityType)) {
+            is arrow.core.Either.Right -> result.value
+            is arrow.core.Either.Left -> {
+                logger.warn("No RuleSet for entityType={}, using fallback: {}", entityType, result.value)
+                FALLBACK_RULESET_REF
+            }
+        }
     }
 
     /**
@@ -54,13 +79,13 @@ class SlicingWorkflow(
      * @param tenantId 테넌트 ID
      * @param entityKey 엔티티 키
      * @param version 데이터 버전
-     * @param ruleSetRef RuleSet 참조 (기본값: V1_RULESET_REF)
+     * @param ruleSetRef RuleSet 참조 (미지정 시 entityKey에서 동적 해석)
      */
     suspend fun execute(
         tenantId: TenantId,
         entityKey: EntityKey,
         version: Long,
-        ruleSetRef: ContractRef = V1_RULESET_REF,
+        ruleSetRef: ContractRef = FALLBACK_RULESET_REF,
     ): Result<List<SliceRepositoryPort.SliceKey>> {
         return tracer.withSpanSuspend(
             "SlicingWorkflow.execute",
@@ -107,7 +132,7 @@ class SlicingWorkflow(
      * RFC-IMPL-010 GAP-F: 자동 슬라이싱 모드 선택
      *
      * 이전 버전이 존재하면 INCREMENTAL, 없으면 FULL로 실행.
-     * OutboxPollingWorker가 이 메서드를 호출하면 자동으로 최적의 경로 선택.
+     * IngestionOrchestrator/SlicingWorkflow 호출 시 자동으로 최적의 경로 선택.
      *
      * ## L12 원칙
      * - **결정성**: 동일 입력 → 동일 결과 (FULL ≡ INCREMENTAL)
@@ -121,7 +146,7 @@ class SlicingWorkflow(
      *
      * ## 사용 예시
      * ```kotlin
-     * // OutboxPollingWorker에서 호출
+     * // Lambda/SinkStreamHandler에서 호출
      * slicingWorkflow.executeAuto(tenantId, entityKey, version)
      * // → 이전 버전 있으면 INCREMENTAL, 없으면 FULL
      * ```
@@ -129,14 +154,14 @@ class SlicingWorkflow(
      * @param tenantId 테넌트 ID
      * @param entityKey 엔티티 키
      * @param version 신규 버전
-     * @param ruleSetRef RuleSet 참조 (기본값: V1_RULESET_REF)
+     * @param ruleSetRef RuleSet 참조 (미지정 시 entityKey에서 동적 해석)
      * @return 생성된 SliceKey 목록
      */
     suspend fun executeAuto(
         tenantId: TenantId,
         entityKey: EntityKey,
         version: Long,
-        ruleSetRef: ContractRef = V1_RULESET_REF,
+        ruleSetRef: ContractRef = FALLBACK_RULESET_REF,
     ): Result<List<SliceRepositoryPort.SliceKey>> {
         return tracer.withSpanSuspend(
             "SlicingWorkflow.executeAuto",

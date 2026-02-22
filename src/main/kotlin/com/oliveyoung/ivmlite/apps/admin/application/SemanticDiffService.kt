@@ -40,7 +40,7 @@ class SemanticDiffService(
             raise(DomainError.ValidationError("after", "YAML 파싱 실패: ${e.message}"))
         }
 
-        val kind = ContractKind.fromString(afterParsed["kind"]?.toString() ?: beforeParsed["kind"]?.toString() ?: "")
+        val kind = ContractKind.fromWireValue(afterParsed["kind"]?.toString() ?: beforeParsed["kind"]?.toString() ?: "")
 
         val changes = mutableListOf<SemanticChange>()
 

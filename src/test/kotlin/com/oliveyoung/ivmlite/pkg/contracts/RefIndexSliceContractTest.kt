@@ -1,10 +1,10 @@
 package com.oliveyoung.ivmlite.pkg.contracts
+
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
-import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
 import com.oliveyoung.ivmlite.shared.domain.types.SliceKind
@@ -144,7 +144,7 @@ class RefIndexSliceContractTest : StringSpec({
 
     "LocalYaml - Product RuleSet에 ENRICHED 슬라이스 존재" {
         val adapter = LocalYamlContractRegistryAdapter()
-        val ref = ContractRef("ruleset.product.doc001.v1", SemVer.parse("1.1.0"))
+        val ref = ContractRef("ruleset.product.oliveyoung.v1", SemVer.parse("1.0.0"))
 
         val result = adapter.loadRuleSetContract(ref)
 
@@ -158,7 +158,7 @@ class RefIndexSliceContractTest : StringSpec({
 
     "LocalYaml - Product ENRICHED 슬라이스는 joins 포함" {
         val adapter = LocalYamlContractRegistryAdapter()
-        val ref = ContractRef("ruleset.product.doc001.v1", SemVer.parse("1.1.0"))
+        val ref = ContractRef("ruleset.product.oliveyoung.v1", SemVer.parse("1.0.0"))
 
         val result = adapter.loadRuleSetContract(ref)
 
@@ -177,7 +177,7 @@ class RefIndexSliceContractTest : StringSpec({
 
     "LocalYaml - Product impactMap에 ENRICHED 포함" {
         val adapter = LocalYamlContractRegistryAdapter()
-        val ref = ContractRef("ruleset.product.doc001.v1", SemVer.parse("1.1.0"))
+        val ref = ContractRef("ruleset.product.oliveyoung.v1", SemVer.parse("1.0.0"))
 
         val result = adapter.loadRuleSetContract(ref)
 
@@ -204,7 +204,7 @@ class RefIndexSliceContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -240,7 +240,7 @@ class RefIndexSliceContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.brand.v1"),
@@ -286,7 +286,7 @@ class RefIndexSliceContractTest : StringSpec({
                     ]
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.product.v1"),
@@ -325,7 +325,7 @@ class RefIndexSliceContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.v1"),
@@ -366,7 +366,7 @@ class RefIndexSliceContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.brand.v1"),
@@ -411,7 +411,7 @@ class RefIndexSliceContractTest : StringSpec({
                     }
                 }
             ]
-        }"""
+        }""".trimIndent()
 
         val responseItem = mapOf(
             "id" to attr("ruleset.brand.v1"),

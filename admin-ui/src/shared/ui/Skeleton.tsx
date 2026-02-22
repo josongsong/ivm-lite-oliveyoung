@@ -125,7 +125,7 @@ export function SkeletonButton({ size = 'md', ...props }: SkeletonButtonProps) {
   return <Skeleton width={dims.w} height={dims.h} radius={6} {...props} />
 }
 
-export interface SkeletonCardProps extends HTMLAttributes<HTMLDivElement> {}
+export type SkeletonCardProps = HTMLAttributes<HTMLDivElement>
 
 export function SkeletonCard({ className = '', ...props }: SkeletonCardProps) {
   return (

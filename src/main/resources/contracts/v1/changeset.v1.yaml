@@ -1,4 +1,4 @@
-kind: ChangeSetContract
+kind: CHANGESET
 id: changeset.v1
 version: 1.0.0
 status: ACTIVE

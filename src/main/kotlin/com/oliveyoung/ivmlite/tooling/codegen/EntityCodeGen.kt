@@ -1,19 +1,20 @@
 package com.oliveyoung.ivmlite.tooling.codegen
 
+import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractKind
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import org.yaml.snakeyaml.Yaml
 import java.io.File
 
 /**
  * Entity Schema Contract → Kotlin 엔티티 빌더 코드 생성기
- * 
+ *
  * Contract YAML 파일에서 타입 세이프한 엔티티 빌더를 자동 생성합니다.
- * 
+ *
  * @example 실행
  * ```bash
  * ./gradlew generateEntities
  * ```
- * 
+ *
  * @example 생성 결과
  * ```kotlin
  * // Entities.kt
@@ -21,7 +22,7 @@ import java.io.File
  *     val Product = EntityRef<ProductBuilder>("PRODUCT")
  *     val Brand = EntityRef<BrandBuilder>("BRAND")
  * }
- * 
+ *
  * // ProductBuilder.kt
  * class ProductBuilder : EntityBuilder {
  *     var sku: String by required()
@@ -34,7 +35,7 @@ import java.io.File
  */
 object EntityCodeGen {
     private val yaml = Yaml()
-    
+
     /**
      * Contract YAML에서 Entity 코드 생성
      */
@@ -51,16 +52,16 @@ object EntityCodeGen {
                 generatedFiles = emptyList()
             )
         }
-        
+
         val generatedFiles = mutableListOf<File>()
-        
+
         // 1. Entities.kt 생성
         val entitiesCode = generateEntitiesObject(entitySchemas, packageName)
         val entitiesFile = File(outputDir, packageName.replace('.', '/') + "/Entities.kt")
         entitiesFile.parentFile.mkdirs()
         entitiesFile.writeText(entitiesCode)
         generatedFiles.add(entitiesFile)
-        
+
         // 2. 각 엔티티 빌더 생성
         entitySchemas.forEach { schema ->
             val builderCode = generateEntityBuilder(schema, packageName)
@@ -68,47 +69,47 @@ object EntityCodeGen {
             builderFile.writeText(builderCode)
             generatedFiles.add(builderFile)
         }
-        
+
         return GenerationResult(
             success = true,
             message = "Generated ${generatedFiles.size} files from ${entitySchemas.size} entity schemas",
             generatedFiles = generatedFiles
         )
     }
-    
+
     private fun scanEntitySchemas(dir: File): List<EntitySchemaInfo> {
         if (!dir.exists()) return emptyList()
-        
+
         return dir.walkTopDown()
             .filter { it.isFile && (it.extension == "yaml" || it.extension == "yml") }
             .mapNotNull { file -> parseEntitySchema(file) }
             .toList()
     }
-    
+
     private fun parseEntitySchema(file: File): EntitySchemaInfo? {
         val content = try {
             yaml.load<Map<String, Any>>(file.readText())
         } catch (e: Exception) {
             throw DomainError.ContractError("Failed to parse YAML file ${file.path}: ${e.message}")
         }
-        
+
         val kind = content["kind"] as? String
-        if (kind == null || kind != "ENTITY_SCHEMA") {
+        if (kind == null || ContractKind.fromWireValue(kind) != ContractKind.ENTITY_SCHEMA) {
             return null
         }
-        
+
         val id = content["id"] as? String
             ?: throw DomainError.ContractError("Missing 'id' field in ${file.path}")
-        
+
         val entityType = content["entityType"] as? String
             ?: throw DomainError.ContractError("Missing 'entityType' field in ${file.path}")
-        
+
         val version = content["version"]?.toString() ?: "1.0.0"
-        
+
         @Suppress("UNCHECKED_CAST")
         val fieldsRaw = content["fields"] as? List<Map<String, Any>>
             ?: throw DomainError.ContractError("Missing 'fields' in ${file.path}")
-        
+
         val fields = fieldsRaw.map { fieldMap ->
             FieldInfo(
                 name = fieldMap["name"] as? String
@@ -119,7 +120,7 @@ object EntityCodeGen {
                 description = fieldMap["description"] as? String ?: ""
             )
         }
-        
+
         return EntitySchemaInfo(
             id = id,
             entityType = entityType,
@@ -128,7 +129,7 @@ object EntityCodeGen {
             sourceFile = file.path
         )
     }
-    
+
     private fun generateEntitiesObject(schemas: List<EntitySchemaInfo>, packageName: String): String {
         return buildString {
             appendLine("// AUTO-GENERATED FILE - DO NOT EDIT")
@@ -153,7 +154,7 @@ object EntityCodeGen {
             appendLine(" */")
             appendLine("object Entities {")
             appendLine()
-            
+
             schemas.forEach { schema ->
                 val builderName = "${schema.entityType.capitalize()}Builder"
                 appendLine("    /**")
@@ -169,7 +170,7 @@ object EntityCodeGen {
                 appendLine("    )")
                 appendLine()
             }
-            
+
             appendLine("    /** All entity references */")
             appendLine("    val all: List<EntityRef<*>> = listOf(")
             schemas.forEachIndexed { index, schema ->
@@ -183,12 +184,12 @@ object EntityCodeGen {
             appendLine("}")
         }
     }
-    
+
     private fun generateEntityBuilder(schema: EntitySchemaInfo, packageName: String): String {
         val className = "${schema.entityType.capitalize()}Builder"
         val requiredFields = schema.fields.filter { it.required }
         val optionalFields = schema.fields.filter { !it.required }
-        
+
         return buildString {
             appendLine("// AUTO-GENERATED FILE - DO NOT EDIT")
             appendLine("// Generated by EntityCodeGen")
@@ -215,7 +216,7 @@ object EntityCodeGen {
             appendLine()
             appendLine("    override val entityType: String = \"${schema.entityType}\"")
             appendLine()
-            
+
             // 필수 필드
             if (requiredFields.isNotEmpty()) {
                 appendLine("    // ===== 필수 필드 =====")
@@ -226,7 +227,7 @@ object EntityCodeGen {
                     appendLine()
                 }
             }
-            
+
             // 선택 필드
             if (optionalFields.isNotEmpty()) {
                 appendLine("    // ===== 선택 필드 =====")
@@ -242,7 +243,7 @@ object EntityCodeGen {
                     appendLine()
                 }
             }
-            
+
             // 커스텀 속성
             appendLine("    // ===== 커스텀 속성 =====")
             appendLine()
@@ -253,17 +254,13 @@ object EntityCodeGen {
             appendLine("        _attributes[key] = value")
             appendLine("    }")
             appendLine()
-            
+
             // build() 메서드
             appendLine("    // ===== Build =====")
             appendLine()
             appendLine("    override fun build(): Map<String, Any?> {")
             appendLine("        // 필수 필드 검증")
             requiredFields.forEach { field ->
-                val check = when {
-                    field.type == "string" -> "${field.name}.isBlank()"
-                    else -> "false"
-                }
                 if (field.type == "string") {
                     appendLine("        require(${field.name}.isNotBlank()) { \"${field.name} is required\" }")
                 }
@@ -279,7 +276,7 @@ object EntityCodeGen {
             appendLine("}")
         }
     }
-    
+
     private fun toKotlinType(type: String, nullable: Boolean): String {
         val baseType = when {
             type == "string" -> "String"
@@ -296,7 +293,7 @@ object EntityCodeGen {
         }
         return if (nullable) "$baseType?" else baseType
     }
-    
+
     private fun getDefaultValue(field: FieldInfo, nullable: Boolean): String {
         if (nullable) return "null"
         return when (field.type) {
@@ -308,7 +305,7 @@ object EntityCodeGen {
             else -> if (field.type.startsWith("list<")) "emptyList()" else "null"
         }
     }
-    
+
     private fun getDefaultLiteral(field: FieldInfo): String {
         val default = field.default ?: return "null"
         return when (field.type) {
@@ -320,7 +317,7 @@ object EntityCodeGen {
             else -> "null"
         }
     }
-    
+
     private fun getExampleValue(field: FieldInfo): String {
         return when (field.type) {
             "string" -> "\"example\""
@@ -330,8 +327,8 @@ object EntityCodeGen {
             else -> "..."
         }
     }
-    
-    private fun String.capitalize(): String = 
+
+    private fun String.capitalize(): String =
         replaceFirstChar { if (it.isLowerCase()) it.titlecase() else it.toString() }
 }
 
@@ -366,20 +363,20 @@ fun main(args: Array<String>) {
     val contractsDir = args.findArg("--contracts") ?: "src/main/resources/contracts"
     val outputDir = args.findArg("--output") ?: "build/generated/kotlin"
     val packageName = args.findArg("--package") ?: "com.oliveyoung.ivmlite.sdk.schema.generated"
-    
+
     println("EntityCodeGen - Contract → Kotlin Entity Builder Generator")
     println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")
     println("Contracts: $contractsDir")
     println("Output:    $outputDir")
     println("Package:   $packageName")
     println()
-    
+
     val result = EntityCodeGen.generate(
         contractsDir = File(contractsDir),
         outputDir = File(outputDir),
         packageName = packageName
     )
-    
+
     if (result.success) {
         println("✅ ${result.message}")
         result.generatedFiles.forEach { println("   → ${it.path}") }

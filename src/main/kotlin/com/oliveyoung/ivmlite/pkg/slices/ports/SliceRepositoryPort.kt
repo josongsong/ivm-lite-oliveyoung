@@ -1,7 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.slices.ports
 
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
-import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord

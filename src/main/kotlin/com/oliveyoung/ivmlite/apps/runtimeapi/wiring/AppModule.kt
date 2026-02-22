@@ -6,7 +6,7 @@ import org.koin.dsl.module
 
 /**
  * App Module (RFC-IMPL-009)
- * 
+ *
  * 모든 DI 모듈을 조합하는 최상위 모듈.
  * wiring 위치: apps/runtimeapi/wiring/ (RFC-IMPL-009 P0)
  */
@@ -24,44 +24,26 @@ val allModules = listOf(
     metricsModule,
     adapterModule,
     domainServiceModule,  // Domain Service Port 바인딩 (공통)
+    viewModule,  // ViewComposer (Sink Dispatch는 Lambda 전용)
     workflowModule,
-    workerModule,
     sdkModule,
 )
 
 /**
- * Production 모듈 조합 (v2: jOOQ 기반)
+ * Production 모듈 조합 (DynamoDB 중심)
  *
- * PostgreSQL + jOOQ 어댑터 사용. infraModule에서 DSLContext 제공.
- * DynamoDB 어댑터는 RFC-IMPL-007에서 추가 예정.
+ * RawData/Slice/InvertedIndex/SinkEvent는 DynamoDB, ChangeSet/View는 PostgreSQL.
+ * - DynamoDB: RawData, Slice, InvertedIndex, SinkEvent, Contract Registry
+ * - PostgreSQL: ChangeSet, View
  */
 val productionModules = listOf(
     appModule,
     tracingModule,
     metricsModule,
     infraModule,
-    jooqAdapterModule,
-    domainServiceModule,  // Domain Service Port 바인딩 (공통)
-    workflowModule,
-    workerModule,
-    sdkModule,
-)
-
-/**
- * Full Production 모듈 조합 (v3: DynamoDB 중심)
- *
- * DynamoDB 기반 운영 환경:
- * - DynamoDB: RawData, Slice, InvertedIndex, Contract Registry
- * - PostgreSQL: Outbox (트랜잭션 보장용)
- */
-val fullProductionModules = listOf(
-    appModule,
-    tracingModule,
-    metricsModule,
-    infraModule,
     productionAdapterModule,
     domainServiceModule,  // Domain Service Port 바인딩 (공통)
+    viewModule,  // ViewComposer (Sink Dispatch는 Lambda 전용)
     workflowModule,
-    workerModule,
     sdkModule,
 )

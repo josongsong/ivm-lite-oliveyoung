@@ -2,6 +2,7 @@ package com.oliveyoung.ivmlite.pkg.contracts.adapters
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.*
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkRule
 import com.oliveyoung.ivmlite.shared.domain.types.Result
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
@@ -10,7 +11,6 @@ import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractError
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError.ContractIntegrityError
 import com.oliveyoung.ivmlite.shared.ports.ContractCachePort
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
-import io.opentelemetry.api.trace.Span
 import io.opentelemetry.api.trace.Tracer
 import org.slf4j.LoggerFactory
 import com.oliveyoung.ivmlite.shared.domain.types.SemVer
@@ -68,7 +68,7 @@ class DynamoDBContractRegistryAdapter(
     private val json = Json { ignoreUnknownKeys = true }
 
     override suspend fun loadChangeSetContract(ref: ContractRef): Result<ChangeSetContract> {
-        val cacheKey = ContractCachePort.key("CHANGESET", ref.id, ref.version.toString())
+        val cacheKey = ContractCachePort.key(ContractKind.CHANGESET.wireValue, ref.id, ref.version.toString())
 
         // 캐시 hit → 즉시 반환
         cache?.get(cacheKey, ChangeSetContract::class)?.let { cached ->
@@ -90,7 +90,7 @@ class DynamoDBContractRegistryAdapter(
     }
 
     override suspend fun loadJoinSpecContract(ref: ContractRef): Result<JoinSpecContract> {
-        val cacheKey = ContractCachePort.key("JOIN_SPEC", ref.id, ref.version.toString())
+        val cacheKey = ContractCachePort.key(ContractKind.JOIN_SPEC.wireValue, ref.id, ref.version.toString())
 
         // 캐시 hit → 즉시 반환
         cache?.get(cacheKey, JoinSpecContract::class)?.let { cached ->
@@ -119,7 +119,7 @@ class DynamoDBContractRegistryAdapter(
     @Suppress("DEPRECATION")
     override suspend fun loadInvertedIndexContract(ref: ContractRef): Result<InvertedIndexContract> {
         log.warn("loadInvertedIndexContract is deprecated. Use IndexSpec.references in RuleSet instead. ref={}", ref)
-        val cacheKey = ContractCachePort.key("INVERTED_INDEX", ref.id, ref.version.toString())
+        val cacheKey = ContractCachePort.key(ContractKind.JOIN_SPEC.wireValue + "_DEPRECATED", ref.id, ref.version.toString())
 
         // 캐시 hit → 즉시 반환
         cache?.get(cacheKey, InvertedIndexContract::class)?.let { cached ->
@@ -148,7 +148,7 @@ class DynamoDBContractRegistryAdapter(
                 "contract_version" to ref.version.toString(),
             ),
         ) { span ->
-            val cacheKey = ContractCachePort.key("RULE_SET", ref.id, ref.version.toString())
+            val cacheKey = ContractCachePort.key(ContractKind.RULESET.wireValue, ref.id, ref.version.toString())
 
             cache?.get(cacheKey, RuleSetContract::class)?.let { cached ->
                 log.debug("Cache hit for RuleSetContract: {}", cacheKey)
@@ -178,7 +178,7 @@ class DynamoDBContractRegistryAdapter(
                 "contract_version" to ref.version.toString(),
             ),
         ) { span ->
-            val cacheKey = ContractCachePort.key("VIEW_DEFINITION", ref.id, ref.version.toString())
+            val cacheKey = ContractCachePort.key(ContractKind.VIEW_DEFINITION.wireValue, ref.id, ref.version.toString())
 
             cache?.get(cacheKey, ViewDefinitionContract::class)?.let { cached ->
                 log.debug("Cache hit for ViewDefinitionContract: {}", cacheKey)
@@ -228,7 +228,9 @@ class DynamoDBContractRegistryAdapter(
     }
 
     private fun parseMeta(item: Map<String, AttributeValue>, ref: ContractRef): Result<ContractMeta> {
-        val kind = item["kind"]?.s() ?: return err("missing kind for ${ref.id}")
+        val kindStr = item["kind"]?.s() ?: return err("missing kind for ${ref.id}")
+        val kind = ContractKind.fromWireValue(kindStr)
+            ?: return err("unknown contract kind '$kindStr' for ${ref.id}")
         val statusStr = item["status"]?.s() ?: return err("missing status for ${ref.id}")
         val status = try {
             ContractStatus.valueOf(statusStr)
@@ -267,7 +269,7 @@ class DynamoDBContractRegistryAdapter(
 
             val payload = data["payload"]?.jsonObject
             val ext = payload?.get("externalizationPolicy")?.jsonObject
-            val threshold = ext?.get("thresholdBytes")?.jsonPrimitive?.intOrNull ?: 100000
+            val threshold = ext?.get("thresholdBytes")?.jsonPrimitive?.intOrNull ?: 100_000
 
             val fanout = data["fanout"]?.jsonObject
             val enabled = fanout?.get("enabled")?.jsonPrimitive?.booleanOrNull ?: false
@@ -305,20 +307,13 @@ class DynamoDBContractRegistryAdapter(
 
             val fanout = data["fanout"]?.jsonObject
             val inverted = fanout?.get("invertedIndex")?.jsonObject
-            val maxFanout = inverted?.get("maxFanout")?.jsonPrimitive?.intOrNull ?: 10000
-
-            val contractRef = inverted?.get("contractRef")?.jsonObject
-            val refId = contractRef?.get("id")?.jsonPrimitive?.content
-                ?: return err("missing invertedIndex.contractRef.id for ${ref.id}")
-            val refVer = contractRef["version"]?.jsonPrimitive?.content?.let(SemVer::parse)
-                ?: return err("missing invertedIndex.contractRef.version for ${ref.id}")
+            val maxFanout = inverted?.get("maxFanout")?.jsonPrimitive?.intOrNull ?: 10_000
 
             Result.Ok(
                 JoinSpecContract(
                     meta = meta,
                     maxJoinDepth = maxJoinDepth,
                     maxFanout = maxFanout,
-                    invertedIndexRef = ContractRef(refId, refVer),
                 ),
             )
         } catch (e: Exception) {
@@ -352,7 +347,7 @@ class DynamoDBContractRegistryAdapter(
             val separator = keySpec["separator"]?.jsonPrimitive?.content ?: "#"
 
             val guards = data["guards"]?.jsonObject
-            val maxTargetsPerRef = guards?.get("maxTargetsPerRef")?.jsonPrimitive?.intOrNull ?: 500000
+            val maxTargetsPerRef = guards?.get("maxTargetsPerRef")?.jsonPrimitive?.intOrNull ?: 500_000
 
             Result.Ok(
                 InvertedIndexContract(
@@ -414,30 +409,6 @@ class DynamoDBContractRegistryAdapter(
                     return err("all paths are null in impactMap for '$key' in ${ref.id}")
                 }
                 impactMap[sliceType] = fields
-            }
-
-            val joinsJson = data["joins"]?.jsonArray ?: emptyList()
-            val joins = mutableListOf<JoinSpec>()
-            for (joinElement in joinsJson) {
-                val joinObj = joinElement.jsonObject
-                val sourceSliceStr = joinObj["sourceSlice"]?.jsonPrimitive?.content
-                    ?: return err("missing sourceSlice in join for ${ref.id}")
-                val sourceSlice = try {
-                    SliceType.valueOf(sourceSliceStr)
-                } catch (e: IllegalArgumentException) {
-                    return err("invalid SliceType '$sourceSliceStr' in join for ${ref.id}")
-                }
-                val targetEntity = joinObj["targetEntity"]?.jsonPrimitive?.content
-                    ?: return err("missing targetEntity in join for ${ref.id}")
-                val joinPath = joinObj["joinPath"]?.jsonPrimitive?.content
-                    ?: return err("missing joinPath in join for ${ref.id}")
-                val cardinalityStr = joinObj["cardinality"]?.jsonPrimitive?.content ?: "ONE_TO_ONE"  // 기본값 허용 (RFC-003)
-                val cardinality = try {
-                    JoinCardinality.valueOf(cardinalityStr)
-                } catch (e: IllegalArgumentException) {
-                    return err("invalid cardinality '$cardinalityStr' in join for ${ref.id}")
-                }
-                joins.add(JoinSpec(sourceSlice, targetEntity, joinPath, cardinality))
             }
 
             val slicesJson = data["slices"]?.jsonArray ?: emptyList()
@@ -512,6 +483,14 @@ class DynamoDBContractRegistryAdapter(
                     val targetKeyPattern = joinObj["targetKeyPattern"]?.jsonPrimitive?.content
                         ?: return err("missing targetKeyPattern in slice join for ${ref.id}")
                     val required = joinObj["required"]?.jsonPrimitive?.booleanOrNull ?: true  // default: fail-closed
+                    val targetSliceType = joinObj["targetSliceType"]?.jsonPrimitive?.content
+                    val missingPolicy = try {
+                        joinObj["missingPolicy"]?.jsonPrimitive?.content?.let { policy: String ->
+                            com.oliveyoung.ivmlite.pkg.slices.domain.MissingPolicy.valueOf(policy)
+                        } ?: com.oliveyoung.ivmlite.pkg.slices.domain.MissingPolicy.FAIL_CLOSED
+                    } catch (e: IllegalArgumentException) {
+                        return err("invalid MissingPolicy in slice join for ${ref.id}")
+                    }
 
                     sliceJoins.add(
                         com.oliveyoung.ivmlite.pkg.slices.domain.JoinSpec(
@@ -521,6 +500,9 @@ class DynamoDBContractRegistryAdapter(
                             targetEntityType = targetEntityType,
                             targetKeyPattern = targetKeyPattern,
                             required = required,
+                            projection = parseProjectionJson(joinObj["projection"]),
+                            targetSliceType = targetSliceType,
+                            missingPolicy = missingPolicy
                         )
                     )
                 }
@@ -545,7 +527,7 @@ class DynamoDBContractRegistryAdapter(
 
                 // 통합 버전: references 및 maxFanout 파싱 (옵션)
                 val references = indexObj["references"]?.jsonPrimitive?.contentOrNull
-                val maxFanout = indexObj["maxFanout"]?.jsonPrimitive?.intOrNull ?: 10000
+                val maxFanout = indexObj["maxFanout"]?.jsonPrimitive?.intOrNull ?: 10_000
 
                 indexes.add(IndexSpec(
                     type = type,
@@ -560,7 +542,6 @@ class DynamoDBContractRegistryAdapter(
                     meta = meta,
                     entityType = entityType,
                     impactMap = impactMap,
-                    joins = joins,
                     slices = slices,
                     indexes = indexes,
                 ),
@@ -591,6 +572,12 @@ class DynamoDBContractRegistryAdapter(
 
         return try {
             val data = json.parseToJsonElement(dataJson).jsonObject
+
+            // viewName 파싱 (선택)
+            val viewName = data["viewName"]?.jsonPrimitive?.content
+
+            // entityType 파싱 (선택)
+            val entityType = data["entityType"]?.jsonPrimitive?.content
 
             // requiredSlices 파싱 (필수 필드)
             if (!data.containsKey("requiredSlices")) {
@@ -673,6 +660,8 @@ class DynamoDBContractRegistryAdapter(
             Result.Ok(
                 ViewDefinitionContract(
                     meta = meta,
+                    viewName = viewName,
+                    entityType = entityType,
                     requiredSlices = requiredSlices,
                     optionalSlices = optionalSlices,
                     missingPolicy = missingPolicy,
@@ -767,13 +756,36 @@ class DynamoDBContractRegistryAdapter(
     private fun err(msg: String): Result.Err =
         Result.Err(ContractError(msg))
 
+    private fun parseProjectionJson(element: JsonElement?): com.oliveyoung.ivmlite.pkg.slices.domain.Projection? {
+        if (element == null || element !is JsonObject) return null
+        val mode = try {
+            com.oliveyoung.ivmlite.pkg.slices.domain.ProjectionMode.valueOf(
+                element["mode"]?.jsonPrimitive?.content?.uppercase() ?: "COPY_FIELDS"
+            )
+        } catch (_: IllegalArgumentException) {
+            com.oliveyoung.ivmlite.pkg.slices.domain.ProjectionMode.COPY_FIELDS
+        }
+        val fieldsArray = element["fields"]?.jsonArray
+            ?: return com.oliveyoung.ivmlite.pkg.slices.domain.Projection(mode, emptyList())
+        val fields = mutableListOf<com.oliveyoung.ivmlite.pkg.slices.domain.FieldMapping>()
+        for (fm in fieldsArray) {
+            val fmObj = fm.jsonObject
+            val from = fmObj["from"]?.jsonPrimitive?.content
+                ?: fmObj["fromTargetPath"]?.jsonPrimitive?.content ?: continue
+            val to = fmObj["to"]?.jsonPrimitive?.content
+                ?: fmObj["toOutputPath"]?.jsonPrimitive?.content ?: continue
+            fields.add(com.oliveyoung.ivmlite.pkg.slices.domain.FieldMapping(fromTargetPath = from, toOutputPath = to))
+        }
+        return com.oliveyoung.ivmlite.pkg.slices.domain.Projection(mode = mode, fields = fields)
+    }
+
     // ===== List Operations (GSI 사용) =====
 
     /**
      * GSI로 Contract 목록 조회
      */
     override suspend fun listContractRefs(
-        kind: String,
+        kind: ContractKind,
         status: ContractStatus?
     ): Result<List<ContractRef>> {
         return try {
@@ -792,7 +804,7 @@ class DynamoDBContractRegistryAdapter(
         status: ContractStatus?
     ): Result<List<ViewDefinitionContract>> {
         return try {
-            val refs = queryByKindStatus("VIEW_DEFINITION", status)
+            val refs = queryByKindStatus(ContractKind.VIEW_DEFINITION, status)
             val contracts = refs.map { ref ->
                 when (val result = loadViewDefinitionContract(ref)) {
                     is Result.Ok -> result.value
@@ -809,7 +821,7 @@ class DynamoDBContractRegistryAdapter(
     }
 
     private suspend fun queryByKindStatus(
-        kind: String,
+        kind: ContractKind,
         status: ContractStatus?
     ): List<ContractRef> = suspendCoroutine { cont ->
         val builder = software.amazon.awssdk.services.dynamodb.model.QueryRequest.builder()
@@ -821,13 +833,13 @@ class DynamoDBContractRegistryAdapter(
             )
             .expressionAttributeValues(
                 buildMap {
-                    put(":kind", AttributeValue.builder().s(kind).build())
+                    put(":kind", AttributeValue.builder().s(kind.wireValue).build())
                     if (status != null) {
                         put(":status", AttributeValue.builder().s(status.name).build())
                     }
                 }
             )
-        
+
         if (status != null) {
             builder.expressionAttributeNames(mapOf("#status" to "status"))
         }
@@ -859,7 +871,7 @@ class DynamoDBContractRegistryAdapter(
         contract: ViewDefinitionContract
     ): Result<Unit> {
         return saveContract(
-            kind = "VIEW_DEFINITION",
+            kind = ContractKind.VIEW_DEFINITION,
             id = contract.meta.id,
             version = contract.meta.version.toString(),
             status = contract.meta.status,
@@ -871,7 +883,7 @@ class DynamoDBContractRegistryAdapter(
         contract: RuleSetContract
     ): Result<Unit> {
         return saveContract(
-            kind = "RULE_SET",
+            kind = ContractKind.RULESET,
             id = contract.meta.id,
             version = contract.meta.version.toString(),
             status = contract.meta.status,
@@ -883,7 +895,7 @@ class DynamoDBContractRegistryAdapter(
         contract: ChangeSetContract
     ): Result<Unit> {
         return saveContract(
-            kind = "CHANGESET",
+            kind = ContractKind.CHANGESET,
             id = contract.meta.id,
             version = contract.meta.version.toString(),
             status = contract.meta.status,
@@ -895,7 +907,7 @@ class DynamoDBContractRegistryAdapter(
         contract: JoinSpecContract
     ): Result<Unit> {
         return saveContract(
-            kind = "JOIN_SPEC",
+            kind = ContractKind.JOIN_SPEC,
             id = contract.meta.id,
             version = contract.meta.version.toString(),
             status = contract.meta.status,
@@ -903,8 +915,22 @@ class DynamoDBContractRegistryAdapter(
         )
     }
 
+    /**
+     * SinkRule 저장 (RFC-022 Phase 2)
+     * DynamoDBSinkRuleRegistryAdapter에서 조회 가능한 형식으로 저장
+     */
+    suspend fun saveSinkRuleContract(contract: SinkRule): Result<Unit> {
+        return saveContract(
+            kind = ContractKind.SINK_RULE,
+            id = contract.id,
+            version = contract.version,
+            status = ContractStatus.valueOf(contract.status.name),
+            data = buildSinkRuleData(contract)
+        )
+    }
+
     private suspend fun saveContract(
-        kind: String,
+        kind: ContractKind,
         id: String,
         version: String,
         status: ContractStatus,
@@ -919,7 +945,7 @@ class DynamoDBContractRegistryAdapter(
                 mapOf(
                     "id" to AttributeValue.builder().s(id).build(),
                     "version" to AttributeValue.builder().s(version).build(),
-                    "kind" to AttributeValue.builder().s(kind).build(),
+                    "kind" to AttributeValue.builder().s(kind.wireValue).build(),
                     "status" to AttributeValue.builder().s(status.name).build(),
                     "data" to AttributeValue.builder().s(data).build(),
                     "checksum" to AttributeValue.builder().s(checksum).build(),
@@ -942,6 +968,12 @@ class DynamoDBContractRegistryAdapter(
 
     private fun buildViewDefinitionData(contract: ViewDefinitionContract): String {
         return buildJsonObject {
+            contract.viewName?.let { viewName ->
+                put("viewName", viewName)
+            }
+            contract.entityType?.let { entityType ->
+                put("entityType", entityType)
+            }
             put("requiredSlices", buildJsonArray {
                 contract.requiredSlices.forEach { add(it.name) }
             })
@@ -973,16 +1005,6 @@ class DynamoDBContractRegistryAdapter(
                     put(slice.name, buildJsonArray { fields.forEach { add(it) } })
                 }
             })
-            put("joins", buildJsonArray {
-                contract.joins.forEach { join ->
-                    add(buildJsonObject {
-                        put("sourceSlice", join.sourceSlice.name)
-                        put("targetEntity", join.targetEntity)
-                        put("joinPath", join.joinPath)
-                        put("cardinality", join.cardinality.name)
-                    })
-                }
-            })
             put("slices", buildJsonArray {
                 contract.slices.forEach { slice ->
                     add(buildJsonObject {
@@ -1011,6 +1033,23 @@ class DynamoDBContractRegistryAdapter(
                                         put("targetEntityType", join.targetEntityType)
                                         put("targetKeyPattern", join.targetKeyPattern)
                                         put("required", join.required)
+                                        if (join.targetSliceType != null) {
+                                            put("targetSliceType", join.targetSliceType)
+                                        }
+                                        put("missingPolicy", join.missingPolicy.name)
+                                        if (join.projection != null) {
+                                            put("projection", buildJsonObject {
+                                                put("mode", join.projection.mode.name)
+                                                put("fields", buildJsonArray {
+                                                    join.projection.fields.forEach { fm ->
+                                                        add(buildJsonObject {
+                                                            put("from", fm.fromTargetPath)
+                                                            put("to", fm.toOutputPath)
+                                                        })
+                                                    }
+                                                })
+                                            })
+                                        }
                                     })
                                 }
                             })
@@ -1066,6 +1105,36 @@ class DynamoDBContractRegistryAdapter(
                     put("maxFanout", contract.maxFanout)
                 })
                 put("joinDepReason", "JOIN_DEP")
+            })
+        }.toString()
+    }
+
+    private fun buildSinkRuleData(contract: SinkRule): String {
+        return buildJsonObject {
+            put("input", buildJsonObject {
+                put("type", contract.input.type.name)
+                put("sliceTypes", buildJsonArray { contract.input.sliceTypes.forEach { add(it.name) } })
+                put("entityTypes", buildJsonArray { contract.input.entityTypes.forEach { add(it) } })
+            })
+            put("target", buildJsonObject {
+                put("type", contract.target.type.name)
+                put("endpoint", contract.target.endpoint)
+                contract.target.indexPattern?.let { put("indexPattern", it) }
+                contract.target.datasetArn?.let { put("datasetArn", it) }
+                contract.target.auth?.let { auth ->
+                    put("auth", buildJsonObject {
+                        put("type", auth.type.name)
+                        auth.username?.let { put("username", it) }
+                        auth.password?.let { put("password", it) }
+                    })
+                }
+            })
+            put("docId", buildJsonObject {
+                put("pattern", contract.docId.pattern)
+            })
+            put("commit", buildJsonObject {
+                put("batchSize", contract.commit.batchSize)
+                put("timeoutMs", contract.commit.timeoutMs)
             })
         }.toString()
     }

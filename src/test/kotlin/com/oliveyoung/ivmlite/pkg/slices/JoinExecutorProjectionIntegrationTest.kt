@@ -17,7 +17,6 @@ import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.coroutines.runBlocking
-import com.fasterxml.jackson.databind.ObjectMapper
 import com.fasterxml.jackson.module.kotlin.jacksonObjectMapper
 
 /**
@@ -32,7 +31,7 @@ class JoinExecutorProjectionIntegrationTest : StringSpec({
 
     "통합: Brand 업데이트 → Product CORE에 brandName projection" {
         val tenantId = TenantId("oliveyoung")
-        
+
         // 1. Brand RawData (업데이트됨)
         val brandData = RawDataRecord(
             tenantId = tenantId,
@@ -90,15 +89,15 @@ class JoinExecutorProjectionIntegrationTest : StringSpec({
 
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val data = (result as Result.Ok).value
-        
+
         // 5. 검증: brandName과 brandLogoUrl만 포함되어야 함
         val brandJson = data["brand"]!!
         val mapper = jacksonObjectMapper()
         val brandObj = mapper.readTree(brandJson)
-        
+
         brandObj.get("brandName")?.asText() shouldBe "이니스프리 (NEW)"
         brandObj.get("brandLogoUrl")?.asText() shouldBe "https://new-logo.png"
-        
+
         // brandDesc, country는 포함되지 않아야 함
         brandObj.has("brandDesc") shouldBe false
         brandObj.has("country") shouldBe false
@@ -106,7 +105,7 @@ class JoinExecutorProjectionIntegrationTest : StringSpec({
 
     "통합: Projection 없음 → 전체 payload 반환 (하위 호환성)" {
         val tenantId = TenantId("oliveyoung")
-        
+
         val brandData = RawDataRecord(
             tenantId = tenantId,
             entityKey = EntityKey("BRAND#oliveyoung#이니스프리"),
@@ -147,7 +146,7 @@ class JoinExecutorProjectionIntegrationTest : StringSpec({
 
         result.shouldBeInstanceOf<Result.Ok<*>>()
         val data = (result as Result.Ok).value
-        
+
         // 전체 payload 반환
         data["brand"] shouldBe """{"brandId":"이니스프리","brandName":"이니스프리","brandDesc":"설명"}"""
     }

@@ -3,12 +3,12 @@ package com.oliveyoung.ivmlite.shared.domain.types
 import kotlinx.serialization.Serializable
 
 /**
- * Outbox 토픽 정의 (RFC-IMPL-008)
- * 
- * Kafka와 PostgreSQL Polling 모두에서 동일한 토픽 패턴 지원.
- * 
+ * Kafka/이벤트 토픽 정의 (RFC-IMPL-008)
+ *
+ * Kafka Consumer 등에서 동일한 토픽 패턴 지원.
+ *
  * 토픽명 패턴: {topicPrefix}.events.{aggregatetype}
- * 
+ *
  * 예시:
  * - ivm.events.raw_data → RAW_DATA
  * - ivm.events.slice → SLICE
@@ -21,7 +21,7 @@ enum class Topic(
 ) {
     /**
      * RawData Ingest 이벤트 토픽
-     * 
+     *
      * 이벤트 타입: RawDataIngested
      * 후속 처리: SlicingWorkflow 트리거
      */
@@ -29,15 +29,15 @@ enum class Topic(
 
     /**
      * Slice 이벤트 토픽
-     * 
-     * 이벤트 타입: SliceCreated, ShipRequested
-     * 후속 처리: ShipWorkflow 트리거
+     *
+     * 이벤트 타입: SliceCreated, ShipRequested, ViewsComposed
+     * 후속 처리: DynamoDB Streams → Lambda (SinkStreamHandler)
      */
     SLICE(AggregateType.SLICE, "slice"),
 
     /**
      * ChangeSet 이벤트 토픽
-     * 
+     *
      * 이벤트 타입: ChangeSetCreated
      * 후속 처리: FanoutWorkflow 트리거
      */
@@ -45,7 +45,7 @@ enum class Topic(
 
     /**
      * 전체 토픽명 생성
-     * 
+     *
      * @param prefix 토픽 prefix (기본: "ivm")
      * @return 전체 토픽명 (예: "ivm.events.raw_data")
      */
@@ -59,7 +59,7 @@ enum class Topic(
 
         /**
          * 토픽명에서 Topic 파싱
-         * 
+         *
          * @param topicName 토픽명 (예: "ivm.events.raw_data")
          * @return Topic 또는 null
          */
@@ -70,7 +70,7 @@ enum class Topic(
 
         /**
          * 토픽명에서 AggregateType 파싱
-         * 
+         *
          * @param topicName 토픽명 (예: "ivm.events.raw_data")
          * @return AggregateType 또는 null
          */
@@ -78,7 +78,7 @@ enum class Topic(
 
         /**
          * 모든 토픽명 생성
-         * 
+         *
          * @param prefix 토픽 prefix (기본: "ivm")
          * @return 모든 토픽명 목록
          */
@@ -88,17 +88,17 @@ enum class Topic(
 
 /**
  * 토픽 설정 (SDK/Worker 공용)
- * 
+ *
  * Kafka Consumer와 PostgreSQL Polling Worker 모두에서 사용.
- * 
+ *
  * @example
  * ```kotlin
  * // 특정 토픽만 구독
  * val config = TopicConfig(topics = listOf(Topic.RAW_DATA))
- * 
+ *
  * // 모든 토픽 구독
  * val config = TopicConfig.all()
- * 
+ *
  * // 토픽명으로 설정
  * val config = TopicConfig.fromTopicNames(listOf("ivm.events.raw_data"))
  * ```

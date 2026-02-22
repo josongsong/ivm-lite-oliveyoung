@@ -11,10 +11,15 @@ import kotlinx.serialization.Serializable
 @Serializable
 data class IngestResponse(
     val success: Boolean,
+    val jobId: String? = null,
     val tenantId: String,
     val entityKey: String,
     val version: Long,
     val payloadHash: String? = null,
+    val sliceCount: Int? = null,
+    val viewCount: Int? = null,
+    val sinkPending: Boolean? = null,
+    val durationMs: Long? = null,
 )
 
 @Serializable

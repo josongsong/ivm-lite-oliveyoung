@@ -12,7 +12,7 @@ import {
 } from 'lucide-react'
 import { useQuery } from '@tanstack/react-query'
 import { explorerApi } from '@/shared/api'
-import { JsonViewer, DiffViewer, computeDiff } from '@/shared/ui'
+import { computeDiff, DiffViewer, JsonViewer } from '@/shared/ui'
 import { Loading } from '@/shared/ui'
 import './RawDataPanel.css'
 

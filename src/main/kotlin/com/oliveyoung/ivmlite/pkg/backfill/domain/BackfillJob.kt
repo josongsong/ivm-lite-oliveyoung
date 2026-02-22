@@ -5,7 +5,7 @@ import java.util.UUID
 
 /**
  * Backfill Job 엔티티
- * 
+ *
  * 재처리 작업의 전체 라이프사이클을 관리한다.
  *
  * @property id 고유 식별자
@@ -45,7 +45,7 @@ data class BackfillJob(
         require(name.isNotBlank()) { "name must not be blank" }
         require(priority in 1..10) { "priority must be between 1 and 10" }
     }
-    
+
     companion object {
         /**
          * 새 Backfill Job 생성
@@ -72,7 +72,7 @@ data class BackfillJob(
             createdAt = Instant.now()
         )
     }
-    
+
     /**
      * Dry Run 시작
      */
@@ -80,7 +80,7 @@ data class BackfillJob(
         require(status == BackfillStatus.PENDING) { "Can only start dry run from PENDING status" }
         return copy(status = BackfillStatus.DRY_RUN)
     }
-    
+
     /**
      * Dry Run 완료
      */
@@ -92,7 +92,7 @@ data class BackfillJob(
             progress = BackfillProgress.initialized(result.estimatedCount)
         )
     }
-    
+
     /**
      * 실행 시작
      */
@@ -105,7 +105,7 @@ data class BackfillJob(
             progress = BackfillProgress.initialized(totalCount, now)
         )
     }
-    
+
     /**
      * 일시 정지
      */
@@ -113,7 +113,7 @@ data class BackfillJob(
         require(status == BackfillStatus.RUNNING) { "Can only pause RUNNING job" }
         return copy(status = BackfillStatus.PAUSED)
     }
-    
+
     /**
      * 재개
      */
@@ -121,7 +121,7 @@ data class BackfillJob(
         require(status == BackfillStatus.PAUSED) { "Can only resume PAUSED job" }
         return copy(status = BackfillStatus.RUNNING)
     }
-    
+
     /**
      * 성공 완료
      */
@@ -132,7 +132,7 @@ data class BackfillJob(
             completedAt = Instant.now()
         )
     }
-    
+
     /**
      * 실패
      */
@@ -146,7 +146,7 @@ data class BackfillJob(
             failureReason = reason
         )
     }
-    
+
     /**
      * 취소
      */
@@ -157,14 +157,14 @@ data class BackfillJob(
             completedAt = Instant.now()
         )
     }
-    
+
     /**
      * 진행 상황 업데이트
      */
     fun updateProgress(newProgress: BackfillProgress): BackfillJob {
         return copy(progress = newProgress)
     }
-    
+
     /**
      * 재시도 (실패한 작업)
      */
@@ -176,7 +176,7 @@ data class BackfillJob(
             completedAt = null
         )
     }
-    
+
     /**
      * 작업 요약 문자열
      */
@@ -195,25 +195,25 @@ data class BackfillJob(
 data class BackfillConfig(
     /** 배치 크기 */
     val batchSize: Int = 100,
-    
+
     /** 동시 처리 수 */
     val concurrency: Int = 4,
-    
+
     /** 에러 발생 시 계속 진행 여부 */
     val continueOnError: Boolean = true,
-    
+
     /** 최대 재시도 횟수 */
     val maxRetries: Int = 3,
-    
+
     /** 재시도 간격 (ms) */
     val retryDelayMs: Long = 1000,
-    
+
     /** 배치 간 딜레이 (throttling, ms) */
     val batchDelayMs: Long = 0,
-    
+
     /** 드라이런 모드 (실제 처리하지 않음) */
     val dryRun: Boolean = false,
-    
+
     /** 스케줄된 실행 시각 (null이면 즉시) */
     val scheduledAt: Instant? = null
 )
@@ -224,16 +224,16 @@ data class BackfillConfig(
 data class DryRunResult(
     /** 예상 처리 건수 */
     val estimatedCount: Long,
-    
+
     /** 영향받는 엔티티 타입별 카운트 */
     val countByType: Map<String, Long>,
-    
+
     /** 예상 소요 시간 */
     val estimatedDuration: java.time.Duration?,
-    
+
     /** 샘플 엔티티 키 (미리보기용) */
     val sampleEntities: List<String>,
-    
+
     /** 경고 메시지 */
     val warnings: List<String> = emptyList()
 )

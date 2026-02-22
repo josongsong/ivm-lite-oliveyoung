@@ -13,25 +13,23 @@ import java.util.UUID
 /**
  * Admin Routes (관리자 페이지용 API)
  *
- * SOTA 리팩토링:
- * - Service 레이어로 비즈니스 로직 분리
- * - StatusPages로 에러 처리 (try-catch 제거)
- * - OutboxStatus enum 사용 (하드코딩 제거)
+ * RawData/Slice/SinkEvent: DynamoDB 기반. Outbox 제거됨.
+ * /outbox/ 경로는 Admin UI 호환을 위해 유지 (SinkEvent 데이터 반환)
  *
  * GET /dashboard: 전체 대시보드 데이터
- * GET /outbox/stats: Outbox 통계
- * GET /worker/status: Worker 상태
- * GET /db/stats: 데이터베이스 통계
- * GET /outbox/recent: 최근 처리된 작업
- * GET /outbox/failed: 실패한 작업
- * GET /outbox/{id}: 특정 Outbox 엔트리 상세
- * GET /outbox/dlq: Dead Letter Queue
- * POST /outbox/dlq/{id}/replay: DLQ 재처리
- * POST /outbox/stale/release: Stale 엔트리 복구
- * POST /outbox/{id}/retry: 실패 엔트리 재시도
- * POST /outbox/failed/retry-all: 모든 실패 엔트리 재시도
- * GET /outbox/stats/hourly: 시간대별 통계
- * GET /outbox/stale: Stale 엔트리 조회
+ * GET /outbox/stats: SinkEvent 통계
+ * GET /worker/status: Worker 상태 (제거됨, stopped 반환)
+ * GET /db/stats: RawData/SinkEvent 통계 (DynamoDB)
+ * GET /outbox/recent: 최근 SinkEvent
+ * GET /outbox/failed: 실패한 SinkEvent
+ * GET /outbox/{id}: SinkEvent 상세
+ * GET /outbox/dlq: DLQ (미지원)
+ * POST /outbox/dlq/{id}/replay: DLQ 재처리 (미지원)
+ * POST /outbox/stale/release: Stale 복구 (미지원)
+ * POST /outbox/{id}/retry: 재시도 (미지원)
+ * POST /outbox/failed/retry-all: 전체 재시도 (미지원)
+ * GET /outbox/stats/hourly: 시간대별 통계 (미지원)
+ * GET /outbox/stale: Stale 조회 (미지원)
  */
 fun Route.adminRoutes() {
     val dashboardService by inject<AdminDashboardService>()
@@ -56,7 +54,7 @@ fun Route.adminRoutes() {
      * Outbox 통계
      */
     get("/outbox/stats") {
-        when (val result = dashboardService.getOutboxStats()) {
+        when (val result = dashboardService.getSinkEventStats()) {
             is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, result.value.toResponse())
             }
@@ -103,9 +101,9 @@ fun Route.adminRoutes() {
     get("/outbox/recent") {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
 
-        when (val result = dashboardService.getRecentOutbox(limit)) {
+        when (val result = dashboardService.getRecentSinkEvents(limit)) {
             is Result.Ok -> {
-                call.respond(HttpStatusCode.OK, RecentOutboxResponse(
+                call.respond(HttpStatusCode.OK, RecentSinkEventResponse(
                     items = result.value.map { it.toResponse() },
                     count = result.value.size
                 ))
@@ -123,9 +121,9 @@ fun Route.adminRoutes() {
     get("/outbox/failed") {
         val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
 
-        when (val result = dashboardService.getFailedOutbox(limit)) {
+        when (val result = dashboardService.getFailedSinkEvents(limit)) {
             is Result.Ok -> {
-                call.respond(HttpStatusCode.OK, FailedOutboxResponse(
+                call.respond(HttpStatusCode.OK, FailedSinkEventResponse(
                     items = result.value.map { it.toResponse() },
                     count = result.value.size
                 ))
@@ -149,9 +147,9 @@ fun Route.adminRoutes() {
             throw IllegalArgumentException("Invalid UUID format: $idParam")
         }
 
-        when (val result = dashboardService.getOutboxEntry(id)) {
+        when (val result = dashboardService.getSinkEventEntry(id)) {
             is Result.Ok -> {
-                call.respond(HttpStatusCode.OK, result.value.toResponse())
+                call.respond(HttpStatusCode.OK, result.value.toSinkEventResponse())
             }
             is Result.Err -> {
                 throw result.error
@@ -169,7 +167,7 @@ fun Route.adminRoutes() {
         when (val result = dashboardService.getDlq(limit)) {
             is Result.Ok -> {
                 call.respond(HttpStatusCode.OK, DlqResponse(
-                    items = result.value.map { it.toResponse() },
+                    items = result.value.map { it.toSinkEventResponse() },
                     count = result.value.size
                 ))
             }
@@ -243,7 +241,7 @@ fun Route.adminRoutes() {
                 call.respond(HttpStatusCode.OK, RetryResponse(
                     success = true,
                     message = "Entry reset to PENDING for retry",
-                    entry = result.value.toResponse()
+                    entry = result.value.toSinkEventResponse()
                 ))
             }
             is Result.Err -> {
@@ -316,36 +314,34 @@ fun Route.adminRoutes() {
 
 @Serializable
 data class DashboardResponse(
-    val outbox: OutboxStatsResponse,
+    val sinkEvent: SinkEventStatsResponse,
     val worker: WorkerStatusResponse,
     val database: DatabaseStatsResponse,
     val timestamp: String
 )
 
 @Serializable
-data class OutboxStatsResponse(
-    val total: OutboxTotalStatsResponse,
+data class SinkEventStatsResponse(
+    val total: SinkEventTotalStatsResponse,
     val byStatus: Map<String, Long>,
-    val byType: Map<String, Long>,
-    val details: List<OutboxStatDetailResponse>
+    val details: List<SinkEventStatDetailResponse>
 )
 
 @Serializable
-data class OutboxTotalStatsResponse(
+data class SinkEventTotalStatsResponse(
     val pending: Long,
     val processing: Long,
     val failed: Long,
-    val processed: Long
+    val completed: Long
 )
 
 @Serializable
-data class OutboxStatDetailResponse(
+data class SinkEventStatDetailResponse(
     val status: String,
-    val aggregateType: String,
+    val viewType: String,
     val count: Long,
     val oldest: String?,
-    val newest: String?,
-    val avgLatencySeconds: Double?
+    val newest: String?
 )
 
 @Serializable
@@ -360,8 +356,51 @@ data class WorkerStatusResponse(
 @Serializable
 data class DatabaseStatsResponse(
     val rawDataCount: Long,
-    val outboxCount: Long,
+    val sinkEventCount: Long,
+    val contractsCount: Long = 0L,
     val note: String
+)
+
+@Serializable
+data class RecentSinkEventResponse(
+    val items: List<RecentSinkEventItemResponse>,
+    val count: Int
+)
+
+@Serializable
+data class RecentSinkEventItemResponse(
+    val id: String,
+    val entityKey: String,
+    val viewType: String,
+    val status: String,
+    val createdAt: String?,
+    val processedAt: String?
+)
+
+@Serializable
+data class FailedSinkEventResponse(
+    val items: List<FailedSinkEventItemResponse>,
+    val count: Int
+)
+
+@Serializable
+data class FailedSinkEventItemResponse(
+    val id: String,
+    val entityKey: String,
+    val viewType: String,
+    val createdAt: String?
+)
+
+@Serializable
+data class SinkEventEntryResponse(
+    val id: String,
+    val idempotencyKey: String,
+    val entityKey: String,
+    val viewType: String,
+    val status: String,
+    val createdAt: String,
+    val processedAt: String?,
+    val sinkTargets: List<String>
 )
 
 @Serializable
@@ -401,34 +440,15 @@ data class FailedOutboxItemResponse(
 
 @Serializable
 data class DlqResponse(
-    val items: List<OutboxEntryResponse>,
+    val items: List<SinkEventEntryResponse>,
     val count: Int
-)
-
-@Serializable
-data class OutboxEntryResponse(
-    val id: String,
-    val idempotencyKey: String,
-    val aggregateType: String,
-    val aggregateId: String,
-    val eventType: String,
-    val payload: String,
-    val status: String,
-    val createdAt: String,
-    val processedAt: String?,
-    val claimedAt: String?,
-    val claimedBy: String?,
-    val retryCount: Int,
-    val failureReason: String?,
-    val priority: Int? = null,
-    val entityVersion: Long? = null
 )
 
 @Serializable
 data class RetryResponse(
     val success: Boolean,
     val message: String,
-    val entry: OutboxEntryResponse?
+    val entry: SinkEventEntryResponse?
 )
 
 @Serializable
@@ -475,26 +495,24 @@ data class StaleOutboxItemResponse(
 // ==================== Domain → DTO 변환 ====================
 
 private fun DashboardData.toResponse() = DashboardResponse(
-    outbox = outbox.toResponse(),
+    sinkEvent = sinkEvent.toResponse(),
     worker = worker.toResponse(),
     database = database.toResponse(),
     timestamp = timestamp.toString()
 )
 
-private fun OutboxStats.toResponse() = OutboxStatsResponse(
-    total = OutboxTotalStatsResponse(total.pending, total.processing, total.failed, total.processed),
+private fun SinkEventStats.toResponse() = SinkEventStatsResponse(
+    total = SinkEventTotalStatsResponse(total.pending, total.processing, total.failed, total.completed),
     byStatus = byStatus,
-    byType = byType,
     details = details.map { it.toResponse() }
 )
 
-private fun OutboxStatDetail.toResponse() = OutboxStatDetailResponse(
+private fun SinkEventStatDetail.toResponse() = SinkEventStatDetailResponse(
     status = status,
-    aggregateType = aggregateType,
+    viewType = viewType,
     count = count,
     oldest = oldest?.toString(),
-    newest = newest?.toString(),
-    avgLatencySeconds = avgLatencySeconds
+    newest = newest?.toString()
 )
 
 private fun WorkerStatus.toResponse() = WorkerStatusResponse(
@@ -507,47 +525,36 @@ private fun WorkerStatus.toResponse() = WorkerStatusResponse(
 
 private fun DatabaseStats.toResponse() = DatabaseStatsResponse(
     rawDataCount = rawDataCount,
-    outboxCount = outboxCount,
+    sinkEventCount = sinkEventCount,
+    contractsCount = contractsCount,
     note = note
 )
 
-private fun RecentOutboxItem.toResponse() = RecentOutboxItemResponse(
+private fun RecentSinkEventItem.toResponse() = RecentSinkEventItemResponse(
     id = id,
-    aggregateType = aggregateType,
-    aggregateId = aggregateId,
-    eventType = eventType,
+    entityKey = entityKey,
+    viewType = viewType,
     status = status,
     createdAt = createdAt?.toString(),
-    processedAt = processedAt?.toString(),
-    retryCount = retryCount
+    processedAt = processedAt?.toString()
 )
 
-private fun FailedOutboxItem.toResponse() = FailedOutboxItemResponse(
+private fun FailedSinkEventItem.toResponse() = FailedSinkEventItemResponse(
     id = id,
-    aggregateType = aggregateType,
-    aggregateId = aggregateId,
-    eventType = eventType,
-    createdAt = createdAt?.toString(),
-    retryCount = retryCount,
-    failureReason = failureReason
+    entityKey = entityKey,
+    viewType = viewType,
+    createdAt = createdAt?.toString()
 )
 
-private fun OutboxEntryDetail.toResponse() = OutboxEntryResponse(
+private fun SinkEventEntryDetail.toSinkEventResponse() = SinkEventEntryResponse(
     id = id,
     idempotencyKey = idempotencyKey,
-    aggregateType = aggregateType,
-    aggregateId = aggregateId,
-    eventType = eventType,
-    payload = payload,
+    entityKey = entityKey,
+    viewType = viewType,
     status = status,
     createdAt = createdAt.toString(),
     processedAt = processedAt?.toString(),
-    claimedAt = claimedAt?.toString(),
-    claimedBy = claimedBy,
-    retryCount = retryCount,
-    failureReason = failureReason,
-    priority = priority,
-    entityVersion = entityVersion
+    sinkTargets = sinkTargets
 )
 
 private fun HourlyStatsData.toResponse() = HourlyStatsResponse(

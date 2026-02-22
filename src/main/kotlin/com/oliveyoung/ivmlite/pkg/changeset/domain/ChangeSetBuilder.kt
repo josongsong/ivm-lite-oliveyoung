@@ -3,6 +3,7 @@ package com.oliveyoung.ivmlite.pkg.changeset.domain
 import com.fasterxml.jackson.databind.JsonNode
 import com.fasterxml.jackson.databind.ObjectMapper
 import com.oliveyoung.ivmlite.pkg.changeset.ports.ChangeSetBuilderPort
+import com.oliveyoung.ivmlite.shared.domain.determinism.CanonicalJson
 import com.oliveyoung.ivmlite.shared.domain.determinism.Hashing
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
@@ -13,6 +14,7 @@ import com.oliveyoung.ivmlite.shared.domain.types.TenantId
  *
  * 결정성(Determinism): 동일 입력 → 동일 ChangeSet (ID 포함)
  * - changeSetId는 입력값의 hash로 결정적 생성
+ * - valueHash, payloadHash: RFC8785 canonical JSON 기반 (changeset.v1 계약 정합성)
  * - UUID.randomUUID() 사용 금지
  */
 class ChangeSetBuilder(
@@ -48,7 +50,10 @@ class ChangeSetBuilder(
             emptyList()
         }
 
-        val payloadHash = Hashing.sha256Hex(toPayload ?: "")
+        // RFC8785 canonical JSON 기반 해시 (계약-구현 정합성)
+        val payloadHash = Hashing.sha256Hex(
+            toPayload?.let { CanonicalJson.canonicalize(it) } ?: ""
+        )
 
         return ChangeSet(
             changeSetId = id,
@@ -76,12 +81,13 @@ class ChangeSetBuilder(
     private fun walkDiff(path: String, a: JsonNode?, b: JsonNode?, out: MutableList<ChangedPath>) {
         if (a == null && b == null) return
         if (a == null || b == null) {
-            val h = Hashing.sha256Hex(b?.toString() ?: "null")
+            val canonical = b?.let { CanonicalJson.canonicalize(it) } ?: "null"
+            val h = Hashing.sha256Hex(canonical)
             out += ChangedPath(path.ifEmpty { "/" }, "sha256:$h")
             return
         }
         if (a.nodeType != b.nodeType) {
-            val h = Hashing.sha256Hex(b.toString())
+            val h = Hashing.sha256Hex(CanonicalJson.canonicalize(b))
             out += ChangedPath(path.ifEmpty { "/" }, "sha256:$h")
             return
         }
@@ -101,8 +107,10 @@ class ChangeSetBuilder(
                 }
             }
             else -> {
-                if (a.asText() != b.asText() || a.toString() != b.toString()) {
-                    val h = Hashing.sha256Hex(b.toString())
+                val aCanon = CanonicalJson.canonicalize(a)
+                val bCanon = CanonicalJson.canonicalize(b)
+                if (aCanon != bCanon) {
+                    val h = Hashing.sha256Hex(bCanon)
                     out += ChangedPath(path.ifEmpty { "/" }, "sha256:$h")
                 }
             }

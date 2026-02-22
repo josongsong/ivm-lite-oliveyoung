@@ -33,7 +33,7 @@ fun Route.alertRoutes() {
     val alertEngine by inject<AlertEngine>()
     val alertRepository by inject<AlertRepositoryPort>()
     val ruleLoader by inject<AlertRuleLoaderPort>()
-    
+
     /**
      * GET /alerts
      * 알림 목록 조회
@@ -45,13 +45,13 @@ fun Route.alertRoutes() {
             val severity = call.request.queryParameters["severity"]
                 ?.let { AlertSeverity.valueOf(it.uppercase()) }
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 50
-            
+
             val filter = AlertFilter(
                 statuses = status?.let { setOf(it) },
                 severities = severity?.let { setOf(it) },
                 limit = limit
             )
-            
+
             when (val result = alertRepository.findByFilter(filter)) {
                 is Result.Ok -> {
                     val response = AlertListResponse(
@@ -75,7 +75,7 @@ fun Route.alertRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /alerts/active
      * 활성 알림 조회
@@ -95,7 +95,7 @@ fun Route.alertRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /alerts/{id}
      * 알림 상세 조회
@@ -106,7 +106,7 @@ fun Route.alertRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid alert ID"))
                 return@get
             }
-            
+
             when (val result = alertRepository.findById(id)) {
                 is Result.Ok -> {
                     val alert = result.value
@@ -130,7 +130,7 @@ fun Route.alertRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /alerts/{id}/acknowledge
      * 알림 확인 처리
@@ -141,10 +141,10 @@ fun Route.alertRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid alert ID"))
                 return@post
             }
-            
+
             val request = call.receive<AcknowledgeRequest>()
             val acknowledged = alertEngine.acknowledge(id, request.by)
-            
+
             if (acknowledged != null) {
                 call.respond(HttpStatusCode.OK, mapOf(
                     "success" to true,
@@ -161,7 +161,7 @@ fun Route.alertRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /alerts/{id}/silence
      * 알림 무음 처리
@@ -172,10 +172,10 @@ fun Route.alertRoutes() {
                 call.respond(HttpStatusCode.BadRequest, ApiError(code = "INVALID_ID", message = "Invalid alert ID"))
                 return@post
             }
-            
+
             val durationMinutes = call.request.queryParameters["duration"]?.toLongOrNull() ?: 60
             val silenced = alertEngine.silence(id, Duration.ofMinutes(durationMinutes))
-            
+
             if (silenced != null) {
                 call.respond(HttpStatusCode.OK, mapOf(
                     "success" to true,
@@ -193,7 +193,7 @@ fun Route.alertRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /alerts/rules
      * 알림 규칙 목록
@@ -223,7 +223,7 @@ fun Route.alertRoutes() {
             )
         }
     }
-    
+
     /**
      * GET /alerts/stats
      * 알림 통계
@@ -249,7 +249,7 @@ fun Route.alertRoutes() {
             )
         }
     }
-    
+
     /**
      * POST /alerts/evaluate
      * 수동 평가 트리거 (테스트/디버깅용)

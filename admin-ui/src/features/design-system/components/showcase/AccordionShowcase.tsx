@@ -2,7 +2,7 @@
  * Accordion Showcase
  */
 import { useState } from 'react'
-import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '@/shared/ui'
+import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/shared/ui'
 import { PageHeader } from '../layout'
 import { LivePreview } from './LivePreview'
 

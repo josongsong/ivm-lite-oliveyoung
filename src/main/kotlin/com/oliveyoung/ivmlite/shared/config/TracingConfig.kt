@@ -2,7 +2,6 @@ package com.oliveyoung.ivmlite.shared.config
 
 import io.opentelemetry.api.GlobalOpenTelemetry
 import io.opentelemetry.api.OpenTelemetry
-import io.opentelemetry.api.common.Attributes
 import io.opentelemetry.exporter.otlp.trace.OtlpGrpcSpanExporter
 import io.opentelemetry.sdk.OpenTelemetrySdk
 import io.opentelemetry.sdk.resources.Resource
@@ -18,7 +17,7 @@ import java.util.concurrent.atomic.AtomicBoolean
  */
 object TracingConfig {
     private val initialized = AtomicBoolean(false)
-    
+
     fun init(config: ObservabilityConfig): OpenTelemetry {
         if (!config.tracingEnabled) {
             return OpenTelemetry.noop()
@@ -57,7 +56,7 @@ object TracingConfig {
             GlobalOpenTelemetry.get()
         }
     }
-    
+
     /**
      * 테스트용: 초기화 상태 리셋
      */

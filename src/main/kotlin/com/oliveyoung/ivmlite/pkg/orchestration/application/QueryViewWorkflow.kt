@@ -2,7 +2,6 @@ package com.oliveyoung.ivmlite.pkg.orchestration.application
 
 import com.oliveyoung.ivmlite.pkg.contracts.domain.ContractRef
 import com.oliveyoung.ivmlite.pkg.contracts.domain.MissingPolicy
-import com.oliveyoung.ivmlite.pkg.contracts.domain.ViewDefinitionContract
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
 import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
@@ -226,7 +225,7 @@ class QueryViewWorkflow(
 
     /**
      * Range Query: 키 프리픽스로 여러 엔티티 조회
-     * 
+     *
      * @param tenantId 테넌트 ID
      * @param keyPrefix 엔티티 키 프리픽스
      * @param sliceType 특정 Slice 타입 (null이면 전체)
@@ -254,7 +253,7 @@ class QueryViewWorkflow(
                 is Result.Ok -> r.value
                 is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
-            
+
             val items = queryResult.items.map { slice ->
                 RangeItem(
                     entityKey = slice.entityKey.value,
@@ -264,7 +263,7 @@ class QueryViewWorkflow(
                     hash = slice.hash
                 )
             }
-            
+
             Result.Ok(RangeResult(
                 items = items,
                 totalCount = items.size.toLong(),
@@ -317,16 +316,16 @@ class QueryViewWorkflow(
                 is Result.Ok -> r.value
                 is Result.Err -> return@withSpanSuspend Result.Err(r.error)
             }
-            
+
             if (slices.isEmpty()) {
                 return@withSpanSuspend Result.Err(DomainError.NotFoundError("Slice", entityKey.value))
             }
-            
+
             val version = slices.first().version
             val sliceTypes = slices.map { it.sliceType }.sortedBy { it.name }
             val gotTypes = sliceTypes.toSet()
             val viewData = buildViewData("latest", entityKey, version, slices, sliceTypes, gotTypes)
-            
+
             Result.Ok(ViewResponse(data = viewData, meta = null))
         }
     }
