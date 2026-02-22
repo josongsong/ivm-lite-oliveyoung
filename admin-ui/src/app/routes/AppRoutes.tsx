@@ -14,7 +14,6 @@ import { Backfill } from '@/features/backfill'
 import { TracesPage } from '@/features/traces'
 import { DataExplorer } from '@/features/explorer'
 import { PlaygroundPage } from '@/features/playground'
-import { WebhooksPage } from '@/features/webhooks'
 import {
   ComponentCategoryPage,
   ComponentDetail,
@@ -72,7 +71,6 @@ export function AppRoutes() {
           <Route path="/explorer" element={<DataExplorer />} />
           <Route path="/explorer/:entityId" element={<DataExplorer />} />
           <Route path="/playground" element={<PlaygroundPage />} />
-          <Route path="/webhooks" element={<WebhooksPage />} />
         </Routes>
       </AnimatePresence>
     </Layout>

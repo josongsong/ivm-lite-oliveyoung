@@ -15,7 +15,6 @@ import {
   RotateCcw,
   Search,
   Settings,
-  Zap
 } from 'lucide-react'
 import { APP_INFO } from '@/shared/config'
 import { EnvironmentSelector, ThemeCycleButton } from '@/shared/ui'
@@ -42,7 +41,6 @@ const opsNavItems = [
   { path: '/observability', label: 'Observability', icon: Activity },
   { path: '/traces', label: 'Traces', icon: Search },
   { path: '/alerts', label: 'Alerts', icon: Bell },
-  { path: '/webhooks', label: 'Webhooks', icon: Zap },
   { path: '/backfill', label: 'Backfill', icon: RotateCcw },
 ]
 

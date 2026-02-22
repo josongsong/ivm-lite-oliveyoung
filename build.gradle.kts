@@ -464,6 +464,21 @@ tasks.register<Test>("unitTest") {
     maxParallelForks = Runtime.getRuntime().availableProcessors()
 }
 
+// Product E2E 테스트 (product-schema-dx-proposal Phase 1.5)
+tasks.register<Test>("productE2E") {
+    useJUnitPlatform()
+    configureTestLogging()
+
+    filter {
+        includeTestsMatching("*ProductE2ETest*")
+    }
+
+    systemProperty("sample", System.getProperty("sample") ?: ".tmp/product/UA11279226.json")
+
+    description = "🛒 Product E2E: parse→validate→ingest→view compose→sink dry-run"
+    group = "verification"
+}
+
 // 특정 패키지 테스트
 tasks.register<Test>("testPackage") {
     useJUnitPlatform()

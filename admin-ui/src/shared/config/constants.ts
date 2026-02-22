@@ -65,7 +65,6 @@ export const NAV_ITEMS = [
   { path: '/explorer', label: 'Explorer', icon: 'Database' },
   { path: '/pipeline', label: 'Pipeline', icon: 'Workflow' },
   { path: '/outbox', label: 'Outbox', icon: 'Inbox' },
-  { path: '/webhooks', label: 'Webhooks', icon: 'Webhook' },
   { path: '/playground', label: 'Playground', icon: 'FlaskConical' },
 ] as const
 

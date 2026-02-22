@@ -127,7 +127,6 @@ src/main/kotlin/com/oliveyoung/ivmlite/
 │   ├── changeset/                 # ChangeSet 빌더 도메인
 │   ├── alerts/                    # 알림 엔진
 │   ├── backfill/                  # 백필 작업
-│   └── webhooks/                  # Webhook 관리
 │
 ├── apps/                          # 애플리케이션 레이어
 │   ├── runtimeapi/                # Runtime API (포트 8080)
@@ -266,15 +265,11 @@ val view = Ivm.query(Views.Product.Pdp)
    - Contract 시뮬레이션
    - 데이터 변환 테스트
 
-8. **Webhooks** (`/webhooks`)
-   - Webhook 등록 및 관리
-   - 전송 이력 조회
-
-9. **Alerts** (`/alerts`)
+8. **Alerts** (`/alerts`)
    - 알림 규칙 관리
    - 알림 이력 조회
 
-10. **Backfill** (`/backfill`)
+9. **Backfill** (`/backfill`)
     - 재처리 작업 관리
     - 백필 작업 실행 및 모니터링
 
@@ -386,11 +381,13 @@ docker-compose up -d
 ```
 src/main/resources/db/migration/
 ├── V001__init_extensions.sql    # uuid-ossp
-├── V002__raw_data_table.sql     # RawData 테이블
-├── V003__slices_table.sql       # Slices 테이블
-├── V004__inverted_index_table.sql
-├── V005__outbox_table.sql       # Transactional Outbox
-└── V006__debezium_heartbeat.sql
+├── V006__debezium_heartbeat.sql # (V031에서 DROP)
+├── V011__webhooks_table.sql     # (V028에서 DROP)
+├── V022__views_table.sql        # (V029에서 DROP)
+├── V025__changesets_table.sql   # (V030에서 DROP)
+├── V026__alerts_table.sql
+├── V027__backfill_jobs_table.sql
+└── V028-V031__drop_*.sql        # 불필요 테이블 제거
 ```
 
 ### jOOQ 사용 예시 (PostgreSQL 어댑터)

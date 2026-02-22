@@ -47,7 +47,6 @@ import {
   GitBranch,
   Play,
   Network,
-  Webhook,
   Workflow,
 } from 'lucide-react'
 import { useMemo, useState } from 'react'
@@ -120,7 +119,6 @@ const features: NavItem[] = [
   { path: '/design-system/features/pipeline', label: 'Pipeline', icon: GitBranch, keywords: ['pipeline', 'flow', '파이프라인'] },
   { path: '/design-system/features/playground', label: 'Playground', icon: Play, keywords: ['playground', 'test', '플레이그라운드'] },
   { path: '/design-system/features/traces', label: 'Traces', icon: Network, keywords: ['trace', 'tracing', '트레이스'] },
-  { path: '/design-system/features/webhooks', label: 'Webhooks', icon: Webhook, keywords: ['webhook', '웹훅'] },
   { path: '/design-system/features/workflow', label: 'Workflow', icon: Workflow, keywords: ['workflow', 'canvas', '워크플로우'] },
 ]
 

@@ -906,25 +906,25 @@ const [isOpen, setIsOpen] = useState(false)
         ),
       },
       {
-        title: '웹훅 폼 모달',
+        title: '설정 폼 모달',
         description: '여러 필드와 체크박스가 있는 복잡한 폼 모달',
         code: `import { Modal, Form, FormGroup, FormInput, Select, Button } from '@/shared/ui'
 
 <Modal
   isOpen={isOpen}
   onClose={() => setIsOpen(false)}
-  title={webhook ? '웹훅 수정' : '웹훅 추가'}
+  title={item ? '설정 수정' : '설정 추가'}
   size="lg"
   footer={
     <>
       <Button variant="ghost" onClick={() => setIsOpen(false)}>취소</Button>
-      <Button variant="primary" type="submit" form="webhook-form">
-        {webhook ? '수정' : '생성'}
+      <Button variant="primary" type="submit" form="settings-form">
+        {item ? '수정' : '생성'}
       </Button>
     </>
   }
 >
-  <Form id="webhook-form" onSubmit={handleSubmit}>
+  <Form id="settings-form" onSubmit={handleSubmit}>
     <FormGroup label="이름" htmlFor="name">
       <FormInput id="name" name="name" required />
     </FormGroup>
@@ -941,15 +941,15 @@ const [isOpen, setIsOpen] = useState(false)
         preview: (
           <Card style={{ padding: '1rem' }}>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>웹훅 추가</h3>
+              <h3 style={{ margin: 0, fontSize: '1.25rem' }}>설정 추가</h3>
               <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <Label>이름</Label>
-                  <Input placeholder="Webhook Name" />
+                  <Input placeholder="Name" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <Label>URL</Label>
-                  <Input type="url" placeholder="https://example.com/webhook" />
+                  <Input type="url" placeholder="https://example.com/endpoint" />
                 </div>
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
                   <Label>이벤트</Label>

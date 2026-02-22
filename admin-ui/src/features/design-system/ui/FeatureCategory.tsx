@@ -21,7 +21,6 @@ import {
   Package,
   Play,
   ScrollText,
-  Webhook,
   Workflow,
 } from 'lucide-react'
 import './FeatureCategory.css'
@@ -163,14 +162,6 @@ const FEATURES: Record<string, FeatureInfo> = {
       { name: 'TraceList', description: '트레이스 목록', path: 'traces/components/TraceList' },
       { name: 'WaterfallTimeline', description: '워터폴 타임라인', path: 'traces/components/WaterfallTimeline' },
       { name: 'SpanDetails', description: 'Span 상세', path: 'traces/components/SpanDetails' },
-    ],
-  },
-  webhooks: {
-    title: 'Webhooks',
-    description: '웹훅 관리에서 사용되는 컴포넌트들입니다.',
-    icon: <Webhook size={32} />,
-    components: [
-      { name: 'WebhooksPage', description: '웹훅 페이지', path: 'webhooks/ui/WebhooksPage' },
     ],
   },
   workflow: {
