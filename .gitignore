@@ -119,7 +119,7 @@ secrets/
 *.tfstate.backup
 *.tfvars
 .terraform/
-.terraform.lock.hcl
+# .terraform.lock.hcl 제외 → 버전 재현성 위해 커밋
 
 # Local configuration
 application-local.yml
