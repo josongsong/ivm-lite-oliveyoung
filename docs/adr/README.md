@@ -1,4 +1,4 @@
-# Architecture Decision Records (ADR)
+# ADR — Architecture Decision Records
 
 이 디렉토리는 ivm-lite 프로젝트의 주요 아키텍처 결정사항을 기록합니다.
 
@@ -38,19 +38,26 @@ ADR은 중요한 아키텍처 결정사항을 문서화하여:
 | [ADR-0011](./0011-contract-versioning-strategy.md) | Contract 버전 관리 전략 | Accepted | 2026-01-27 | RFC-012 |
 | [ADR-0012](./0012-projection-mathematical-correctness.md) | Projection 기능 수학적 정합성 검증 | Accepted | 2026-01-29 | - |
 | [ADR-0013](./0013-projection-end-to-end-verification.md) | Projection End-to-End 검증 | Accepted | 2026-01-29 | - |
-| [ADR-0014](./0014-doc001-flat-catalog-onboarding.md) | DOC-001 상품 마스터(Flat Catalog) 온보딩 | Accepted | 2026-01-26 | RFC-IR-031 |
+| [ADR-0014](./0014-doc001-flat-catalog-onboarding.md) | DOC-001 상품 마스터 — Flat Catalog 온보딩 | Accepted | 2026-01-26 | RFC-IR-031 |
+| [ADR-0015](./0015-sink-plugin-architecture.md) | Sink Plugin Architecture & IaC | Accepted | 2026-02-12 | RFC-017 |
+| [ADR-0016](./0016-slice-execution-order-enforcement.md) | Slice 실행 순서/의존성 런타임 강제 | Accepted | 2026-02 | RFC-018 |
+| [ADR-0017](./0017-sdk-driven-architecture.md) | SDK-Driven Architecture — Outbox 제거 | Proposed | 2026-02-12 | RFC-018 |
+| [ADR-0018](./0018-external-sdk-integration.md) | External SDK Integration | Proposed | 2026-02-12 | RFC-019 |
+| [ADR-0019](./0019-sink-reliability-and-consistency.md) | Sink Reliability & Data Consistency | Proposed | 2026-02-16 | RFC-020 |
+| [ADR-0020](./0020-sota-dsl-dx.md) | SOTA DSL DX — Developer Experience | Proposed | 2026-02 | RFC-021 |
+| [ADR-0021](./0021-contract-registry-dynamodb-unification.md) | Contract Registry DynamoDB 통합 | Accepted | 2026-02 | RFC-022 |
+| [ADR-0022](./0022-product-schema-dx.md) | Product Schema DX | Accepted | 2026-02 | product-schema-dx |
 
 ## RFC와의 관계
 
 이 ADR들은 원본 RFC 문서들을 기반으로 작성되었습니다:
 
-- RFC-V4-001 ~ RFC-V4-010: 핵심 아키텍처 결정사항
-- RFC-011: DOC-001 상품 마스터 온보딩 (구현 가이드)
-- RFC-012: Contract 버전 관리 전략
-
-각 ADR은 해당 RFC의 핵심 결정사항을 요약하고, 아키텍처 관점에서의 의미를 명확히 합니다.
+- **RFC-V4-001 ~ RFC-V4-010**: 핵심 아키텍처 결정사항 (rfc_archive)
+- **RFC-017 ~ RFC-022**: Sink, SDK, Contract 등 (rfc_archive/2026-02)
+- 각 ADR은 해당 RFC의 핵심 결정사항을 요약
 
 ## 참고
 
-- [RFC 문서](../rfc_archive/) - 원본 RFC 문서들 (아카이브)
-- [Architecture Onboarding](../architecture-onboarding.md) - 아키텍처 개요
+- [RFC 아카이브](../rfc_archive/) - 원본 RFC 문서들
+- [RFC 2026-02](../rfc_archive/2026-02/) - 최근 RFC (017~022, product-schema-dx)
+- [Architecture Onboarding](../guides/architecture-onboarding.md) - 아키텍처 개요

@@ -6,6 +6,7 @@ import com.amazonaws.services.lambda.runtime.events.SQSEvent
 import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse
 import com.oliveyoung.ivmlite.apps.lambda.wiring.lambdaTracingModule
 import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.sinkPluginModule
+import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.sinkPluginRegistryModule
 import com.oliveyoung.ivmlite.shared.adapters.withSpan
 import io.opentelemetry.api.trace.Tracer
 import kotlinx.coroutines.runBlocking
@@ -40,6 +41,7 @@ class SinkBatchHandler : RequestHandler<SQSEvent, SQSBatchResponse> {
                 modules(
                     lambdaInfraModule,
                     lambdaTracingModule,
+                    sinkPluginRegistryModule,
                     sinkPluginModule,
                 )
             }

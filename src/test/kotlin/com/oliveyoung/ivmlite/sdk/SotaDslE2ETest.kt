@@ -61,7 +61,8 @@ class SotaDslE2ETest : StringSpec(init@{
         workflow = workflow,
         sinkEventRepo = sinkEventRepo,
         transactionPort = NoOpTransactionAdapter(),
-        sinkRuleRegistry = sinkRuleRegistry
+        sinkRuleRegistry = sinkRuleRegistry,
+        sinkPreflight = com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight,
     )
 
     val queryWorkflow = QueryViewWorkflow(

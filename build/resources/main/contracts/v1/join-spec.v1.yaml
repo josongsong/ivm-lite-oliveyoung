@@ -1,4 +1,4 @@
-kind: JoinSpecContract
+kind: JOIN_SPEC
 id: join-spec.v1
 version: 1.0.0
 status: ACTIVE

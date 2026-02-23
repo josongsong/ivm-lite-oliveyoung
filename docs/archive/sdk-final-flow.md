@@ -1,4 +1,4 @@
-# 최종 SDK 흐름 (Final SDK Flow)
+# 최종 SDK 흐름 — Final SDK Flow
 
 > **버전**: RFC-IMPL-013 완료  
 > **최종 업데이트**: 2026-01-27  
@@ -606,7 +606,7 @@ ivm.product(product).compileOnly()
 - [SDK 가이드](./sdk-guide.md) - SDK 사용법
 - [Sink Data Flow](./sink-data-flow.md) - Sink 전달 상세
 - [Slice → Sink Outbox Flow](./slice-to-sink-outbox-flow.md) - Outbox 흐름
-- [RFC-IMPL-013](./rfc/rfcimpl013-ship-mandatory.md) - SinkRule 기반 자동 Ship
+- [RFC-IMPL-013](../rfc_archive/rfcimpl013-ship-mandatory.md) - SinkRule 기반 자동 Ship
 
 ---
 

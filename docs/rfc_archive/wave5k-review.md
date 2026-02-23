@@ -1,4 +1,4 @@
-# Wave 5-K Status API - 비판적 검증 및 개선 결과
+# Wave 5-K Status API — 비판적 검증 및 개선 결과
 
 ## 🔍 비판적 검증 결과
 

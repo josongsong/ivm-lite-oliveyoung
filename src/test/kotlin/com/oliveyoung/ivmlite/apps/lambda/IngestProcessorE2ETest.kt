@@ -63,6 +63,7 @@ class IngestProcessorE2ETest : StringSpec({
         sinkEventRepo = sinkEventRepo,
         transactionPort = NoOpTransactionAdapter(),
         sinkRuleRegistry = sinkRuleRegistry,
+        sinkPreflight = com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight,
     )
 
     val contractResolver = EntityContractResolver(contractRegistry)

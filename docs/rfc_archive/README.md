@@ -1,4 +1,4 @@
-# RFC 문서
+# RFC — 문서
 
 이 디렉토리는 ivm-lite 프로젝트의 Request for Comments (RFC) 문서들을 포함합니다.
 

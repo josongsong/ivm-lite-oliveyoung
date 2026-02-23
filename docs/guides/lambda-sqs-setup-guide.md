@@ -1,4 +1,4 @@
-# Lambda & SQS 환경 설정 가이드
+# Lambda & SQS — 환경 설정 가이드
 
 > 다른 환경(dev/staging/prod)에 Lambda와 SQS를 세팅할 때 필요한 정보를 한 곳에 모았습니다.
 
@@ -7,6 +7,7 @@
 ## 목차
 
 1. [아키텍처 개요](#1-아키텍처-개요)
+   - [1-2. Runtime API Ingest 옵션 (Lambda 우회)](#1-2-runtime-api-ingest-옵션-lambda-우회)
 2. [Lambda 종류별 설정](#2-lambda-종류별-설정)
 3. [SQS 설정](#3-sqs-설정)
 4. [환경 변수 전체 목록](#4-환경-변수-전체-목록)
@@ -14,6 +15,7 @@
 6. [인프라 (Terraform)](#6-인프라-terraform)
 7. [빌드 & 배포](#7-빌드--배포)
 8. [체크리스트](#8-체크리스트)
+9. [환경별 설정 (로컬 vs Dev)](#9-환경별-설정-로컬-vs-dev)
 
 ---
 
@@ -47,6 +49,34 @@ IngestionWorkflow → SinkEvent → SQS (ivm-sink-events)
 - **Lambda Handler**: `com.oliveyoung.ivmlite.apps.lambda.SinkBatchHandler`
 - **특징**: 500건 또는 60초 모아서 벌크 처리, DynamoDB 미사용
 - **활성화**: Runtime API에 `SQS_SINK_QUEUE_URL` 환경변수 설정 시 SqsSinkEventRepository 사용
+
+### 1-2. Runtime API Ingest 옵션 (Lambda 우회)
+
+Runtime API `POST /api/v1/ingest`를 **직접 호출**할 때만 사용 가능. Lambda(API Gateway) 경로에는 해당 없음.
+
+| 옵션 | 동작 | 용도 |
+|------|------|------|
+| **기본** (둘 다 false) | SinkEvent → DynamoDB/SQS → Lambda → SinkPlugin | 프로덕션 기본 경로 |
+| **skipSink=true** | RawData → Slicing → View까지만 (SinkEvent 미발행) | 테스트, View 검증, Sink 불필요 시 |
+| **inProcessSink=true** | RawData → Slicing → View → **같은 세션에서 SinkPlugin 직접 호출** (Lambda/DynamoDB 미사용) | 로컬 개발, 동기 처리 필요 시, Lambda 인프라 없이 E2E 검증 |
+
+**inProcessSink 요구사항**:
+- Runtime API에 `OPENSEARCH_ENDPOINT` 등 Sink 플러그인 환경변수 설정 필요
+- `pluginRegistry`가 null이면 `ValidationError` 반환
+
+**요청 예시**:
+```json
+{
+  "tenantId": "oliveyoung",
+  "entityKey": "product:UA11279226",
+  "version": 1,
+  "schemaId": "ruleset.product.oliveyoung.v1",
+  "schemaVersion": "1.0.0",
+  "payload": { "name": "...", "price": 29000 },
+  "skipSink": false,
+  "inProcessSink": true
+}
+```
 
 ---
 
@@ -111,7 +141,7 @@ IngestionWorkflow → SinkEvent → SQS (ivm-sink-events)
 ```bash
 aws sqs create-queue \
   --queue-name ivm-sink-events-{환경명} \
-  --attributes '{
+  --attributes '{ev 
     "VisibilityTimeout": "300",
     "MessageRetentionPeriod": "1209600",
     "ReceiveMessageWaitTimeSeconds": "20"
@@ -399,9 +429,33 @@ cd infra/terraform/preview
 terraform apply
 ```
 
+### 7-3-1. QA Dev 배포 (S3 → Lambda)
+
+JAR가 50MB 초과 시 직접 업로드 불가. S3 경유 필요.
+
+```bash
+# 1. 빌드
+./gradlew shadowJar
+
+# 2. S3 업로드
+aws s3 cp build/libs/ivm-ingest-lambda-1.0.0.jar \
+  s3://qa-ivm-lite-lambda-deployments/ivm-ingest-lambda-1.0.0.jar \
+  --region ap-northeast-2 --profile qa-dev
+
+# 3. Lambda 업데이트 (qa-ivm-s3-sync = SinkStreamHandler)
+aws lambda update-function-code \
+  --function-name qa-ivm-s3-sync \
+  --s3-bucket qa-ivm-lite-lambda-deployments \
+  --s3-key ivm-ingest-lambda-1.0.0.jar \
+  --region ap-northeast-2 --profile qa-dev
+```
+
+- **사전 조건**: `aws sso login --profile qa-dev`
+- **함수**: `qa-ivm-s3-sync` (SinkStreamHandler, DynamoDB Streams 트리거)
+
 ---
 
-## 8. E2E 테스트 (LocalStack)
+### 7-4. E2E 테스트 (LocalStack, 선택)
 
 SQS + SinkBatchProcessor 플로우를 LocalStack으로 검증:
 
@@ -419,7 +473,7 @@ SQS + SinkBatchProcessor 플로우를 LocalStack으로 검증:
 
 ---
 
-## 9. 체크리스트
+## 8. 체크리스트
 
 ### Lambda (SinkStreamHandler)
 
@@ -451,6 +505,112 @@ SQS + SinkBatchProcessor 플로우를 LocalStack으로 검증:
 - [ ] 인덱스/alias 생성 (ivm-products-{tenantId}__write)
 - [ ] Index template 적용 (index-template-static.v1.json)
 - [ ] Lambda VPC/보안그룹에서 OpenSearch 접근 가능
+
+---
+
+## 9. 환경별 설정 (로컬 vs Dev)
+
+### 9-1. 로컬 (현재 구성)
+
+| 항목 | 값 |
+|------|-----|
+| DynamoDB | DYNAMODB_ENDPOINT (LocalStack/로컬) 또는 AWS |
+| OpenSearch | localhost:9200 또는 AWS |
+| S3 | localhost 또는 AWS |
+| PostgreSQL | .env / application.yaml |
+
+### 9-2. Dev (QA) 환경 - 확정된 정보
+
+| 항목 | 값 |
+|------|-----|
+| **AWS 계정 ID** | `443370690162` |
+| **AWS Region** | `ap-northeast-2` |
+| **Lambda JAR 버킷** | `qa-ivm-lite-lambda-deployments` |
+| **Sink 데이터 버킷** | `qa-oyg-ivm-lite-sink-data` |
+| **DynamoDB sink-events** | `ivm-sink-events-qa` (Streams 활성화됨) |
+| **DynamoDB sink-ledger** | `ivm-sink-ledger-qa` |
+| **DynamoDB sink-failures** | `ivm-sink-failures-qa` |
+| **OpenSearch Endpoint** | `https://dev-search-common.oliveyoung.com` |
+| **OpenSearch User** | `ivm-service-app` |
+| **OpenSearch Password** | (Secret Manager 등에서 로드) |
+
+**AWS CLI 접근 (IAM Identity Center SSO):**
+
+```bash
+# ~/.aws/config 에 qa-dev 프로파일 추가 후
+aws sso login --profile qa-dev
+aws sts get-caller-identity --profile qa-dev
+aws s3 ls s3://qa-ivm-lite-lambda-deployments/ --profile qa-dev
+```
+
+SSO 설정 예시 (`~/.aws/config`):
+
+```
+[profile qa-dev]
+sso_start_url = https://d-9b6776e9d8.awsapps.com/start/
+sso_region = ap-northeast-2
+sso_account_id = 443370690162
+sso_role_name = OYG_GlobalDeveloper
+region = ap-northeast-2
+```
+
+### 9-3. Dev 환경 부족/확인 필요 정보
+
+| 항목 | 용도 | 상태 |
+|------|------|------|
+| **ivm-lite-schema-registry** | Contract 저장 | QA 계정에 없음 (생성 필요) |
+| **ivm-lite-data** | RawData, Slice | QA 계정에 없음 (생성 필요) |
+| **PostgreSQL** | Slice/View 저장 | Dev DB URL, user, password |
+| **OpenSearch 인덱스** | Static write alias | `ivm-products-{tenantId}__write` 생성 여부 |
+| **Lambda (SinkStreamHandler)** | DynamoDB Streams → OpenSearch | ✅ qa-ivm-s3-sync (배포됨) |
+| **Lambda (SinkBatchHandler)** | SQS → OpenSearch | QA에 미배포 |
+| **Lambda VPC** | dev-search-common 접근 | Lambda가 VPC 내/외부? OpenSearch 접근 가능? |
+| **SQS** | (SQS 경로 사용 시) | QA에 ivm-sink-events 큐 없음 |
+
+### 9-4. Dev 체크리스트
+
+- [x] DynamoDB sink-events, sink-ledger, sink-failures (ivm-sink-*-qa) 존재
+- [x] sink-events에 Streams 활성화됨
+- [x] S3 버킷: qa-ivm-lite-lambda-deployments, qa-oyg-ivm-lite-sink-data
+- [ ] DynamoDB schema-registry, data 테이블 생성 (ivm-lite-schema-registry-qa, ivm-lite-data-qa)
+- [ ] OpenSearch 인덱스/alias 생성 (ivm-products-oliveyoung__write)
+- [ ] Index template 적용 (index-template-static.v1.json)
+- [x] Lambda SinkStreamHandler 배포 (qa-ivm-s3-sync, DynamoDB Streams 트리거 연결됨)
+- [ ] Lambda SinkBatchHandler 배포 (SQS 경로 사용 시)
+- [ ] Lambda → dev-search-common 네트워크 접근 가능 여부
+- [ ] Contract 시드 (아래 9-5 참조)
+
+### 9-5. Contract 마이그레이션 (Lambda 배포 전 필수)
+
+Lambda/Ingest 파이프라인은 Contract(schema-registry)에 의존합니다. Dev 배포 전 Contract 마이그레이션을 수행하세요.
+
+**방법 1: Dev 전용 스크립트 (테이블 생성 + 시드)**
+
+```bash
+# 사전: aws sso login --profile qa-dev
+./scripts/migrate-contracts-dev.sh
+# Dry run: ./scripts/migrate-contracts-dev.sh --dry-run
+```
+
+**방법 2: 수동 (테이블 이미 있는 경우)**
+
+```bash
+./scripts/seed-contracts.sh --table ivm-lite-schema-registry-qa --profile qa-dev
+```
+
+**방법 3: 환경변수**
+
+```bash
+AWS_PROFILE=qa-dev DYNAMODB_TABLE=ivm-lite-schema-registry-qa ./scripts/seed-contracts.sh
+```
+
+**OpsCli 직접 호출:**
+
+```bash
+./gradlew run --args="seed-contracts-to-dynamo --table ivm-lite-schema-registry-qa --profile qa-dev --dir src/main/resources/contracts/v1"
+```
+
+**시드 대상**: `src/main/resources/contracts/v1/*.yaml` (ENTITY_SCHEMA, RULESET, VIEW_DEFINITION, SINKRULE 등)
 
 ---
 

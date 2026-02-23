@@ -1,4 +1,4 @@
-# OpenTelemetry 트레이싱 설정 가이드
+# OpenTelemetry — 트레이싱 설정 가이드
 
 > **목적**: OpenTelemetry 트레이싱 데이터를 어디로 보내고 어떻게 확인하는지 정리
 
@@ -223,4 +223,4 @@ curl http://localhost:8080/api/v1/products
 - [OpenTelemetry 공식 문서](https://opentelemetry.io/docs/)
 - [Jaeger 문서](https://www.jaegertracing.io/docs/)
 - [Grafana Tempo 문서](https://grafana.com/docs/tempo/)
-- [RFC-IMPL-009](./rfc/rfcimpl009.md) - Observability SSOT
+- [RFC-IMPL-009](../rfc_archive/rfcimpl009.md) - Observability SSOT

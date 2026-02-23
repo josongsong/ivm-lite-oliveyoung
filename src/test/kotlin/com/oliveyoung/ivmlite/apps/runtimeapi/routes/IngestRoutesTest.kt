@@ -6,14 +6,24 @@ import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.application.IngestionOrchestrator
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.IngestionWorkflow
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkEventRepository
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkPluginRegistry
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkRuleRegistry
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.SinkPreflightPluginRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
 import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
 import com.oliveyoung.ivmlite.pkg.views.application.ViewComposer
+import com.oliveyoung.ivmlite.sdk.execution.DeployExecutor
 import com.oliveyoung.ivmlite.sdk.execution.EntityContractResolver
 import com.oliveyoung.ivmlite.shared.adapters.NoOpTransactionAdapter
+import com.oliveyoung.ivmlite.sinks.contract.BatchResult
+import com.oliveyoung.ivmlite.sinks.contract.PluginCapabilities
+import com.oliveyoung.ivmlite.sinks.contract.SinkPayload
+import com.oliveyoung.ivmlite.sinks.contract.SinkPlugin
+import com.oliveyoung.ivmlite.sinks.contract.SinkResult
+import com.oliveyoung.ivmlite.sinks.contract.SinkStatus
+import arrow.core.Either
 import io.kotest.core.spec.style.StringSpec
 import io.kotest.matchers.shouldBe
 import io.ktor.client.request.*
@@ -66,7 +76,8 @@ class IngestRoutesTest : StringSpec({
             workflow = workflow,
             sinkEventRepo = sinkEventRepo,
             transactionPort = NoOpTransactionAdapter(),
-            sinkRuleRegistry = InMemorySinkRuleRegistry()
+            sinkRuleRegistry = InMemorySinkRuleRegistry(),
+            sinkPreflight = com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight,
         )
     }
 
@@ -80,6 +91,7 @@ class IngestRoutesTest : StringSpec({
                         LocalYamlContractRegistryAdapter("/contracts/v1")
                     }
                     single { EntityContractResolver(get()) }
+                    single { DeployExecutor(orchestrator = get(), contractResolver = get()) }
                 })
             }
             routing {
@@ -94,7 +106,9 @@ class IngestRoutesTest : StringSpec({
         version: Long = 1L,
         name: String = "Test Product",
         price: Int = 29000,
-        jobId: String? = null
+        jobId: String? = null,
+        skipSink: Boolean = false,
+        inProcessSink: Boolean = false,
     ): String {
         return buildJsonObject {
             jobId?.let { put("jobId", it) }
@@ -108,7 +122,44 @@ class IngestRoutesTest : StringSpec({
                 put("price", price)
                 put("category", "skincare")
             })
+            if (skipSink) put("skipSink", true)
+            if (inProcessSink) put("inProcessSink", true)
         }.toString()
+    }
+
+    fun createOrchestratorWithInProcessSink(
+        sinkEventRepo: InMemorySinkEventRepository,
+    ): Pair<IngestionOrchestrator, RouteCaptureSinkPlugin> {
+        val rawDataRepo = InMemoryRawDataRepository()
+        val sliceRepo = InMemorySliceRepository()
+
+        val contractRegistry = LocalYamlContractRegistryAdapter("/contracts/v1")
+        val joinExecutor = JoinExecutor(rawDataRepo)
+        val slicingEngine = DefaultSlicingEngineAdapter(
+            SlicingEngine(contractRegistry, joinExecutor)
+        )
+        val viewComposer = ViewComposer()
+
+        val workflow = IngestionWorkflow(
+            rawDataRepo = rawDataRepo,
+            sliceRepo = sliceRepo,
+            slicingEngine = slicingEngine,
+            viewComposer = viewComposer
+        )
+
+        val capturePlugin = RouteCaptureSinkPlugin()
+        val pluginRegistry = InMemorySinkPluginRegistry(mapOf("opensearch-sink" to capturePlugin))
+        val preflight = SinkPreflightPluginRegistryAdapter(pluginRegistry)
+
+        val orchestrator = IngestionOrchestrator(
+            workflow = workflow,
+            sinkEventRepo = sinkEventRepo,
+            transactionPort = NoOpTransactionAdapter(),
+            sinkRuleRegistry = InMemorySinkRuleRegistry(),
+            sinkPreflight = preflight,
+            pluginRegistry = pluginRegistry,
+        )
+        return orchestrator to capturePlugin
     }
 
     "POST /api/v1/ingest → 200 OK, success=true" {
@@ -251,4 +302,62 @@ class IngestRoutesTest : StringSpec({
             assert(durationMs >= 0) { "durationMs should be >= 0 but was $durationMs" }
         }
     }
+
+    "POST /api/v1/ingest → skipSink=true 시 sinkPending=false" {
+        testApplication {
+            configureIngestApp(createOrchestrator())
+
+            val response = client.post("/api/v1/ingest") {
+                contentType(ContentType.Application.Json)
+                setBody(buildIngestBody(skipSink = true))
+            }
+
+            response.status shouldBe HttpStatusCode.OK
+            val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            json["success"]?.jsonPrimitive?.boolean shouldBe true
+            json["sinkPending"]?.jsonPrimitive?.boolean shouldBe false
+        }
+    }
+
+    "POST /api/v1/ingest → inProcessSink=true 시 200 OK, SinkEvent 미발행" {
+        testApplication {
+            val sinkEventRepo = InMemorySinkEventRepository()
+            val (orchestrator, capturePlugin) = createOrchestratorWithInProcessSink(sinkEventRepo)
+            configureIngestApp(orchestrator)
+
+            val response = client.post("/api/v1/ingest") {
+                contentType(ContentType.Application.Json)
+                setBody(buildIngestBody(entityKey = "product:inproc-http-001", inProcessSink = true))
+            }
+
+            response.status shouldBe HttpStatusCode.OK
+            val json = Json.parseToJsonElement(response.bodyAsText()).jsonObject
+            json["success"]?.jsonPrimitive?.boolean shouldBe true
+            json["sinkPending"]?.jsonPrimitive?.boolean shouldBe true
+            json["sliceCount"]?.jsonPrimitive?.int shouldBe 9
+            json["viewCount"]?.jsonPrimitive?.int shouldBe 1
+            sinkEventRepo.size() shouldBe 0
+            capturePlugin.receivedPayloads.size shouldBe 1
+            capturePlugin.receivedPayloads[0].entityKey shouldBe "product:inproc-http-001"
+        }
+    }
 })
+
+private class RouteCaptureSinkPlugin : SinkPlugin {
+    val receivedPayloads = mutableListOf<SinkPayload.V1>()
+
+    override val pluginId = "opensearch-sink"
+    override val capabilities = PluginCapabilities(
+        supportedContractVersions = setOf("1.0"),
+        supportsBatch = true,
+        maxBatchSize = 500,
+    )
+
+    override suspend fun executeBatch(payloads: List<SinkPayload>): Either<com.oliveyoung.ivmlite.sinks.contract.SinkError, BatchResult> {
+        payloads.filterIsInstance<SinkPayload.V1>().forEach { receivedPayloads.add(it) }
+        val results = payloads.map { p ->
+            SinkResult(p.idempotencyKey, SinkStatus.SUCCESS, java.time.Instant.now().toString())
+        }
+        return Either.Right(BatchResult(results, emptyList(), emptyList()))
+    }
+}

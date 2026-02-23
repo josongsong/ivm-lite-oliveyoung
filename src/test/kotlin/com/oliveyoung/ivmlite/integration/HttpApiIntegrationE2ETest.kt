@@ -20,6 +20,7 @@ import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
 import com.oliveyoung.ivmlite.pkg.slices.domain.SlicingEngine
 import com.oliveyoung.ivmlite.pkg.views.application.ViewComposer
+import com.oliveyoung.ivmlite.sdk.execution.DeployExecutor
 import com.oliveyoung.ivmlite.sdk.execution.EntityContractResolver
 import com.oliveyoung.ivmlite.shared.adapters.NoOpTransactionAdapter
 import io.kotest.core.spec.style.DescribeSpec
@@ -43,7 +44,7 @@ import org.koin.ktor.plugin.Koin
  * Ktor testApplication을 사용하여 실제 HTTP 레이어 경유 검증:
  * 1. POST /api/v1/ingest → 200 OK (올인원 처리)
  * 2. POST /api/v1/slice → 200 OK (Slicing 확인)
- * 3. POST /api/v2/query → 200 OK (View 조회)
+ * 3. POST /api/v1/query → 200 OK (View 조회)
  * 4. Ingest → Query 전체 라운드트립
  * 5. 잘못된 entityKey 형식 → 400 BadRequest
  * 6. Multi-tenant HTTP 레벨 격리
@@ -77,7 +78,8 @@ class HttpApiIntegrationE2ETest : DescribeSpec({
         workflow = ingestionWorkflow,
         sinkEventRepo = sinkEventRepo,
         transactionPort = NoOpTransactionAdapter(),
-        sinkRuleRegistry = sinkRuleRegistry
+        sinkRuleRegistry = sinkRuleRegistry,
+        sinkPreflight = com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight,
     )
 
     val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
@@ -106,6 +108,7 @@ class HttpApiIntegrationE2ETest : DescribeSpec({
                 modules(module {
                     single { orchestrator }
                     single { contractResolver }
+                    single { DeployExecutor(orchestrator = get(), contractResolver = get()) }
                     single { slicingWorkflow }
                     single { queryViewWorkflow }
                 })
@@ -182,8 +185,8 @@ class HttpApiIntegrationE2ETest : DescribeSpec({
                 val sliceCount = sliceJson["count"]?.jsonPrimitive?.int
                 check(sliceCount != null && sliceCount >= 1) { "sliceCount should be >= 1" }
 
-                // 3. Query (v2 - ViewDefinition 기반)
-                val queryResponse = client.post("/api/v2/query") {
+                // 3. Query (ViewDefinition 기반)
+                val queryResponse = client.post("/api/v1/query") {
                     contentType(ContentType.Application.Json)
                     setBody(buildJsonObject {
                         put("tenantId", "http-e2e")
@@ -294,7 +297,7 @@ class HttpApiIntegrationE2ETest : DescribeSpec({
                     .jsonObject["version"]?.jsonPrimitive?.long!!
 
                 // Tenant B Query → 데이터 없음 (에러 응답)
-                val queryResponse = client.post("/api/v2/query") {
+                val queryResponse = client.post("/api/v1/query") {
                     contentType(ContentType.Application.Json)
                     setBody(buildJsonObject {
                         put("tenantId", "tenant-B")
@@ -345,7 +348,7 @@ class HttpApiIntegrationE2ETest : DescribeSpec({
                     .jsonObject["version"]?.jsonPrimitive?.long!!
 
                 // Tenant A Query → Tenant A 데이터
-                val queryA = client.post("/api/v2/query") {
+                val queryA = client.post("/api/v1/query") {
                     contentType(ContentType.Application.Json)
                     setBody(buildJsonObject {
                         put("tenantId", "tenant-A")
@@ -357,7 +360,7 @@ class HttpApiIntegrationE2ETest : DescribeSpec({
                 queryA.status shouldBe HttpStatusCode.OK
 
                 // Tenant B Query → Tenant B 데이터
-                val queryB = client.post("/api/v2/query") {
+                val queryB = client.post("/api/v1/query") {
                     contentType(ContentType.Application.Json)
                     setBody(buildJsonObject {
                         put("tenantId", "tenant-B")

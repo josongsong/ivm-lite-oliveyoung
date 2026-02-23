@@ -25,6 +25,7 @@ val allModules = listOf(
     adapterModule,
     domainServiceModule,  // Domain Service Port 바인딩 (공통)
     viewModule,  // ViewComposer (Sink Dispatch는 Lambda 전용)
+    sinkPluginRegistryModule,  // Sink Preflight (Ingest 시점 검증)
     workflowModule,
     sdkModule,
 )
@@ -44,6 +45,7 @@ val productionModules = listOf(
     productionAdapterModule,
     domainServiceModule,  // Domain Service Port 바인딩 (공통)
     viewModule,  // ViewComposer (Sink Dispatch는 Lambda 전용)
+    sinkPluginRegistryModule,  // Sink Preflight (Ingest 시점 검증)
     workflowModule,
     sdkModule,
 )

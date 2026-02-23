@@ -63,7 +63,8 @@ class IngestQueryE2ETest : StringSpec({
         workflow = workflow,
         sinkEventRepo = sinkEventRepo,
         transactionPort = NoOpTransactionAdapter(),
-        sinkRuleRegistry = sinkRuleRegistry
+        sinkRuleRegistry = sinkRuleRegistry,
+        sinkPreflight = com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight,
     )
 
     fun productCommand(

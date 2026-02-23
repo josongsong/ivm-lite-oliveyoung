@@ -312,7 +312,7 @@ tasks.register<JavaExec>("extractJsonPaths") {
     classpath = sourceSets.main.get().runtimeClasspath
 
     val sample = System.getProperty("sample") ?: ".tmp/product/UA11279226.json"
-    val output = System.getProperty("output") ?: "paths.yaml"
+    val output = System.getProperty("output") ?: ".tmp/paths.yaml"
 
     args = listOf("--sample", sample, "--output", output)
 }
@@ -324,8 +324,8 @@ tasks.register<JavaExec>("pathsToImpactMap") {
     mainClass.set("com.oliveyoung.ivmlite.tooling.application.PathsToImpactMapMainKt")
     classpath = sourceSets.main.get().runtimeClasspath
 
-    val paths = System.getProperty("paths") ?: "paths.yaml"
-    val output = System.getProperty("output") ?: "impact-map-draft.yaml"
+    val paths = System.getProperty("paths") ?: ".tmp/paths.yaml"
+    val output = System.getProperty("output") ?: ".tmp/impact-map-draft.yaml"
 
     args = listOf("--paths", paths, "--output", output)
 }
@@ -552,8 +552,8 @@ tasks.register<Test>("retryFailed") {
 
 // CI 체크 태스크
 tasks.register("checkAll") {
-    dependsOn("test", "detekt")
-    description = "🔍 Run all checks (tests + lint)"
+    dependsOn("test", "detekt", "lintDocs")
+    description = "🔍 Run all checks (tests + lint + docs)"
     group = "verification"
 
     doLast {
@@ -602,6 +602,13 @@ tasks.register<Exec>("semgrep") {
     group = "verification"
     description = "Run Semgrep static analysis (security/bug patterns)"
     commandLine("bash", "$projectDir/scripts/semgrep.sh", "src/")
+}
+
+// 문서 lint (docs/RULES.md + markdownlint). Node/npx 필요
+tasks.register<Exec>("lintDocs") {
+    group = "verification"
+    description = "📄 Run documentation lint (RULES.md + markdownlint)"
+    commandLine("bash", "$projectDir/scripts/lint-docs.sh")
 }
 
 application {
@@ -771,7 +778,7 @@ publishing {
     repositories {
         maven {
             name = "GitHubPackages"
-            url = uri("https://maven.pkg.github.com/josongsong/ivm-lite-oliveyoung")
+            url = uri("https://maven.pkg.github.com/oyg-dev/use-ivm-lite")
             credentials {
                 username = System.getenv("GITHUB_ACTOR")
                 password = System.getenv("GITHUB_TOKEN")
@@ -798,7 +805,7 @@ publishing {
             pom {
                 name.set("IVM Lite SDK")
                 description.set("IVM Lite SDK for Kotlin (Internal)")
-                url.set("https://github.com/oliveyoung/ivm-lite-oliveyoung-full")
+                url.set("https://github.com/oyg-dev/use-ivm-lite")
 
                 licenses {
                     license {

@@ -140,11 +140,11 @@ product-e2e sample=".tmp/product/UA11279226.json":
     ./gradlew productE2E -Dsample={{sample}}
 
 # DX 도구 (product-schema-dx-proposal RFC 2.2, 5.1)
-extract-paths sample=".tmp/product/UA11279226.json" output="paths.yaml":
+extract-paths sample=".tmp/product/UA11279226.json" output=".tmp/paths.yaml":
     @echo "📂 Extracting PathExpr from JSON..."
     ./gradlew extractJsonPaths -Dsample={{sample}} -Doutput={{output}}
 
-paths-to-impact paths="paths.yaml" output="impact-map-draft.yaml":
+paths-to-impact paths=".tmp/paths.yaml" output=".tmp/impact-map-draft.yaml":
     @echo "🗺️ Generating impactMap draft..."
     ./gradlew pathsToImpactMap -Dpaths={{paths}} -Doutput={{output}}
 
@@ -165,6 +165,11 @@ check:
 lint:
     @echo "🔍 Running Kotlin lint..."
     ./gradlew lint
+
+# 문서 린트 (docs/RULES.md + markdownlint)
+lint-docs:
+    @echo "📄 Running documentation lint..."
+    ./gradlew lintDocs
 
 # Frontend 린트
 lint-ui:

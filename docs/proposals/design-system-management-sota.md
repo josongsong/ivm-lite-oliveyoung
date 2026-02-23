@@ -1,4 +1,4 @@
-# Design System Component Management - SOTA Best Practices
+# Design System Component Management — SOTA Best Practices
 
 **작성일**: 2026-02-01  
 **버전**: 1.0

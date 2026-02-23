@@ -1,4 +1,4 @@
-# Design System Catalog 배치별 작업 프롬프트
+# Design System Catalog — 배치별 작업 프롬프트
 
 **목적**: 각 배치 작업자가 복사-붙여넣기하여 바로 사용할 수 있는 독립적인 프롬프트
 

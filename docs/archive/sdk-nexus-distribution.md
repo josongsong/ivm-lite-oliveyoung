@@ -1,4 +1,4 @@
-# SDK Nexus 배포 가이드
+# SDK Nexus — 배포 가이드
 
 > **목적**: Nexus Repository에 SDK를 배포하고 사용하는 방법  
 > **대상**: 조직 내부 Nexus 서버가 있는 경우

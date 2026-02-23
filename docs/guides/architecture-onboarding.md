@@ -1,4 +1,4 @@
-# IVM-Lite 아키텍처 온보딩
+# IVM-Lite — 아키텍처 온보딩
 
 ## 개요
 
@@ -21,7 +21,7 @@ IVM-Lite는 **Incremental View Maintenance** 패턴을 구현한 엔터프라이
 ┌──────────────────────────▼──────────────────────────────────┐
 │                   Application Layer                          │
 │              (apps/runtimeapi/routes)                        │
-│         REST API: /api/v1/ingest, /api/v2/query              │
+│         REST API: /api/v1/ingest, /api/v1/query              │
 └──────────────────────────┬──────────────────────────────────┘
                            │
 ┌──────────────────────────▼──────────────────────────────────┐
@@ -386,7 +386,7 @@ data class OutboxEntry(
 |------------|--------|------|
 | `/api/v1/ingest` | POST | RawData 수집 |
 | `/api/v1/slice` | POST | 슬라이싱 실행 |
-| `/api/v2/query` | POST | View 조회 (Contract 기반) |
+| `/api/v1/query` | POST | View 조회 (Contract 기반) |
 | `/health` | GET | 헬스체크 |
 
 ---
@@ -452,7 +452,7 @@ startKoin {
 ## 참고 문서
 
 - [SDK Guide](sdk-guide.md)
-- [RFC 문서](rfc/)
+- [RFC 아카이브](../rfc_archive/)
   - RFC-003: ViewDefinition Contract
   - RFC-010: Slicing Engine
   - RFCIMPL-009: OpenTelemetry Tracing

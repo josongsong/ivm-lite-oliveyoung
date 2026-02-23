@@ -1,4 +1,4 @@
-# Admin Application (관리자 앱)
+# Admin Application — 관리자 앱
 
 > **목적**: IVM Lite 시스템 모니터링 및 관리 전용 애플리케이션  
 > **포트**: 8081 (기본값, `ADMIN_PORT` 환경 변수로 변경 가능)  
@@ -340,6 +340,6 @@ Production 환경에서는 다음을 추가해야 합니다:
 ## 관련 문서
 
 - [관리자 대시보드 사용 가이드](./admin-dashboard.md)
-- [Runtime API](./docs/rfc/rfcimpl009.md)
-- [RFC-IMPL-015: Workflow Canvas](../rfc/rfcimpl015-workflow-canvas.md)
-- [RFC-IMPL-014: Contract Version Management](../rfc/rfcimpl014-version-runtime-verification.md)
+- [Runtime API](../rfc_archive/rfcimpl009.md)
+- [RFC-IMPL-015: Workflow Canvas](../rfc_archive/rfcimpl015-workflow-canvas.md)
+- [RFC-IMPL-014: Contract Version Management](../rfc_archive/rfcimpl014-version-runtime-verification.md)

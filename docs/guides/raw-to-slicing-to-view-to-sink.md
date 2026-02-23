@@ -1,4 +1,4 @@
-# Raw → Slicing → View → Sink (인덱싱 파이프라인)
+# Raw → Slicing → View → Sink — 인덱싱 파이프라인
 
 > **목적**: 인덱싱을 위한 데이터가 Raw부터 최종 Sink(검색 엔진)까지 전달되는 전체 과정 설명  
 > **대상**: 검색 엔진 파이프라인 추가 예정
@@ -1012,5 +1012,5 @@ indexes:
 
 ## 📎 참고 문서
 
-- **RFC-018 Slice 실행 순서**: [RFC-018-slice-execution-order-enforcement.md](../rfc/RFC-018-slice-execution-order-enforcement.md) — 의존성 자동 추론, TopoSort, 병렬 실행
+- **RFC-018 Slice 실행 순서**: [RFC-018-slice-execution-order-enforcement.md](../rfc_archive/2026-02/RFC-018-slice-execution-order-enforcement.md) — 의존성 자동 추론, TopoSort, 병렬 실행
 - **ChangeSet·buildRules 설계 반박자료**: [REBUTTAL-IVM-DESIGN-CRITIQUE.md](../REBUTTAL-IVM-DESIGN-CRITIQUE.md) — ChangeSet 모델, old vs new 비교, 현재 스코프 vs 확장 계획 상세

@@ -43,8 +43,7 @@ import org.koin.ktor.plugin.Koin
  * QueryRoutes HTTP-level 테스트
  *
  * POST /api/v1/slice: Slicing 실행
- * POST /api/v1/query: View 조회 (v1 - sliceTypes 직접)
- * POST /api/v2/query: View 조회 (v2 - ViewDefinition 기반)
+ * POST /api/v1/query: View 조회 (sliceTypes 없으면 ViewDefinition 기반)
  */
 class QueryRoutesTest : StringSpec(init@{
     tags(com.oliveyoung.ivmlite.integration.IntegrationTag)
@@ -72,7 +71,8 @@ class QueryRoutesTest : StringSpec(init@{
         workflow = ingestionWorkflow,
         sinkEventRepo = sinkEventRepo,
         transactionPort = NoOpTransactionAdapter(),
-        sinkRuleRegistry = InMemorySinkRuleRegistry()
+        sinkRuleRegistry = InMemorySinkRuleRegistry(),
+        sinkPreflight = com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight,
     )
 
     val changeSetBuilder = DefaultChangeSetBuilderAdapter(ChangeSetBuilder())
@@ -183,13 +183,13 @@ class QueryRoutesTest : StringSpec(init@{
         }
     }
 
-    "POST /api/v2/query → 200 OK, ViewDefinition 기반 조회" {
+    "POST /api/v1/query → 200 OK, ViewDefinition 기반 조회" {
         seedProduct()
 
         testApplication {
             configureQueryApp()
 
-            val response = client.post("/api/v2/query") {
+            val response = client.post("/api/v1/query") {
                 contentType(ContentType.Application.Json)
                 setBody(buildJsonObject {
                     put("tenantId", "test-tenant")
@@ -207,11 +207,11 @@ class QueryRoutesTest : StringSpec(init@{
         }
     }
 
-    "POST /api/v2/query → 존재하지 않는 데이터 → 에러" {
+    "POST /api/v1/query → 존재하지 않는 데이터 → 에러" {
         testApplication {
             configureQueryApp()
 
-            val response = client.post("/api/v2/query") {
+            val response = client.post("/api/v1/query") {
                 contentType(ContentType.Application.Json)
                 setBody(buildJsonObject {
                     put("tenantId", "no-tenant")

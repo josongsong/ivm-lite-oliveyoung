@@ -1,4 +1,4 @@
-# AWS DynamoDB 자격 증명 설정 가이드
+# AWS DynamoDB — 자격 증명 설정 가이드
 
 ## 개요
 

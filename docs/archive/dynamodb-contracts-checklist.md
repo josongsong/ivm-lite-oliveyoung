@@ -1,4 +1,4 @@
-# DynamoDB에 올려야 할 계약 세트 (Contract Set)
+# DynamoDB — 계약 세트 (Contract Set)
 
 ## 개요
 

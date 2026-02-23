@@ -1,4 +1,4 @@
-# ivm-lite Implementation Roadmap (RFC-IMPL Master Index)
+# ivm-lite Implementation Roadmap — RFC-IMPL Master Index
 
 Status: **Phase A/B/C/D Complete ✅ → Phase E (Fluent SDK DX) Ready**
 Last Updated: 2026-01-25

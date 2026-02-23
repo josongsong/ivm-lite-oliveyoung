@@ -15,7 +15,7 @@ import com.oliveyoung.ivmlite.pkg.fanout.application.FanoutWorkflow
 import com.oliveyoung.ivmlite.pkg.fanout.domain.CircuitBreakerAction
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutConfig
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutDependency
-import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
+import com.oliveyoung.ivmlite.pkg.fanout.ports.FanoutSlicingPort
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexBuilder
 import com.oliveyoung.ivmlite.pkg.slices.domain.SliceRecord
@@ -96,15 +96,15 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // ===== Step 3: Brand 변경 시 FanoutWorkflow가 역방향 인덱스 조회 =====
         val contractRegistry = createMockContractRegistryWithReferences()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
-        coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(any(), any(), any()) } returns
             Result.Ok(emptyList())
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
             config = FanoutConfig.DEFAULT,
         )
 
@@ -122,23 +122,21 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.status shouldBe FanoutResultStatus.SUCCESS
 
-        // SlicingWorkflow가 P001에 대해 정확히 1번 호출되었는지 검증 (atLeast 대신 exactly)
+        // FanoutSlicingPort가 P001에 대해 정확히 1번 호출되었는지 검증 (atLeast 대신 exactly)
         coVerify(exactly = 1) {
-            slicingWorkflow.execute(
+            fanoutSlicing.execute(
                 tenantId = tenantId,
                 entityKey = EntityKey("PRODUCT#test-tenant#P001"),
                 version = any(),
-                ruleSetRef = any(),
             )
         }
 
         // 다른 엔티티는 호출되지 않았는지 검증
         coVerify(exactly = 0) {
-            slicingWorkflow.execute(
+            fanoutSlicing.execute(
                 tenantId = tenantId,
                 entityKey = EntityKey("PRODUCT#test-tenant#P002"),
                 version = any(),
-                ruleSetRef = any(),
             )
         }
     }
@@ -195,15 +193,15 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // ===== Step 3: Fanout 실행 =====
         val contractRegistry = createMockContractRegistryWithReferences()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
-        coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(any(), any(), any()) } returns
             Result.Ok(emptyList())
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
@@ -222,18 +220,17 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // 각 Product에 대해 정확히 1번씩 호출되었는지 검증
         listOf("P001", "P002", "P003").forEach { productId ->
             coVerify(exactly = 1) {
-                slicingWorkflow.execute(
+                fanoutSlicing.execute(
                     tenantId = tenantId,
                     entityKey = EntityKey("PRODUCT#test-tenant#$productId"),
                     version = any(),
-                    ruleSetRef = any(),
                 )
             }
         }
 
         // 총 3번 호출되었는지 검증
         coVerify(exactly = 3) {
-            slicingWorkflow.execute(any(), any(), any(), any())
+            fanoutSlicing.execute(any(), any(), any())
         }
     }
 
@@ -267,12 +264,12 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // ===== Step 3: Tag 변경 시 Fanout 시도 =====
         val contractRegistry = createMockContractRegistryWithTagOnly()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // TAG 엔티티 변경 (references가 없으므로 의존성 없음)
@@ -289,8 +286,8 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 0
 
-        // SlicingWorkflow 호출 없음 (4개 파라미터: tenantId, entityKey, version, ruleSetRef)
-        coVerify(exactly = 0) { slicingWorkflow.execute(any(), any(), any(), any()) }
+        // FanoutSlicingPort 호출 없음 (3개 파라미터: tenantId, entityKey, version)
+        coVerify(exactly = 0) { fanoutSlicing.execute(any(), any(), any()) }
     }
 
     "통합: 배열 FK (categoryIds) → 여러 역방향 인덱스 생성" {
@@ -332,15 +329,15 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // ===== Step 3: CAT001 변경 시 P001 재슬라이싱 =====
         val contractRegistry = createMockContractRegistryWithCategory()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
-        coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(any(), any(), any()) } returns
             Result.Ok(emptyList())
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         val categoryKey = EntityKey("CATEGORY#test-tenant#CAT001")
@@ -358,21 +355,19 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // 정확히 1번 호출되었는지 검증
         coVerify(exactly = 1) {
-            slicingWorkflow.execute(
+            fanoutSlicing.execute(
                 tenantId = tenantId,
                 entityKey = EntityKey("PRODUCT#test-tenant#P001"),
                 version = any(),
-                ruleSetRef = any(),
             )
         }
 
         // 다른 엔티티는 호출되지 않았는지 검증
         coVerify(exactly = 0) {
-            slicingWorkflow.execute(
+            fanoutSlicing.execute(
                 tenantId = tenantId,
                 entityKey = EntityKey("PRODUCT#test-tenant#P002"),
                 version = any(),
-                ruleSetRef = any(),
             )
         }
     }
@@ -384,7 +379,7 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = InMemoryInvertedIndexRepository(),
-            slicingWorkflow = mockk(relaxed = true),
+            fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true),
         )
 
         // 의존성 추론
@@ -435,12 +430,12 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // ===== Step 2: Circuit Breaker 동작 확인 =====
         val contractRegistry = createMockContractRegistryWithMaxFanout(maxFanout)
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
             config = FanoutConfig(
                 maxFanout = maxFanout,
                 circuitBreakerAction = CircuitBreakerAction.SKIP,  // SKIP 동작
@@ -476,9 +471,9 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // SKIPPED는 전체가 0일 때만 사용되므로, 여기서는 SUCCESS
         fanoutResult.status shouldBe FanoutResultStatus.SUCCESS
 
-        // SlicingWorkflow는 호출되지 않아야 함 (SKIP)
+        // FanoutSlicingPort는 호출되지 않아야 함 (SKIP)
         coVerify(exactly = 0) {
-            slicingWorkflow.execute(any(), any(), any(), any())
+            fanoutSlicing.execute(any(), any(), any())
         }
     }
 
@@ -515,12 +510,12 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // ===== Step 2: Circuit Breaker ERROR 동작 확인 =====
         val contractRegistry = createMockContractRegistryWithMaxFanout(maxFanout)
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
             config = FanoutConfig(
                 maxFanout = maxFanout,
                 circuitBreakerAction = CircuitBreakerAction.ERROR,  // ERROR 동작
@@ -556,9 +551,9 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         // 모든 dependency가 FAILED면 PARTIAL_FAILURE
         (fanoutResult.status == FanoutResultStatus.FAILED || fanoutResult.status == FanoutResultStatus.PARTIAL_FAILURE) shouldBe true
 
-        // SlicingWorkflow는 호출되지 않아야 함 (FAILED)
+        // FanoutSlicingPort는 호출되지 않아야 함 (FAILED)
         coVerify(exactly = 0) {
-            slicingWorkflow.execute(any(), any(), any(), any())
+            fanoutSlicing.execute(any(), any(), any())
         }
     }
 
@@ -589,12 +584,12 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // ===== Step 2: 존재하지 않는 Brand 변경 =====
         val contractRegistry = createMockContractRegistryWithReferences()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         val nonExistentBrandKey = EntityKey("BRAND#test-tenant#BR999")  // 존재하지 않는 Brand
@@ -611,9 +606,9 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         fanoutResult.totalAffected shouldBe 0
         fanoutResult.processedCount shouldBe 0
 
-        // SlicingWorkflow 호출 없음
+        // FanoutSlicingPort 호출 없음
         coVerify(exactly = 0) {
-            slicingWorkflow.execute(any(), any(), any(), any())
+            fanoutSlicing.execute(any(), any(), any())
         }
     }
 
@@ -647,12 +642,12 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
 
         // ===== Step 2: tenant2의 Brand 변경 (다른 tenant) =====
         val contractRegistry = createMockContractRegistryWithReferences()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val fanoutWorkflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         val tenant2BrandKey = EntityKey("BRAND#tenant2#BR001")  // 다른 tenant
@@ -668,9 +663,9 @@ class InvertedIndexFanoutIntegrationTest : StringSpec({
         val fanoutResult = (result as Result.Ok<FanoutResult>).value
         fanoutResult.totalAffected shouldBe 0  // 다른 tenant이므로 영향 없음
 
-        // SlicingWorkflow 호출 없음
+        // FanoutSlicingPort 호출 없음
         coVerify(exactly = 0) {
-            slicingWorkflow.execute(any(), any(), any(), any())
+            fanoutSlicing.execute(any(), any(), any())
         }
     }
 })

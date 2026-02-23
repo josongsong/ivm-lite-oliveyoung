@@ -1,4 +1,4 @@
-# DOC-001 상품 마스터 데이터 Slicing & View 정책 제안
+# DOC-001: 상품 마스터 데이터 — Slicing & View 정책 제안
 
 **작성일**: 2026-01-16  
 **기반 문서**: DOC-001 Flat Catalog v3.0  

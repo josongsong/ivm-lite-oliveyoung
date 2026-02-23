@@ -4,9 +4,12 @@ id: view.brand.detail.v1
 version: 1.0.0
 status: ACTIVE
 
+viewName: BRAND_DETAIL
+entityType: BRAND
+
 requiredSlices:
   - CORE
-  - METADATA
+  - SUMMARY
 
 optionalSlices: []
 
@@ -22,5 +25,5 @@ partialPolicy:
 fallbackPolicy: NONE
 
 ruleSetRef:
-  id: ruleset.core.v1
+  id: ruleset.brand.v1
   version: 1.0.0

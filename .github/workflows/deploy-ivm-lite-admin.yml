@@ -1,0 +1,374 @@
+name: deploy IVM-Lite Admin API
+run-name: "Deploy IVM-Lite Admin API to ${{ inputs.environment || github.ref_name }}${{ inputs.ref && format(' (custom ref: {0})', inputs.ref) || '' }}"
+
+on:
+  push:
+    branches:
+      - main
+      - dev
+      - qa
+      - stg
+      - prd
+
+  workflow_dispatch:
+    inputs:
+      ref:
+        description: "Commit sha to deploy (default: current branch)"
+        required: false
+        type: string
+      environment:
+        description: "Environment (ex. dev, qa, stg, prd)"
+        required: true
+        default: "dev"
+        type: choice
+        options:
+          - dev
+          - qa
+          - stg
+          - prd
+
+jobs:
+  setup-environment:
+    name: Setup Environment
+    runs-on: arc-runner-set
+    timeout-minutes: 5
+    outputs:
+      environment: ${{ steps.set-env.outputs.environment }}
+      ref: ${{ steps.set-env.outputs.ref }}
+      image_tag: ${{ steps.set-env.outputs.image_tag }}
+    steps:
+      - name: Set environment variables
+        id: set-env
+        run: |
+          if [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
+            ENV="${{ inputs.environment }}"
+            echo "environment=${ENV}" >> $GITHUB_OUTPUT
+            REF="${{ inputs.ref || github.sha }}"
+            echo "ref=${REF}" >> $GITHUB_OUTPUT
+          else
+            BRANCH_NAME="${{ github.ref_name }}"
+            if [ "$BRANCH_NAME" == "main" ]; then
+              ENV="dev"
+            else
+              ENV="${BRANCH_NAME}"
+            fi
+            echo "environment=${ENV}" >> $GITHUB_OUTPUT
+            REF="${{ github.sha }}"
+            echo "ref=${REF}" >> $GITHUB_OUTPUT
+          fi
+
+          IMAGE_TAG="${ENV}"
+          echo "image_tag=${IMAGE_TAG}" >> $GITHUB_OUTPUT
+
+  build-and-push-image:
+    name: Build and Push (${{ needs.setup-environment.outputs.environment }})
+    needs: [setup-environment]
+    runs-on: arc-runner-set
+    timeout-minutes: 30
+    permissions:
+      id-token: write
+      contents: read
+      packages: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup-environment.outputs.ref }}
+
+      - name: Install AWS CLI
+        uses: oyg-dev/github-action/install-aws-cli@install-aws-cli.v1
+
+      - name: ECR Login
+        uses: oyg-dev/github-action/ecr-login@ecr-login.v1
+        with:
+          repository-uri: ${{ vars.PROD_ECR_URI }}
+          role-name: ${{ vars.PROD_GITHUB_ROLE_ARN }}
+
+      - name: Setup JDK
+        uses: actions/setup-java@v4
+        with:
+          distribution: "corretto"
+          java-version: 17
+
+      - name: Build and Push with JIB
+        run: |
+          # Git 정보 수집
+          GIT_COMMIT_HASH=$(git rev-parse --short HEAD)
+          GIT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+          GIT_COMMIT_DATE=$(git log -1 --format="%cI")
+          GIT_COMMIT_MESSAGE=$(git log -1 --format="%s" | head -c 100)
+
+          ./gradlew jib --no-configuration-cache \
+            -Djib.to.image=${{ vars.PROD_ECR_URI }}/use-ivm-lite-admin:${{ needs.setup-environment.outputs.image_tag }} \
+            -Djib.to.tags=latest,${{ needs.setup-environment.outputs.environment }} \
+            -Djib.container.mainClass=com.oliveyoung.ivmlite.apps.admin.AdminApplicationKt \
+            -Djib.container.labels=git.commit.hash="${GIT_COMMIT_HASH}",git.branch="${GIT_BRANCH}",git.commit.date="${GIT_COMMIT_DATE}",git.commit.message="${GIT_COMMIT_MESSAGE}" \
+            -Djib.container.environment=GIT_COMMIT_HASH="${GIT_COMMIT_HASH}",GIT_BRANCH="${GIT_BRANCH}",GIT_COMMIT_DATE="${GIT_COMMIT_DATE}",GIT_COMMIT_MESSAGE="${GIT_COMMIT_MESSAGE}" \
+            -Djib.console=plain
+        env:
+          GITHUB_ACTOR: ${{ secrets.GH_ACTOR_CLASSIC }}
+          GITHUB_TOKEN: ${{ secrets.GH_PAT_CLASSIC }}
+
+  notify:
+    name: Notify (${{ needs.setup-environment.outputs.environment }})
+    needs: [build-and-push-image, setup-environment]
+    runs-on: arc-runner-set
+    timeout-minutes: 10
+    permissions:
+      id-token: write
+      contents: read
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.setup-environment.outputs.ref }}
+          fetch-tags: true
+          fetch-depth: 100
+
+      - name: Get PR and Commit Info
+        if: always()
+        id: git-info
+        run: |
+          COMMIT_HASH=$(git rev-parse --short HEAD)
+          COMMIT_MSG=$(git log -1 --pretty=format:'%s')
+          COMMIT_AUTHOR=$(git log -1 --pretty=format:'%an')
+          COMMIT_URL="${{ github.server_url }}/${{ github.repository }}/commit/${{ github.sha }}"
+
+          PR_NUMBER=$(echo "$COMMIT_MSG" | grep -oP '\(#\K[0-9]+(?=\)$)' || echo "")
+
+          echo "hash=$COMMIT_HASH" >> $GITHUB_OUTPUT
+          echo "message=$COMMIT_MSG" >> $GITHUB_OUTPUT
+          echo "author=$COMMIT_AUTHOR" >> $GITHUB_OUTPUT
+          echo "commit_url=$COMMIT_URL" >> $GITHUB_OUTPUT
+
+          if [ -n "$PR_NUMBER" ]; then
+            PR_URL="${{ github.server_url }}/${{ github.repository }}/pull/$PR_NUMBER"
+            echo "has_pr=true" >> $GITHUB_OUTPUT
+            echo "pr_number=$PR_NUMBER" >> $GITHUB_OUTPUT
+            echo "pr_url=$PR_URL" >> $GITHUB_OUTPUT
+          else
+            echo "has_pr=false" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Notify Deployment Success (with PR)
+        if: success() && steps.git-info.outputs.has_pr == 'true'
+        continue-on-error: true
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          channel-id: "C0A22UPCHPT"
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "#2EB67D",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*🚀 Deployment Succeeded*"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Project:*\nIVM-Lite Admin API"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Environment:*\n`${{ needs.setup-environment.outputs.environment }}`"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Commit Message:*\n> `${{ steps.git-info.outputs.message }}`"
+                      }
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "👤 *Author:* ${{ steps.git-info.outputs.author }}  |  🔗 *Hash:* `${{ steps.git-info.outputs.hash }}`"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "🔀 View PR #${{ steps.git-info.outputs.pr_number }}"
+                          },
+                          "url": "${{ steps.git-info.outputs.pr_url }}",
+                          "style": "primary"
+                        },
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "🔍 Actions Log"
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify Deployment Success (without PR)
+        if: success() && steps.git-info.outputs.has_pr != 'true'
+        continue-on-error: true
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          channel-id: "C0A22UPCHPT"
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "#2EB67D",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*🚀 Deployment Succeeded*"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Project:*\nIVM-Lite Admin API"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Environment:*\n`${{ needs.setup-environment.outputs.environment }}`"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Commit Message:*\n> `${{ steps.git-info.outputs.message }}`"
+                      }
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "👤 *Author:* ${{ steps.git-info.outputs.author }}  |  🔗 *Hash:* `${{ steps.git-info.outputs.hash }}`"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "💾 View Commit"
+                          },
+                          "url": "${{ steps.git-info.outputs.commit_url }}",
+                          "style": "primary"
+                        },
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "🔍 Actions Log"
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}
+
+      - name: Notify Deployment Failure
+        if: failure()
+        continue-on-error: true
+        uses: slackapi/slack-github-action@v1.27.0
+        with:
+          channel-id: "C0A22UPCHPT"
+          payload: |
+            {
+              "attachments": [
+                {
+                  "color": "#CF0A2C",
+                  "blocks": [
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*❌ Deployment Failed*"
+                      }
+                    },
+                    {
+                      "type": "section",
+                      "fields": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Project:*\nIVM-Lite Admin API"
+                        },
+                        {
+                          "type": "mrkdwn",
+                          "text": "*Environment:*\n`${{ needs.setup-environment.outputs.environment }}`"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "section",
+                      "text": {
+                        "type": "mrkdwn",
+                        "text": "*Commit Message:*\n> `${{ steps.git-info.outputs.message }}`"
+                      }
+                    },
+                    {
+                      "type": "context",
+                      "elements": [
+                        {
+                          "type": "mrkdwn",
+                          "text": "👤 *Author:* ${{ steps.git-info.outputs.author }}  |  🔗 *Hash:* `${{ steps.git-info.outputs.hash }}`"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "actions",
+                      "elements": [
+                        {
+                          "type": "button",
+                          "text": {
+                            "type": "plain_text",
+                            "text": "🔍 Debug Actions"
+                          },
+                          "url": "${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}",
+                          "style": "danger"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+        env:
+          SLACK_BOT_TOKEN: ${{ secrets.SLACK_BOT_TOKEN }}

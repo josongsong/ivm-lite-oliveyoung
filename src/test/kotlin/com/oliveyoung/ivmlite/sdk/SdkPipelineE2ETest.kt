@@ -72,7 +72,8 @@ class SdkPipelineE2ETest : DescribeSpec({
         workflow = workflow,
         sinkEventRepo = sinkEventRepo,
         transactionPort = NoOpTransactionAdapter(),
-        sinkRuleRegistry = sinkRuleRegistry
+        sinkRuleRegistry = sinkRuleRegistry,
+        sinkPreflight = com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight,
     )
 
     val contractResolver = EntityContractResolver(LocalYamlContractRegistryAdapter("/contracts/v1"))

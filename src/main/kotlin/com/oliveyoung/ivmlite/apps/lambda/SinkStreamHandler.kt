@@ -5,6 +5,7 @@ import com.amazonaws.services.lambda.runtime.RequestHandler
 import com.amazonaws.services.lambda.runtime.events.DynamodbEvent
 import com.oliveyoung.ivmlite.apps.lambda.wiring.lambdaTracingModule
 import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.sinkPluginModule
+import com.oliveyoung.ivmlite.apps.runtimeapi.wiring.sinkPluginRegistryModule
 import com.oliveyoung.ivmlite.shared.adapters.withSpan
 import io.opentelemetry.api.trace.Tracer
 import kotlinx.coroutines.future.await
@@ -41,6 +42,7 @@ class SinkStreamHandler : RequestHandler<DynamodbEvent, String> {
                 modules(
                     lambdaInfraModule,
                     lambdaTracingModule,
+                    sinkPluginRegistryModule,
                     sinkPluginModule,
                 )
             }

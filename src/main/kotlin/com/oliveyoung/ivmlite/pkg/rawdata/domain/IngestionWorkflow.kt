@@ -102,7 +102,11 @@ data class IngestionCommand(
     val viewDefId: String,
     val viewDefVersion: String = "1.0.0",
     val version: Long = 1L,
-    val jobId: String? = null
+    val jobId: String? = null,
+    /** true면 SinkEvent 발행 스킵 (RawData → Slicing → View만 수행, DynamoDB Streams/Lambda 미호출) */
+    val skipSink: Boolean = false,
+    /** true면 DynamoDB/Lambda 대신 같은 세션에서 SinkPlugin 직접 호출 (동기 처리) */
+    val inProcessSink: Boolean = false,
 )
 
 /**

@@ -1,4 +1,4 @@
-# ADR-0014: DOC-001 상품 마스터(Flat Catalog) 온보딩
+# ADR-0014: DOC-001 상품 마스터 — Flat Catalog 온보딩
 
 **Status**: Accepted  
 **Date**: 2026-01-26  
@@ -86,6 +86,6 @@ DOC-001의 특성:
 
 ## 참고
 
-- [RFC-IR-031](../rfc/rfc011-doc001-flat-catalog.md) - 원본 RFC 문서
+- [RFC-IR-031](../rfc_archive/rfc011-doc001-flat-catalog.md) - 원본 RFC 문서
 - [ADR-0001](./0001-contract-first-architecture.md) - Contract-First 아키텍처
 - [ADR-0006](./0006-slicing-join-scope.md) - Slicing Join 허용 범위

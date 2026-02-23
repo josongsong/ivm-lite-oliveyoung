@@ -1,4 +1,4 @@
-# Living Design System Catalog
+# Living Design System — Catalog
 
 **Subtitle**: 개발자/디자이너 모두 열광하는 Self-Documenting Design System
 

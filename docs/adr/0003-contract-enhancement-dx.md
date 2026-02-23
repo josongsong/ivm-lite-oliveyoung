@@ -90,5 +90,5 @@ v4/v4.1 아키텍처의 계약(Contract) 레이어를 보완하고, 개발자 �
 
 ## 참고
 
-- [RFC-V4-003](../rfc/rfc003.md) - 원본 RFC 문서
-- [RFC-V4-001](../rfc/rfc001.md) - Contract-First 아키텍처
+- [RFC-V4-003](../rfc_archive/rfc003.md) - 원본 RFC 문서
+- [RFC-V4-001](../rfc_archive/rfc001.md) - Contract-First 아키텍처

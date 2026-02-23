@@ -1,4 +1,4 @@
-# RFC-IMPL-013: SinkRule 기반 자동 Ship (Automatic Ship via SinkRule)
+# RFC-IMPL-013: SinkRule 기반 자동 Ship — Automatic Ship via SinkRule
 
 ## Status: Implemented
 

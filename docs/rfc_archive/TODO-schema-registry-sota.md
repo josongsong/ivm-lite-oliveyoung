@@ -1,4 +1,4 @@
-# TODO: Schema Registry SOTA 개선 계획
+# Schema Registry — SOTA 개선 계획 (TODO)
 
 > 작성일: 2026-01-26  
 > 상태: **BACKLOG** (나중에 진행)

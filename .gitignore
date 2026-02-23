@@ -141,5 +141,6 @@ out/
 gen/
 
 # DX 도구 출력 (product-schema-dx-proposal RFC 2.2)
+# DX 도구 생성물 (루트에 남은 경우)
 paths.yaml
 impact-map-draft.yaml

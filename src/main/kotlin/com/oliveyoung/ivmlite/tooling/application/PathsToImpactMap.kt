@@ -12,7 +12,7 @@ import java.io.File
  *
  * 실행:
  * ```bash
- * ./gradlew pathsToImpactMap -Dpaths=paths.yaml -Doutput=impact-map-draft.yaml
+ * ./gradlew pathsToImpactMap -Dpaths=.tmp/paths.yaml -Doutput=.tmp/impact-map-draft.yaml
  * ```
  */
 object PathsToImpactMap {

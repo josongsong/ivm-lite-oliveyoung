@@ -11,6 +11,7 @@ import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
@@ -49,6 +50,8 @@ private class SeedContractsToDynamoCmd : CliktCommand(name = "seed-contracts-to-
     private val dirPath by option("--dir", help = "contracts directory path").default("src/main/resources/contracts/v1")
     private val endpoint by option("--endpoint", help = "DynamoDB endpoint URL (optional; default uses AWS endpoint)")
         .default(System.getenv("DYNAMODB_ENDPOINT") ?: "")
+    private val profile by option("--profile", help = "AWS profile name (e.g. qa-dev, default)")
+        .default(System.getenv("AWS_PROFILE") ?: "")
     private val dryRun by option("--dry-run", help = "Dry run mode (no changes)").flag()
 
     override fun run() {
@@ -70,8 +73,13 @@ private class SeedContractsToDynamoCmd : CliktCommand(name = "seed-contracts-to-
                     )
                 )
             } else {
-                // Remote AWS mode: use default credentials chain (env, ~/.aws, IAM role, ...)
-                builder.credentialsProvider(DefaultCredentialsProvider.create())
+                // Remote AWS mode: profile 지정 시 ProfileCredentialsProvider, 아니면 default chain
+                val credentialsProvider = if (profile.isNotBlank()) {
+                    ProfileCredentialsProvider.create(profile)
+                } else {
+                    DefaultCredentialsProvider.create()
+                }
+                builder.credentialsProvider(credentialsProvider)
             }
 
             val dynamoClient = builder.build()
@@ -85,6 +93,7 @@ private class SeedContractsToDynamoCmd : CliktCommand(name = "seed-contracts-to-
             echo("📦 Seeding contracts to DynamoDB...")
             echo("   Table: $tableName")
             echo("   Directory: $dirPath")
+            echo("   Profile: ${if (profile.isNotBlank()) profile else "(default)"}")
             echo("   Endpoint: ${if (endpoint.isBlank()) "(AWS default)" else endpoint}")
             if (dryRun) {
                 echo("   Mode: DRY RUN")

@@ -1,4 +1,4 @@
-# RFC-IMPL-015 Workflow Canvas - 최종 검증 완료
+# RFC-IMPL-015: Workflow Canvas — 최종 검증 완료
 
 ## ✅ 완료 항목
 

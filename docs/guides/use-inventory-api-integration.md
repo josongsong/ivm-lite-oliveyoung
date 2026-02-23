@@ -1,4 +1,4 @@
-# USE Inventory API 연동 가이드
+# USE Inventory API — 연동 가이드
 
 > USE(United States E-commerce) 상품 재고 조회 API 연동 문서
 

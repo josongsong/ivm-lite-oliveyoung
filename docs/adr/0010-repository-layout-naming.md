@@ -33,7 +33,7 @@ ivm-lite 레포의 **폴더 구조·네이밍·경계(가드레일)** 를 SSOT�
 ```
 ivm-lite/
   docs/
-    rfc/
+    rfc_archive/
     adr/
   
   src/main/kotlin/com/oliveyoung/ivmlite/
@@ -191,5 +191,5 @@ package/orchestration/
 
 ## 참고
 
-- [RFC-V4-010](../rfc/rfc010.md) - 원본 RFC 문서
-- [RFC-V4-005](../rfc/rfc005.md) - Domain-sliced Architecture
+- [RFC-V4-010](../rfc_archive/rfc010.md) - 원본 RFC 문서
+- [RFC-V4-005](../rfc_archive/rfc005.md) - Domain-sliced Architecture

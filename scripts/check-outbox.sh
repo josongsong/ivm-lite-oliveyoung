@@ -17,4 +17,4 @@ if [ -n "${DB_URL:-}" ] && [[ "$DB_URL" == jdbc:* ]]; then
 fi
 
 # Python 스크립트 실행
-python3 "$PROJECT_ROOT/check-outbox.py"
+python3 "$SCRIPT_DIR/check-outbox.py"

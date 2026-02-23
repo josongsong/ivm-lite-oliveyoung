@@ -1,4 +1,4 @@
-# OpenSearch 인덱스 계획 v2 (2-인덱스 SOTA)
+# OpenSearch 인덱스 계획 v2 — 2-인덱스 SOTA
 
 > IVM-Lite → OpenSearch 인덱싱 전략. Static(검색/필터/카탈로그) + Dynamic(고빈도 변동) 분리 구조.
 
@@ -1151,4 +1151,4 @@ Q01~Q20, D01~D20, Join 10개를 "샘플 문자열"이 아니라 **실제 운영 
 - [sinkrule-opensearch-product.v1.yaml](../../src/main/resources/contracts/v1/sinkrule-opensearch-product.v1.yaml) - SinkRule 계약
 - [view-product-search.v1.yaml](../../src/main/resources/contracts/v1/view-product-search.v1.yaml) - PRODUCT_SEARCH View
 - [ruleset-product-oliveyoung.v1.yaml](../../src/main/resources/contracts/v1/ruleset-product-oliveyoung.v1.yaml) - Slice 정의
-- [product-schema-dx-proposal.md](../rfc/product-schema-dx-proposal.md) - RFC 상세
+- [product-schema-dx-proposal.md](../rfc_archive/2026-02/product-schema-dx-proposal.md) - RFC 상세

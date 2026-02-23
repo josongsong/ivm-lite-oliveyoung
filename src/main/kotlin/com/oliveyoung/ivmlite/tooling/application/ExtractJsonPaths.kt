@@ -15,7 +15,7 @@ import java.io.File
  *
  * 실행:
  * ```bash
- * ./gradlew extractJsonPaths -Dsample=.tmp/product/UA30953620.json -Doutput=paths.yaml
+ * ./gradlew extractJsonPaths -Dsample=.tmp/product/UA30953620.json -Doutput=.tmp/paths.yaml
  * ```
  */
 object ExtractJsonPaths {
@@ -92,7 +92,7 @@ object ExtractJsonPaths {
  */
 fun main(args: Array<String>) {
     val sample = args.findArg("--sample") ?: System.getProperty("sample") ?: ".tmp/product/UA11279226.json"
-    val output = args.findArg("--output") ?: System.getProperty("output") ?: "paths.yaml"
+    val output = args.findArg("--output") ?: System.getProperty("output") ?: ".tmp/paths.yaml"
 
     println("ExtractJsonPaths - PathExpr 경로 추출 (product-schema-dx-proposal RFC 2.2)")
     println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

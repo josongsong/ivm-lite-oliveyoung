@@ -1,4 +1,4 @@
-# RFC-IMPL-014: Contract Version Management - Runtime Verification & Auto-Migration
+# RFC-IMPL-014: Contract Version Management — Runtime Verification & Auto-Migration
 
 **Status**: Draft
 **Created**: 2026-01-29

@@ -1,4 +1,4 @@
-# SDK & API 엔진 아키텍처
+# SDK & API — 엔진 아키텍처
 
 ## 개요
 
@@ -112,7 +112,7 @@ suspend fun executeCount(
 
 **사용처**:
 - **SDK**: `QueryApi.executeQueryViaWorkflow()` → `QueryViewWorkflow.execute()`
-- **Runtime API**: `QueryRoutes.post("/api/v2/query")` → `QueryViewWorkflow.execute()`
+- **Runtime API**: `QueryRoutes.post("/api/v1/query")` → `QueryViewWorkflow.execute()`
 
 **의존성**:
 - `SliceRepositoryPort`: Slice 조회

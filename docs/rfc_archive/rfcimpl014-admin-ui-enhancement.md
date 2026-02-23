@@ -1,4 +1,4 @@
-# RFC-IMPL-014: Admin UI Enhancement (SOTA Gap Analysis)
+# RFC-IMPL-014: Admin UI Enhancement — SOTA Gap Analysis
 
 **Status**: Draft  
 **Created**: 2026-01-29  

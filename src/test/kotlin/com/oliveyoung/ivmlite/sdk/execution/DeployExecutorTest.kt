@@ -47,7 +47,8 @@ class DeployExecutorTest : DescribeSpec({
         workflow = workflow,
         sinkEventRepo = sinkEventRepo,
         transactionPort = NoOpTransactionAdapter(),
-        sinkRuleRegistry = InMemorySinkRuleRegistry()
+        sinkRuleRegistry = InMemorySinkRuleRegistry(),
+        sinkPreflight = com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight,
     )
 
     val contractResolver = EntityContractResolver(contractRegistry)

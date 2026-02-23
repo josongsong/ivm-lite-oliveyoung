@@ -1,4 +1,4 @@
-# 컴포넌트 위치 판단 가이드
+# 컴포넌트 위치 — 판단 가이드
 
 이 문서는 각 컴포넌트를 `shared/ui`, `shared/ui/recipes`, `features/*/components` 중 어디에 둘지 판단하는 가이드입니다.
 

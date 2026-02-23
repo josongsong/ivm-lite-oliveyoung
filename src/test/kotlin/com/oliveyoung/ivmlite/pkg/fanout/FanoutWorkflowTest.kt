@@ -15,7 +15,7 @@ import com.oliveyoung.ivmlite.pkg.fanout.domain.CircuitBreakerAction
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutConfig
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutJobStatus
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutPriority
-import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
+import com.oliveyoung.ivmlite.pkg.fanout.ports.FanoutSlicingPort
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemoryInvertedIndexRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.InvertedIndexEntry
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
@@ -56,7 +56,7 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         // Product들이 Brand를 참조하는 Inverted Index 세팅
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
@@ -66,13 +66,13 @@ class FanoutWorkflowTest : StringSpec({
             EntityKey("PRODUCT#test-tenant#P003") to 1L,
         ))
 
-        coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(any(), any(), any()) } returns
             Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // When
@@ -89,22 +89,22 @@ class FanoutWorkflowTest : StringSpec({
         fanoutResult.status shouldBe FanoutResultStatus.SUCCESS
         fanoutResult.processedCount shouldBe 3
 
-        // SlicingWorkflow가 3번 호출되었는지 확인
-        coVerify(exactly = 3) { slicingWorkflow.execute(any(), any(), any(), any()) }
+        // FanoutSlicingPort가 3번 호출되었는지 확인
+        coVerify(exactly = 3) { fanoutSlicing.execute(any(), any(), any()) }
     }
 
     "fanout 없음 - 참조하는 downstream 없을 때" {
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         // Inverted Index에 데이터 없음
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // When
@@ -121,8 +121,8 @@ class FanoutWorkflowTest : StringSpec({
         fanoutResult.totalAffected shouldBe 0
         fanoutResult.processedCount shouldBe 0
 
-        // SlicingWorkflow가 호출되지 않아야 함
-        coVerify(exactly = 0) { slicingWorkflow.execute(any(), any(), any(), any()) }
+        // FanoutSlicingPort가 호출되지 않아야 함
+        coVerify(exactly = 0) { fanoutSlicing.execute(any(), any(), any()) }
     }
 
     // ==================== 2. 대량 fanout + batching ====================
@@ -131,7 +131,7 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         // 150개 Product가 Brand 참조
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
@@ -140,7 +140,7 @@ class FanoutWorkflowTest : StringSpec({
         }
         setupInvertedIndex(invertedIndexRepo, tenantId, "product_by_brand", brandKey.value, products)
 
-        coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(any(), any(), any()) } returns
             Result.Ok(emptyList())
 
         // 배치 크기 50으로 설정
@@ -152,7 +152,7 @@ class FanoutWorkflowTest : StringSpec({
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
             config = config,
         )
 
@@ -169,8 +169,8 @@ class FanoutWorkflowTest : StringSpec({
         val fanoutResult = (result as Result.Ok).value
         fanoutResult.processedCount shouldBe 150
 
-        // SlicingWorkflow가 150번 호출되었는지 확인
-        coVerify(exactly = 150) { slicingWorkflow.execute(any(), any(), any(), any()) }
+        // FanoutSlicingPort가 150번 호출되었는지 확인
+        coVerify(exactly = 150) { fanoutSlicing.execute(any(), any(), any()) }
     }
 
     "배치 수 계산 테스트" {
@@ -189,7 +189,7 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         // 15000개 Product (maxFanout 초과)
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
@@ -206,7 +206,7 @@ class FanoutWorkflowTest : StringSpec({
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
             config = config,
         )
 
@@ -224,15 +224,15 @@ class FanoutWorkflowTest : StringSpec({
         fanoutResult.dependencyResults.first().status shouldBe FanoutJobStatus.SKIPPED
         fanoutResult.skippedCount shouldBe 15000
 
-        // SlicingWorkflow가 호출되지 않아야 함
-        coVerify(exactly = 0) { slicingWorkflow.execute(any(), any(), any(), any()) }
+        // FanoutSlicingPort가 호출되지 않아야 함
+        coVerify(exactly = 0) { fanoutSlicing.execute(any(), any(), any()) }
     }
 
     "Circuit Breaker - ERROR 모드" {
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
         val products = (1..5000).map { i ->
@@ -248,7 +248,7 @@ class FanoutWorkflowTest : StringSpec({
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
             config = config,
         )
 
@@ -281,14 +281,14 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val config = FanoutConfig(enabled = false)
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
             config = config,
         )
 
@@ -306,21 +306,21 @@ class FanoutWorkflowTest : StringSpec({
         fanoutResult.status shouldBe FanoutResultStatus.SKIPPED
         fanoutResult.message shouldBe "Fanout disabled"
 
-        coVerify(exactly = 0) { slicingWorkflow.execute(any(), any(), any(), any()) }
+        coVerify(exactly = 0) { fanoutSlicing.execute(any(), any(), any()) }
     }
 
     "중복 제거 (Deduplication) - 같은 엔티티 연속 요청" {
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
         setupInvertedIndex(invertedIndexRepo, tenantId, "product_by_brand", brandKey.value, listOf(
             EntityKey("PRODUCT#test-tenant#P001") to 1L,
         ))
 
-        coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(any(), any(), any()) } returns
             Result.Ok(emptyList())
 
         val config = FanoutConfig(
@@ -330,7 +330,7 @@ class FanoutWorkflowTest : StringSpec({
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
             config = config,
         )
 
@@ -358,15 +358,15 @@ class FanoutWorkflowTest : StringSpec({
         (result2 as Result.Ok).value.status shouldBe FanoutResultStatus.SKIPPED
         (result2 as Result.Ok).value.message shouldBe "Duplicate within deduplication window"
 
-        // SlicingWorkflow가 1번만 호출되어야 함
-        coVerify(exactly = 1) { slicingWorkflow.execute(any(), any(), any(), any()) }
+        // FanoutSlicingPort가 1번만 호출되어야 함
+        coVerify(exactly = 1) { fanoutSlicing.execute(any(), any(), any()) }
     }
 
-    "SlicingWorkflow 실패 시 부분 실패 처리" {
+    "FanoutSlicingPort 실패 시 부분 실패 처리" {
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
         setupInvertedIndex(invertedIndexRepo, tenantId, "product_by_brand", brandKey.value, listOf(
@@ -376,17 +376,17 @@ class FanoutWorkflowTest : StringSpec({
         ))
 
         // P002만 실패하도록 설정
-        coEvery { slicingWorkflow.execute(tenantId, EntityKey("PRODUCT#test-tenant#P001"), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(tenantId, EntityKey("PRODUCT#test-tenant#P001"), any()) } returns
             Result.Ok(emptyList())
-        coEvery { slicingWorkflow.execute(tenantId, EntityKey("PRODUCT#test-tenant#P002"), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(tenantId, EntityKey("PRODUCT#test-tenant#P002"), any()) } returns
             Result.Err(DomainError.ValidationError("field", "test error"))
-        coEvery { slicingWorkflow.execute(tenantId, EntityKey("PRODUCT#test-tenant#P003"), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(tenantId, EntityKey("PRODUCT#test-tenant#P003"), any()) } returns
             Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // When
@@ -411,12 +411,12 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // When
@@ -435,12 +435,12 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // When - 어떤 것도 참조하지 않는 타입
@@ -458,12 +458,12 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // When
@@ -482,12 +482,12 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // When
@@ -508,7 +508,7 @@ class FanoutWorkflowTest : StringSpec({
         // Given
         val contractRegistry = createMockContractRegistry()
         val invertedIndexRepo = InMemoryInvertedIndexRepository()
-        val slicingWorkflow = mockk<SlicingWorkflow>(relaxed = true)
+        val fanoutSlicing = mockk<FanoutSlicingPort>(relaxed = true)
 
         val brandKey = EntityKey("BRAND#test-tenant#BR001")
         setupInvertedIndex(invertedIndexRepo, tenantId, "product_by_brand", brandKey.value, listOf(
@@ -516,13 +516,13 @@ class FanoutWorkflowTest : StringSpec({
             EntityKey("PRODUCT#test-tenant#P002") to 1L,
         ))
 
-        coEvery { slicingWorkflow.execute(any(), any(), any(), any()) } returns
+        coEvery { fanoutSlicing.execute(any(), any(), any()) } returns
             Result.Ok(emptyList())
 
         val workflow = FanoutWorkflow(
             contractRegistry = contractRegistry,
             invertedIndexRepo = invertedIndexRepo,
-            slicingWorkflow = slicingWorkflow,
+            fanoutSlicing = fanoutSlicing,
         )
 
         // When

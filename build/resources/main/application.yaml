@@ -19,9 +19,11 @@ dynamodb:
   region: ${AWS_REGION:-ap-northeast-2}
   # Remote-only: 환경 변수 우선, 없으면 .env 기본값 사용
   tableName: ${DYNAMODB_TABLE:-ivm-lite-schema-registry}
-  # AWS 자격 증명 (환경 변수 우선, 없으면 여기서 사용)
-  accessKeyId: ${AWS_ACCESS_KEY_ID:-AKIAQ3EGTFD6OOJMNI6W}
-  secretAccessKey: ${AWS_SECRET_ACCESS_KEY:-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}
+  # AWS 자격 증명 (우선순위: awsProfile > accessKeyId/secretAccessKey)
+  # awsProfile 설정 시 ~/.aws/credentials의 해당 프로필 사용 (AWS CLI 프로필과 동일)
+  awsProfile: ${AWS_PROFILE:-}
+  accessKeyId: ${AWS_ACCESS_KEY_ID:-}
+  secretAccessKey: ${AWS_SECRET_ACCESS_KEY:-}
 
 kafka:
   bootstrapServers: ${KAFKA_BOOTSTRAP_SERVERS:-localhost:9094}
@@ -30,6 +32,8 @@ kafka:
 
 contracts:
   resourcePath: /contracts/v1
+  # 개발 모드 Hot Reload: 파일 경로 설정 시 YAML 직접 로드 (재시작 없이 반영)
+  filePath: ${CONTRACTS_FILE_PATH:-}
 
 observability:
   metricsEnabled: true

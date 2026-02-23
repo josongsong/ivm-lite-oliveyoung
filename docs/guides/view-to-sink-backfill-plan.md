@@ -1,4 +1,4 @@
-# VIEW_TO_SINK Backfill 구현 계획
+# VIEW_TO_SINK Backfill — 구현 계획
 
 > Slice → View 조합 → Sink(OpenSearch) 벌크 인덱싱. 전체 데이터 reindex 지원.
 >

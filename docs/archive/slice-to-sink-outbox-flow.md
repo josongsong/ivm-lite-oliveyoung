@@ -1,4 +1,4 @@
-# Slice → Sink → Outbox 흐름
+# Slice → Sink → Outbox — 흐름
 
 ## 전체 파이프라인
 

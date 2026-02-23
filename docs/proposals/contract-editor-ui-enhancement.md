@@ -1,4 +1,4 @@
-# Ultimate Contract DX/UX Platform
+# Contract Editor — Ultimate DX/UX Platform
 
 **Subtitle**: Thinking Environment for Contract-First Systems
 

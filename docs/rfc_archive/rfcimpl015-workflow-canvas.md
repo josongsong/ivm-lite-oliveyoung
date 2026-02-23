@@ -1,4 +1,4 @@
-# RFC-IMPL-015: Workflow Canvas - 데이터 파이프라인 시각화
+# RFC-IMPL-015: Workflow Canvas — 데이터 파이프라인 시각화
 
 | 항목 | 내용 |
 |------|------|

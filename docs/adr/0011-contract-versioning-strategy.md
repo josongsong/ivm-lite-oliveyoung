@@ -256,6 +256,6 @@ vim src/main/resources/contracts/v1/entity.product.v1.yaml
 
 ## 참고
 
-- [RFC-012](../rfc/rfc012-contract-versioning-strategy.md) - 원본 RFC 문서
-- [RFC-V4-003](../rfc/rfc003.md) - Contract Enhancement
+- [RFC-012](../rfc_archive/rfc012-contract-versioning-strategy.md) - 원본 RFC 문서
+- [RFC-V4-003](../rfc_archive/rfc003.md) - Contract Enhancement
 - [Semantic Versioning 2.0.0](https://semver.org/)

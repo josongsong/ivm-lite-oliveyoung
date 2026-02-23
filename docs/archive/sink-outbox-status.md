@@ -1,4 +1,4 @@
-# Sink Outbox 설정 현황
+# Sink Outbox — 설정 현황
 
 ## 현재 상태
 

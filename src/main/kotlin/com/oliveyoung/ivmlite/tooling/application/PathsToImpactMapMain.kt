@@ -4,11 +4,11 @@ import java.io.File
 
 /**
  * pathsToImpactMap Gradle 실행용 main
- * ./gradlew pathsToImpactMap -Dpaths=paths.yaml -Doutput=impact-map-draft.yaml
+ * ./gradlew pathsToImpactMap -Dpaths=.tmp/paths.yaml -Doutput=.tmp/impact-map-draft.yaml
  */
 fun main(args: Array<String>) {
-    val paths = args.findArg("--paths") ?: System.getProperty("paths") ?: "paths.yaml"
-    val output = args.findArg("--output") ?: System.getProperty("output") ?: "impact-map-draft.yaml"
+    val paths = args.findArg("--paths") ?: System.getProperty("paths") ?: ".tmp/paths.yaml"
+    val output = args.findArg("--output") ?: System.getProperty("output") ?: ".tmp/impact-map-draft.yaml"
 
     println("PathsToImpactMap - impactMap 초안 생성 (product-schema-dx-proposal RFC 2.2)")
     println("━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━")

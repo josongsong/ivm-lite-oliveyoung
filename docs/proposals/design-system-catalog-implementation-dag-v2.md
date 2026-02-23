@@ -1,4 +1,4 @@
-# Design System Catalog 구현 DAG - 최대 동시성 버전
+# Design System Catalog 구현 DAG — 최대 동시성 버전
 
 **목적**: 최대 20-25명이 동시에 작업할 수 있도록 의존성을 최소화하고 작업을 세분화
 

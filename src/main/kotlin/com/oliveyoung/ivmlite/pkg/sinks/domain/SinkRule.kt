@@ -67,6 +67,21 @@ enum class SinkTargetType {
      * 규칙: {type}-sink (예: opensearch-sink, s3-sink)
      */
     fun toPluginId(): String = "${name.lowercase()}-sink"
+
+    /**
+     * Preflight 에러 메시지용: 이 타입 활성화에 필요한 환경변수
+     */
+    fun requiredEnvVar(): String? = when (this) {
+        OPENSEARCH -> "OPENSEARCH_ENDPOINT"
+        S3 -> "S3_BUCKET"
+        PERSONALIZE -> "PERSONALIZE_DATASET_ARN"
+        KAFKA -> "KAFKA_BOOTSTRAP_SERVERS"
+    }
+
+    companion object {
+        fun fromPluginId(pluginId: String): SinkTargetType? =
+            entries.find { it.toPluginId() == pluginId }
+    }
 }
 
 data class AuthSpec(

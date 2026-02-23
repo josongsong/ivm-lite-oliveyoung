@@ -4,6 +4,7 @@ import arrow.core.Either
 import arrow.core.left
 import arrow.core.right
 import com.oliveyoung.ivmlite.pkg.rawdata.application.IngestionOrchestrator
+import com.oliveyoung.ivmlite.pkg.rawdata.application.IngestionResult
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.IngestionCommand
 import com.oliveyoung.ivmlite.sdk.dsl.entity.BrandInput
 import com.oliveyoung.ivmlite.sdk.dsl.entity.CategoryInput
@@ -39,6 +40,54 @@ class DeployExecutor(
     private val orchestrator: IngestionOrchestrator,
     private val contractResolver: EntityContractResolver
 ) {
+    /**
+     * API용 Deploy: IngestRequest 스타일 입력 → IngestionResult
+     *
+     * POST /api/v1/ingest에서 SDK를 통한 일원화된 처리.
+     * Contract 해석 → IngestionCommand → IngestionOrchestrator
+     */
+    suspend fun executeFromApi(
+        tenantId: String,
+        entityKey: String,
+        payload: JsonObject,
+        jobId: String? = null,
+        skipSink: Boolean = false,
+        inProcessSink: Boolean = false,
+    ): Result<IngestionResult> {
+        val entityType = entityKey.substringBefore(":")
+        if (entityType.isBlank() || !entityKey.contains(":")) {
+            return Result.Err(DomainError.ValidationError("entityKey", "entityKey must be 'type:id' format (e.g. 'product:SKU-001')"))
+        }
+
+        val ruleSetRef = when (val r = contractResolver.resolveRuleSetRef(entityType)) {
+            is Either.Left -> return Result.Err(r.value)
+            is Either.Right -> r.value
+        }
+        val viewDefId = when (val r = contractResolver.resolveViewDefId(entityType)) {
+            is Either.Left -> return Result.Err(r.value)
+            is Either.Right -> r.value
+        }
+        val viewDefVersion = when (val r = contractResolver.resolveViewDefVersion(entityType)) {
+            is Either.Left -> return Result.Err(r.value)
+            is Either.Right -> r.value
+        }
+
+        val command = IngestionCommand(
+            tenantId = TenantId(tenantId),
+            entityKey = EntityKey(entityKey),
+            data = payload,
+            ruleSetRef = ruleSetRef,
+            viewDefId = viewDefId,
+            viewDefVersion = viewDefVersion,
+            version = VersionGenerator.generate(),
+            jobId = jobId,
+            skipSink = skipSink,
+            inProcessSink = inProcessSink,
+        )
+
+        return orchestrator.ingest(command)
+    }
+
     /**
      * 동기 Deploy 실행 (올인원)
      *

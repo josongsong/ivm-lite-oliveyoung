@@ -8,7 +8,7 @@ import java.time.Duration
  * 기본 Alert Rule Loader
  *
  * 하드코딩된 기본 규칙들을 제공한다.
- * TODO: YAML 파일에서 로드하도록 확장 가능
+ * YAML 확장: YamlAlertRuleLoader 사용 시 /alerts/rules.yaml에서 추가 규칙 로드 가능.
  */
 class DefaultAlertRuleLoader : AlertRuleLoaderPort {
 

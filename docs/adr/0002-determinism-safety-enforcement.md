@@ -102,5 +102,5 @@ RFC-V4-001은 구조적으로 완결된 런타임 아키텍처를 정의했지�
 
 ## 참고
 
-- [RFC-V4-002](../rfc/rfc002.md) - 원본 RFC 문서
+- [RFC-V4-002](../rfc_archive/rfc002.md) - 원본 RFC 문서
 - [RFC 8785](https://www.rfc-editor.org/rfc/rfc8785.html) - JSON Canonicalization Scheme

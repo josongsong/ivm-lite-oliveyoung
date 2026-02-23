@@ -9,7 +9,7 @@ import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutConfig
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutDependency
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutJob
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutJobStatus
-import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
+import com.oliveyoung.ivmlite.pkg.fanout.ports.FanoutSlicingPort
 import com.oliveyoung.ivmlite.pkg.slices.ports.FanoutTarget
 import com.oliveyoung.ivmlite.pkg.slices.ports.InvertedIndexRepositoryPort
 import com.oliveyoung.ivmlite.shared.adapters.withSpanSuspend
@@ -52,7 +52,7 @@ import java.util.concurrent.atomic.AtomicLong
 class FanoutWorkflow(
     private val contractRegistry: ContractRegistryPort,
     private val invertedIndexRepo: InvertedIndexRepositoryPort,
-    private val slicingWorkflow: SlicingWorkflow,
+    private val fanoutSlicing: FanoutSlicingPort,
     private val config: FanoutConfig = FanoutConfig.DEFAULT,
     private val tracer: Tracer = OpenTelemetry.noop().getTracer("fanout"),
     private val contractResolver: EntityContractResolver? = null,
@@ -462,7 +462,7 @@ class FanoutWorkflow(
 
             if (targetSliceTypes.isEmpty()) {
                 // 전체 재슬라이싱
-                when (val r = slicingWorkflow.execute(tenantId, target.entityKey, newVersion)) {
+                when (val r = fanoutSlicing.execute(tenantId, target.entityKey, newVersion)) {
                     is Result.Ok -> {
                         log.debug("Successfully re-sliced: {}#{}", target.entityKey.value, newVersion)
                         true
@@ -476,7 +476,7 @@ class FanoutWorkflow(
                 // 특정 슬라이스만 재슬라이싱 (executeIncremental 활용)
                 // NOTE: 현재 SlicingWorkflow는 sliceType 필터를 지원하지 않음
                 // 전체 재슬라이싱 후 필요한 것만 저장하는 방식으로 구현
-                when (val r = slicingWorkflow.execute(tenantId, target.entityKey, newVersion)) {
+                when (val r = fanoutSlicing.execute(tenantId, target.entityKey, newVersion)) {
                     is Result.Ok -> {
                         log.debug("Successfully re-sliced (filtered): {}#{}", target.entityKey.value, newVersion)
                         true

@@ -1,4 +1,4 @@
-# OpenTelemetry Tracing 연동 현황
+# OpenTelemetry Tracing — 연동 현황
 
 > **RFC-IMPL-009**: Tracing SSOT (Single Source Of Truth)  
 > **상태**: ✅ Production Ready  
@@ -451,7 +451,7 @@ service:
 
 ## 📚 관련 문서
 
-- [RFC-IMPL-009](./rfc/rfcimpl009.md) - Observability SSOT
+- [RFC-IMPL-009](../rfc_archive/rfcimpl009.md) - Observability SSOT
 - [OpenTelemetry 공식 문서](https://opentelemetry.io/docs/)
 - [OTLP Exporter 가이드](https://opentelemetry.io/docs/specs/otel/protocol/exporter/)
 

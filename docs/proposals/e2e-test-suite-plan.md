@@ -1,4 +1,4 @@
-# SOTA급 E2E Test Suite 계획
+# SOTA급 E2E Test Suite — 계획
 
 ## 현재 상태
 - **33개 테스트 통과** (15.5초)

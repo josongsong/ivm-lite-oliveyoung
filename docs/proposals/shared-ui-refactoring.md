@@ -1,4 +1,4 @@
-# RFC: Shared UI Component 리팩토링 제안서
+# Shared UI Component — 리팩토링 제안서
 
 > **Status**: ✅ **Implemented** (Phase 4 완료)
 > **Author**: Claude Code

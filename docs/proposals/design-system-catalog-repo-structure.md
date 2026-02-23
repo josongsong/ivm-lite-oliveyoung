@@ -1,4 +1,4 @@
-# Design System Catalog 레포지토리 구성
+# Design System Catalog — 레포지토리 구성
 
 **목적**: FSD 아키텍처를 준수하면서 확장 가능한 레포지토리 구조 정의
 

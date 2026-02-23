@@ -39,15 +39,10 @@ fun Route.backfillRoutes() {
     get("/backfill") {
         try {
             val status = call.request.queryParameters["status"]
-                ?.let { BackfillStatus.valueOf(it.uppercase()) }
+                ?.let { runCatching { BackfillStatus.valueOf(it.uppercase()) }.getOrNull() }
             val limit = call.request.queryParameters["limit"]?.toIntOrNull() ?: 20
 
-            val jobs = if (status != null) {
-                // TODO: status 필터 지원
-                backfillService.getRecentJobs(limit)
-            } else {
-                backfillService.getRecentJobs(limit)
-            }
+            val jobs = backfillService.getRecentJobs(limit = limit, status = status)
 
             call.respond(HttpStatusCode.OK, BackfillJobListResponse(
                 jobs = jobs.map { it.toDto() },

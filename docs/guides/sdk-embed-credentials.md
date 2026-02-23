@@ -1,4 +1,4 @@
-# SDK Embed 시 CredentialsProvider 주입
+# SDK Embed — CredentialsProvider 주입
 
 IVM-Lite를 라이브러리로 embed하는 외부 앱에서 AWS 자격 증명을 주입하는 방법입니다.
 
@@ -87,5 +87,5 @@ install(Koin) {
 
 ## 5. 관련 문서
 
-- [RFC-019 External SDK Integration](../rfc/RFC-019-external-sdk-integration.md)
+- [RFC-019 External SDK Integration](../rfc_archive/2026-02/RFC-019-external-sdk-integration.md)
 - [IAM 역할 설정](../.cursorrules) - ECS/EC2/Lambda IAM 연결 방법

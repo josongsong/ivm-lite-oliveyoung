@@ -66,7 +66,7 @@ QUERY_JSON=$(jq -n \
     --argjson version "$VERSION" \
     '{tenantId: $tenantId, viewId: "view.product.search.v1", entityKey: $entityKey, version: $version}')
 
-QUERY_RESP=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/v2/query" \
+QUERY_RESP=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/v1/query" \
     -H "Content-Type: application/json" \
     -d "$QUERY_JSON")
 
@@ -91,7 +91,7 @@ QUERY2_JSON=$(jq -n \
     --argjson version "$VERSION" \
     '{tenantId: $tenantId, viewId: "view.product.pdp.v1", entityKey: $entityKey, version: $version}')
 
-QUERY2_RESP=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/v2/query" \
+QUERY2_RESP=$(curl -s -w "\n%{http_code}" -X POST "$API_BASE/api/v1/query" \
     -H "Content-Type: application/json" \
     -d "$QUERY2_JSON")
 

@@ -2,12 +2,16 @@ package com.oliveyoung.ivmlite.apps.runtimeapi.wiring
 
 import com.oliveyoung.ivmlite.pkg.changeset.ports.ChangeSetBuilderPort
 import com.oliveyoung.ivmlite.pkg.changeset.ports.ImpactCalculatorPort
+import com.oliveyoung.ivmlite.pkg.fanout.adapters.SlicingWorkflowFanoutAdapter
 import com.oliveyoung.ivmlite.pkg.fanout.application.FanoutWorkflow
 import com.oliveyoung.ivmlite.pkg.fanout.domain.FanoutConfig
+import com.oliveyoung.ivmlite.pkg.fanout.ports.FanoutSlicingPort
 import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 import com.oliveyoung.ivmlite.pkg.orchestration.application.SlicingWorkflow
 import com.oliveyoung.ivmlite.pkg.rawdata.application.IngestionOrchestrator
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.IngestionWorkflow
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPluginRegistryPort
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPreflightPort
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
 import com.oliveyoung.ivmlite.pkg.slices.ports.SlicingEnginePort
 import com.oliveyoung.ivmlite.shared.adapters.ExposedTransactionAdapter
@@ -48,14 +52,16 @@ val workflowModule = module {
 
     // ===== Application Layer =====
 
-    // IngestionOrchestrator (트랜잭션 + SinkEvent 발행)
+    // IngestionOrchestrator (트랜잭션 + SinkEvent 발행 또는 inProcessSink 시 SinkPlugin 직접 호출)
     // SOTA: RawData → Slicing → View → SinkEvent (단일 트랜잭션)
     single {
         IngestionOrchestrator(
             workflow = get(),
             sinkEventRepo = get(),
             transactionPort = get(),
-            sinkRuleRegistry = get<SinkRuleRegistryPort>()
+            sinkRuleRegistry = get<SinkRuleRegistryPort>(),
+            sinkPreflight = get<SinkPreflightPort>(),
+            pluginRegistry = getOrNull<SinkPluginRegistryPort>(),
         )
     }
 
@@ -75,7 +81,7 @@ val workflowModule = module {
         )
     }
 
-    // QueryViewWorkflow (RFC-IMPL-005, /api/v1/query, /api/v2/query 엔드포인트)
+    // QueryViewWorkflow (RFC-IMPL-005, /api/v1/query 엔드포인트)
     single {
         QueryViewWorkflow(
             sliceRepo = get(),
@@ -84,12 +90,17 @@ val workflowModule = module {
         )
     }
 
+    // FanoutSlicingPort (RFC-V4-010: orchestration 직접 호출 방지)
+    single<FanoutSlicingPort> {
+        SlicingWorkflowFanoutAdapter(slicingWorkflow = get())
+    }
+
     // FanoutWorkflow (RFC-IMPL-012)
     single {
         FanoutWorkflow(
             contractRegistry = get(),
             invertedIndexRepo = get(),
-            slicingWorkflow = get(),
+            fanoutSlicing = get(),
             config = FanoutConfig.DEFAULT,
             tracer = get<Tracer>(),
             contractResolver = get(),

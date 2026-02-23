@@ -4,9 +4,31 @@ import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAd
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.IngestionCommand
 import com.oliveyoung.ivmlite.pkg.rawdata.domain.IngestionWorkflow
+import arrow.core.Either
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkEventRepository
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkPluginRegistry
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkRuleRegistry
+import com.oliveyoung.ivmlite.sinks.contract.BatchResult
+import com.oliveyoung.ivmlite.sinks.contract.PluginCapabilities
+import com.oliveyoung.ivmlite.sinks.contract.SinkPayload
+import com.oliveyoung.ivmlite.sinks.contract.SinkPlugin
+import com.oliveyoung.ivmlite.sinks.contract.SinkResult
+import com.oliveyoung.ivmlite.sinks.contract.ErrorReasonCode
+import com.oliveyoung.ivmlite.sinks.contract.SinkError
+import com.oliveyoung.ivmlite.sinks.contract.SinkStatus
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.NoOpSinkPreflight
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.SinkPreflightPluginRegistryAdapter
+import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPreflightPort
+import com.oliveyoung.ivmlite.pkg.sinks.domain.AuthSpec
+import com.oliveyoung.ivmlite.pkg.sinks.domain.AuthType
+import com.oliveyoung.ivmlite.pkg.sinks.domain.DocIdSpec
+import com.oliveyoung.ivmlite.pkg.sinks.domain.InputType
 import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkEvent
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkRule
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkRuleInput
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkRuleStatus
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkRuleTarget
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkTargetType
 import com.oliveyoung.ivmlite.pkg.slices.adapters.DefaultSlicingEngineAdapter
 import com.oliveyoung.ivmlite.pkg.slices.adapters.InMemorySliceRepository
 import com.oliveyoung.ivmlite.pkg.slices.domain.JoinExecutor
@@ -17,11 +39,13 @@ import com.oliveyoung.ivmlite.shared.adapters.NoOpTransactionAdapter
 import com.oliveyoung.ivmlite.shared.domain.errors.DomainError
 import com.oliveyoung.ivmlite.shared.domain.types.EntityKey
 import com.oliveyoung.ivmlite.shared.domain.types.Result
+import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.domain.types.TenantId
 import com.oliveyoung.ivmlite.shared.ports.TransactionPort
 import io.kotest.core.spec.style.DescribeSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
+import io.kotest.matchers.string.shouldContain
 import io.kotest.matchers.types.shouldBeInstanceOf
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -55,12 +79,17 @@ class IngestionOrchestratorTest : DescribeSpec({
     val productViewDefVersion = (contractResolver.resolveViewDefVersion("product") as arrow.core.Either.Right).value
 
     fun createOrchestrator(
-        transactionPort: TransactionPort = NoOpTransactionAdapter()
+        transactionPort: TransactionPort = NoOpTransactionAdapter(),
+        sinkPreflight: SinkPreflightPort = NoOpSinkPreflight,
+        pluginRegistry: com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPluginRegistryPort? = null,
+        sinkRuleRegistryOverride: com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkRuleRegistry? = null,
     ) = IngestionOrchestrator(
         workflow = workflow,
         sinkEventRepo = sinkEventRepo,
         transactionPort = transactionPort,
-        sinkRuleRegistry = sinkRuleRegistry
+        sinkRuleRegistry = sinkRuleRegistryOverride ?: sinkRuleRegistry,
+        sinkPreflight = sinkPreflight,
+        pluginRegistry = pluginRegistry,
     )
 
     fun productCommand(
@@ -68,7 +97,9 @@ class IngestionOrchestratorTest : DescribeSpec({
         name: String = "Test Product",
         price: Int = 29000,
         version: Long = 1L,
-        jobId: String? = null
+        jobId: String? = null,
+        skipSink: Boolean = false,
+        inProcessSink: Boolean = false,
     ) = IngestionCommand(
         tenantId = TenantId("test-tenant"),
         entityKey = EntityKey(entityKey),
@@ -81,7 +112,9 @@ class IngestionOrchestratorTest : DescribeSpec({
         viewDefId = productViewDefId,
         viewDefVersion = productViewDefVersion,
         version = version,
-        jobId = jobId
+        jobId = jobId,
+        skipSink = skipSink,
+        inProcessSink = inProcessSink,
     )
 
     beforeEach {
@@ -198,6 +231,37 @@ class IngestionOrchestratorTest : DescribeSpec({
         }
     }
 
+    describe("Sink Preflight") {
+
+        it("미등록 Sink target 시 즉시 ConfigError 반환") {
+            val emptyRegistry = InMemorySinkPluginRegistry(emptyMap())
+            val failingPreflight = SinkPreflightPluginRegistryAdapter(emptyRegistry)
+            val orchestrator = createOrchestrator(sinkPreflight = failingPreflight)
+            val command = productCommand("product:preflight-fail")
+
+            val result = orchestrator.ingest(command)
+
+            result.shouldBeInstanceOf<Result.Err>()
+            val err = (result as Result.Err).error
+            err.shouldBeInstanceOf<DomainError.ConfigError>()
+            err.message shouldContain "opensearch-sink"
+            err.message shouldContain "OPENSEARCH_ENDPOINT"
+        }
+
+        it("Preflight 실패 시 RawData/Slice 저장 안됨 (Workflow 실행 전 검증)") {
+            val emptyRegistry = InMemorySinkPluginRegistry(emptyMap())
+            val failingPreflight = SinkPreflightPluginRegistryAdapter(emptyRegistry)
+            val orchestrator = createOrchestrator(sinkPreflight = failingPreflight)
+            val command = productCommand("product:preflight-no-save")
+
+            orchestrator.ingest(command)
+
+            rawDataRepo.size() shouldBe 0
+            sliceRepo.size() shouldBe 0
+            sinkEventRepo.size() shouldBe 0
+        }
+    }
+
     describe("SinkRule 미매칭") {
 
         it("SinkRule 없으면 SinkEvent 미발행") {
@@ -238,4 +302,198 @@ class IngestionOrchestratorTest : DescribeSpec({
             r.version shouldBe 777L
         }
     }
+
+    describe("inProcessSink") {
+
+        it("inProcessSink=true 시 SinkPlugin 직접 호출, SinkEvent 미발행") {
+            val capturePlugin = CaptureSinkPlugin()
+            val pluginRegistry = InMemorySinkPluginRegistry(
+                mapOf("opensearch-sink" to capturePlugin)
+            )
+            val preflight = SinkPreflightPluginRegistryAdapter(pluginRegistry)
+            val freshSinkRuleRegistry = InMemorySinkRuleRegistry()
+            val orchestrator = createOrchestrator(
+                sinkPreflight = preflight,
+                pluginRegistry = pluginRegistry,
+                sinkRuleRegistryOverride = freshSinkRuleRegistry,
+            )
+            val command = productCommand("product:inproc-001", inProcessSink = true)
+
+            val result = orchestrator.ingest(command)
+
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val r = (result as Result.Ok<*>).value as IngestionResult
+            r.sinkPending shouldBe true
+            r.sliceCount shouldBe 9
+            r.viewCount shouldBe 1
+            // SinkEvent는 DynamoDB에 넣지 않음 (inProcessSink)
+            sinkEventRepo.size() shouldBe 0
+            // Capture 플러그인이 페이로드 수신
+            capturePlugin.receivedPayloads.shouldHaveSize(1)
+            capturePlugin.receivedPayloads[0].entityKey shouldBe "product:inproc-001"
+        }
+
+        it("pluginRegistry=null이면 inProcessSink=true 시 ValidationError") {
+            val freshSinkRuleRegistry = InMemorySinkRuleRegistry()
+            val preflight = SinkPreflightPluginRegistryAdapter(InMemorySinkPluginRegistry(mapOf("opensearch-sink" to CaptureSinkPlugin())))
+            val orchestrator = createOrchestrator(
+                sinkPreflight = preflight,
+                pluginRegistry = null,
+                sinkRuleRegistryOverride = freshSinkRuleRegistry,
+            )
+            val command = productCommand("product:err-001", inProcessSink = true)
+
+            val result = orchestrator.ingest(command)
+
+            result.shouldBeInstanceOf<Result.Err>()
+            val err = (result as Result.Err).error
+            err.shouldBeInstanceOf<DomainError.ValidationError>()
+            (err as DomainError.ValidationError).field shouldBe "inProcessSink"
+            err.message shouldContain "SinkPluginRegistry"
+        }
+
+        it("skipSink=true이면 inProcessSink=true여도 sink 처리 안 함") {
+            val capturePlugin = CaptureSinkPlugin()
+            val pluginRegistry = InMemorySinkPluginRegistry(mapOf("opensearch-sink" to capturePlugin))
+            val preflight = SinkPreflightPluginRegistryAdapter(pluginRegistry)
+            val freshSinkRuleRegistry = InMemorySinkRuleRegistry()
+            val orchestrator = createOrchestrator(
+                sinkPreflight = preflight,
+                pluginRegistry = pluginRegistry,
+                sinkRuleRegistryOverride = freshSinkRuleRegistry,
+            )
+            val command = productCommand("product:skip-001", skipSink = true, inProcessSink = true)
+
+            val result = orchestrator.ingest(command)
+
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val r = (result as Result.Ok<*>).value as IngestionResult
+            r.sinkPending shouldBe false
+            r.sliceCount shouldBe 9
+            r.viewCount shouldBe 1
+            sinkEventRepo.size() shouldBe 0
+            capturePlugin.receivedPayloads.shouldHaveSize(0)
+        }
+
+        it("플러그인 실행 실패 시 Result.Err") {
+            val failingPlugin = FailingSinkPlugin()
+            val pluginRegistry = InMemorySinkPluginRegistry(mapOf("opensearch-sink" to failingPlugin))
+            val preflight = SinkPreflightPluginRegistryAdapter(pluginRegistry)
+            val freshSinkRuleRegistry = InMemorySinkRuleRegistry()
+            val orchestrator = createOrchestrator(
+                sinkPreflight = preflight,
+                pluginRegistry = pluginRegistry,
+                sinkRuleRegistryOverride = freshSinkRuleRegistry,
+            )
+            val command = productCommand("product:fail-001", inProcessSink = true)
+
+            val result = orchestrator.ingest(command)
+
+            result.shouldBeInstanceOf<Result.Err>()
+            val err = (result as Result.Err).error
+            err.shouldBeInstanceOf<DomainError.StorageError>()
+            (err as DomainError.StorageError).msg shouldContain "opensearch-sink"
+        }
+
+        it("일부 target만 등록되어 있으면 등록된 플러그인만 실행") {
+            val capturePlugin = CaptureSinkPlugin()
+            val pluginRegistry = InMemorySinkPluginRegistry(mapOf("opensearch-sink" to capturePlugin))
+            val freshSinkRuleRegistry = InMemorySinkRuleRegistry().apply {
+                register(
+                    SinkRule(
+                        id = "sinkrule.s3.default",
+                        version = "1.0.0",
+                        status = SinkRuleStatus.ACTIVE,
+                        input = SinkRuleInput(
+                            type = InputType.SLICE,
+                            sliceTypes = listOf(SliceType.CORE),
+                            entityTypes = listOf("PRODUCT")
+                        ),
+                        target = SinkRuleTarget(
+                            type = SinkTargetType.S3,
+                            endpoint = "s3://test-bucket",
+                            auth = AuthSpec(type = AuthType.NONE)
+                        ),
+                        docId = DocIdSpec()
+                    )
+                )
+            }
+            val preflight = SinkPreflightPluginRegistryAdapter(
+                InMemorySinkPluginRegistry(
+                    mapOf(
+                        "opensearch-sink" to capturePlugin,
+                        "s3-sink" to CaptureSinkPlugin(),
+                    )
+                )
+            )
+            val orchestrator = createOrchestrator(
+                sinkPreflight = preflight,
+                pluginRegistry = pluginRegistry,
+                sinkRuleRegistryOverride = freshSinkRuleRegistry,
+            )
+            val command = productCommand("product:partial-001", inProcessSink = true)
+
+            val result = orchestrator.ingest(command)
+
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            val r = (result as Result.Ok<*>).value as IngestionResult
+            r.sinkPending shouldBe true
+            capturePlugin.receivedPayloads.shouldHaveSize(1)
+        }
+
+        it("jobId가 metadata에 전달됨") {
+            val capturePlugin = CaptureSinkPlugin()
+            val pluginRegistry = InMemorySinkPluginRegistry(mapOf("opensearch-sink" to capturePlugin))
+            val preflight = SinkPreflightPluginRegistryAdapter(pluginRegistry)
+            val freshSinkRuleRegistry = InMemorySinkRuleRegistry()
+            val orchestrator = createOrchestrator(
+                sinkPreflight = preflight,
+                pluginRegistry = pluginRegistry,
+                sinkRuleRegistryOverride = freshSinkRuleRegistry,
+            )
+            val command = productCommand("product:job-001", jobId = "job-xyz-123", inProcessSink = true)
+
+            val result = orchestrator.ingest(command)
+
+            result.shouldBeInstanceOf<Result.Ok<*>>()
+            capturePlugin.receivedPayloads.shouldHaveSize(1)
+            capturePlugin.receivedPayloads[0].metadata["jobId"] shouldBe "job-xyz-123"
+        }
+    }
 })
+
+private class CaptureSinkPlugin : SinkPlugin {
+    val receivedPayloads = mutableListOf<SinkPayload.V1>()
+
+    override val pluginId = "opensearch-sink"
+    override val capabilities = PluginCapabilities(
+        supportedContractVersions = setOf("1.0"),
+        supportsBatch = true,
+        maxBatchSize = 500,
+    )
+
+    override suspend fun executeBatch(payloads: List<SinkPayload>): Either<SinkError, BatchResult> {
+        payloads.filterIsInstance<SinkPayload.V1>().forEach { receivedPayloads.add(it) }
+        val results = payloads.map { p ->
+            SinkResult(p.idempotencyKey, SinkStatus.SUCCESS, java.time.Instant.now().toString())
+        }
+        return Either.Right(BatchResult(results, emptyList(), emptyList()))
+    }
+}
+
+private class FailingSinkPlugin : SinkPlugin {
+    override val pluginId = "opensearch-sink"
+    override val capabilities = PluginCapabilities(
+        supportedContractVersions = setOf("1.0"),
+        supportsBatch = true,
+        maxBatchSize = 500,
+    )
+
+    override suspend fun executeBatch(payloads: List<SinkPayload>): Either<SinkError, BatchResult> =
+        Either.Left(
+            SinkError.NonRetryableError(
+                reasonCode = ErrorReasonCode.PLUGIN_EXECUTION_FAILED,
+                message = "Simulated plugin failure"
+            )
+        )
+}

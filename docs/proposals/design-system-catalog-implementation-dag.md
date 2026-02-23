@@ -1,4 +1,4 @@
-# Design System Catalog 구현 DAG 및 배치별 작업 프롬프트
+# Design System Catalog — 구현 DAG 및 배치별 작업 프롬프트
 
 **목적**: 여러 개발자가 동시에 작업할 수 있도록 의존성 기반 작업 분할
 

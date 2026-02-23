@@ -27,8 +27,7 @@ import org.koin.ktor.ext.inject
  * Query Routes (RFC-IMPL-004, RFC-IMPL-005, RFC-IMPL-010 GAP-D)
  *
  * POST /api/v1/slice: Slicing 실행
- * POST /api/v1/query: View 조회 (v1 - sliceTypes 직접 전달, deprecated)
- * POST /api/v2/query: View 조회 (v2 - ViewDefinition 기반)
+ * POST /api/v1/query: View 조회 (sliceTypes 비어있으면 ViewDefinition 기반, 있으면 sliceTypes 직접 사용)
  */
 fun Route.queryRoutes() {
     val slicingWorkflow by inject<SlicingWorkflow>()
@@ -70,15 +69,14 @@ fun Route.queryRoutes() {
             }
         }
 
-        // Query View v1 (RFC-IMPL-005) - deprecated, sliceTypes 직접 전달
-        @Suppress("DEPRECATION")
+        // Query View (RFC-IMPL-005, RFC-IMPL-010: sliceTypes 없으면 ViewDefinition 기반)
         post("/query") {
             val request = call.receive<QueryRequest>()
 
             val tenantId = TenantId(request.tenantId)
             val entityKey = EntityKey(request.entityKey)
 
-            // sliceTypes가 비어있으면 v2 API로 처리 (ViewDefinition 기반)
+            // sliceTypes가 비어있으면 ViewDefinition 기반 조회
             if (request.sliceTypes.isEmpty()) {
                 val result = queryViewWorkflow.execute(
                     tenantId = tenantId,
@@ -131,36 +129,6 @@ fun Route.queryRoutes() {
             }
         }
     }
-
-    // v2 API (RFC-IMPL-010 GAP-D: ViewDefinition 기반)
-    route("/api/v2") {
-        post("/query") {
-            val request = call.receive<QueryRequestV2>()
-
-            val tenantId = TenantId(request.tenantId)
-            val entityKey = EntityKey(request.entityKey)
-
-            val result = queryViewWorkflow.execute(
-                tenantId = tenantId,
-                viewId = request.viewId,
-                entityKey = entityKey,
-                version = request.version,
-            )
-
-            when (result) {
-                is Result.Ok -> {
-                    call.respondText(
-                        serializeViewResponse(result.value),
-                        ContentType.Application.Json,
-                        HttpStatusCode.OK,
-                    )
-                }
-                is Result.Err -> {
-                    call.respond(result.error.toKtorStatus(), ApiError.from(result.error))
-                }
-            }
-        }
-    }
 }
 
 /**
@@ -191,14 +159,3 @@ private fun serializeViewResponse(response: QueryViewWorkflow.ViewResponse): Str
     jsonBuilder.append("}")
     return jsonBuilder.toString()
 }
-
-/**
- * v2 Query Request (ViewDefinition 기반 - sliceTypes 없음)
- */
-@kotlinx.serialization.Serializable
-data class QueryRequestV2(
-    val tenantId: String,
-    val viewId: String,
-    val entityKey: String,
-    val version: Long,
-)
