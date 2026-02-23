@@ -77,7 +77,7 @@ src/main/kotlin/com/oliveyoung/ivmlite/
 │   │   └── adapters/        # Jooq, DynamoDB, InMemory
 │   │
 │   ├── slices/
-│   │   ├── domain/          # SliceRecord, SlicingEngine, InvertedIndexBuilder
+│   │   ├── domain/          # SliceRecord, SliceExecutionPlanner, SlicingEngine, InvertedIndexBuilder
 │   │   ├── ports/           # SliceRepositoryPort, InvertedIndexRepositoryPort
 │   │   └── adapters/        # Jooq, DynamoDB, InMemory
 │   │
@@ -167,8 +167,8 @@ suspend fun slicePartial(rawData, ruleSetRef, impactedTypes): Result<SlicingResu
 2. IngestWorkflow.execute()
    - CanonicalJson.canonicalize(payload)  # 정규화
    - Hashing.sha256Hex(...)               # 해싱
-   - rawRepo.putIdempotent(record)        # RawData 저장
-   - outboxRepo.insert(entry)             # Outbox 저장
+   - rawRepo.putIdempotent(record)        # RawData 저장 (DynamoDB)
+   - SlicingWorkflow → SinkEvent (DynamoDB Streams → Lambda)
    ↓
 3. SlicingWorkflow.execute()  (또는 executeAuto)
    - rawRepo.get()                        # RawData 조회
@@ -228,30 +228,29 @@ suspend fun executeIncremental(tenantId, entityKey, fromVersion, toVersion, rule
 
 | Port | 메서드 |
 |------|--------|
-| `RawDataRepositoryPort` | `putIdempotent()`, `get()` |
+| `RawDataRepositoryPort` | `putIdempotent()`, `get()`, `getLatest()`, `batchGetLatest()` |
 | `SliceRepositoryPort` | `putAllIdempotent()`, `batchGet()`, `getByVersion()`, `findByKeyPrefix()`, `count()` |
 | `ContractRegistryPort` | `loadViewDefinitionContract()`, `loadRuleSetContract()`, `listViewDefinitions()` |
-| `OutboxRepositoryPort` | `insert()`, `findPending()`, `markProcessed()` |
+| `SinkEventRepositoryPort` | `put()`, `findByStatus()`, `findById()` (Outbox 대체) |
 | `InvertedIndexRepositoryPort` | `putAllIdempotent()`, `queryByIndex()`, `listTargets()` |
 
 ### Adapters
 
-| Port | InMemory | PostgreSQL | DynamoDB |
-|------|----------|------------|----------|
-| RawData | `InMemoryRawDataRepository` | `JooqRawDataRepository` | `DynamoDbRawDataRepository` |
-| Slice | `InMemorySliceRepository` | `JooqSliceRepository` | `DynamoDbSliceRepository` |
-| Contract | - | - | `DynamoDBContractRegistryAdapter` |
-| Outbox | `InMemoryOutboxRepository` | `JooqOutboxRepository` | - |
-| InvertedIndex | `InMemoryInvertedIndexRepository` | `JooqInvertedIndexRepository` | `DynamoDbInvertedIndexRepository` |
+| Port | InMemory | DynamoDB |
+|------|----------|----------|
+| RawData | `InMemoryRawDataRepository` | `DynamoDbRawDataRepository` |
+| Slice | `InMemorySliceRepository` | `DynamoDbSliceRepository` |
+| Contract | - | `DynamoDBContractRegistryAdapter` |
+| SinkEvent | `InMemorySinkEventRepository` | `DynamoDbSinkEventRepository` |
+| InvertedIndex | `InMemoryInvertedIndexRepository` | `DynamoDbInvertedIndexRepository` |
 
 ### DI 모듈 (Koin)
 
 | 모듈 | 용도 |
 |------|------|
 | `adapterModule` | InMemory 어댑터 (개발/테스트) |
-| `jooqAdapterModule` | PostgreSQL 어댑터 |
 | `dynamodbContractModule` | DynamoDB Contract 어댑터 |
-| `productionAdapterModule` | DynamoDB + PostgreSQL (운영) |
+| `productionAdapterModule` | DynamoDB(RawData/Slice/InvertedIndex/SinkEvent/Contract) + PostgreSQL(View/Alert/Backfill) (운영) |
 
 ---
 
@@ -319,15 +318,15 @@ tracer.withSpanSuspend(
 ) { /* ... */ }
 ```
 
-### 6. Transactional Outbox
+### 6. SinkEvent (DynamoDB Streams)
 
-RawData 저장과 이벤트 발행의 **원자성 보장**.
+Outbox 제거됨. SinkEvent(DynamoDB) + Lambda로 Sink 단계 처리.
 
 ```kotlin
-// IngestWorkflow.kt
-rawRepo.putIdempotent(record)     // RawData 저장
-outboxRepo.insert(outboxEntry)    // Outbox 저장 (같은 트랜잭션)
-// → OutboxPollingWorker가 비동기로 처리
+// SinkEvent 흐름
+rawRepo.putIdempotent(record)     // RawData 저장 (DynamoDB)
+slicingWorkflow.execute(...)      // Slice 생성
+// → DynamoDB Streams → Lambda가 SinkEvent 처리
 ```
 
 ---
@@ -432,7 +431,10 @@ val view = Ivm.query(Views.Product.Pdp)
     .get()
 ```
 
-### 2. 운영 환경 (PostgreSQL + DynamoDB)
+### 2. 운영 환경 (DynamoDB + PostgreSQL)
+
+- **DynamoDB**: RawData, Slice, InvertedIndex, SinkEvent, Contract Registry
+- **PostgreSQL**: Alert, Backfill, Changeset, Webhook (View는 Slice 실시간 조합)
 
 ```kotlin
 // Koin DI 설정

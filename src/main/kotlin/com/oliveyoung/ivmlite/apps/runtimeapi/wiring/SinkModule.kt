@@ -6,6 +6,7 @@ import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkPluginRegistry
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.OpenSearchSinkPlugin
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.PersonalizeSinkPlugin
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.S3SinkPlugin
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkTargetType
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkFailureRepositoryPort
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPluginRegistryPort
 import com.oliveyoung.ivmlite.pkg.views.application.ViewComposer
@@ -46,27 +47,30 @@ val sinkPluginModule = module {
     single<SinkPluginRegistryPort> {
         val plugins = mutableMapOf<String, SinkPlugin>()
 
-        // OpenSearch Plugin
+        // OpenSearch Plugin (opensearch-index-plan v2: Static write alias)
         val opensearchEndpoint = System.getenv("OPENSEARCH_ENDPOINT")
         if (!opensearchEndpoint.isNullOrBlank()) {
-            val indexPattern = System.getenv("OPENSEARCH_INDEX_PATTERN") ?: "ivm-products-{tenantId}"
+            val writeAlias = System.getenv("OPENSEARCH_STATIC_WRITE_ALIAS")
+                ?: System.getenv("OPENSEARCH_INDEX_PATTERN")
+                ?: "ivm-products-{tenantId}__write"
             val username = System.getenv("OPENSEARCH_USERNAME")
             val password = System.getenv("OPENSEARCH_PASSWORD")
             val auth = if (!username.isNullOrBlank() && !password.isNullOrBlank()) {
                 OpenSearchSinkPlugin.AuthConfig(username, password)
             } else null
 
-            plugins["opensearch-sink"] = OpenSearchSinkPlugin(
+            plugins[SinkTargetType.OPENSEARCH.toPluginId()] = OpenSearchSinkPlugin(
                 endpoint = opensearchEndpoint,
-                indexPattern = indexPattern,
+                indexPattern = writeAlias,
                 auth = auth,
+                useStaticProjection = true,
             )
         }
 
         // S3 Plugin
         val s3Bucket = System.getenv("S3_BUCKET")
         if (!s3Bucket.isNullOrBlank()) {
-            plugins["s3-sink"] = S3SinkPlugin(
+            plugins[SinkTargetType.S3.toPluginId()] = S3SinkPlugin(
                 s3Client = S3Client.builder().build(),
                 bucketName = s3Bucket,
             )
@@ -75,7 +79,7 @@ val sinkPluginModule = module {
         // Personalize Plugin
         val personalizeDatasetArn = System.getenv("PERSONALIZE_DATASET_ARN")
         if (!personalizeDatasetArn.isNullOrBlank()) {
-            plugins["personalize-sink"] = PersonalizeSinkPlugin(
+            plugins[SinkTargetType.PERSONALIZE.toPluginId()] = PersonalizeSinkPlugin(
                 personalizeClient = PersonalizeEventsClient.builder().build(),
                 datasetArn = personalizeDatasetArn,
             )

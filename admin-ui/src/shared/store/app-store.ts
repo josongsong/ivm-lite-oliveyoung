@@ -27,10 +27,6 @@ interface AppState {
   highlightedSlice: string | null
   setHighlightedSlice: (slice: string | null) => void
   
-  // Outbox filters
-  activeOutboxTab: 'recent' | 'failed' | 'dlq' | 'stale'
-  setActiveOutboxTab: (tab: 'recent' | 'failed' | 'dlq' | 'stale') => void
-  
   // View preferences
   viewMode: 'grid' | 'list'
   setViewMode: (mode: 'grid' | 'list') => void
@@ -62,10 +58,6 @@ export const useAppStore = create<AppState>()(
         // Pipeline filters
         highlightedSlice: null,
         setHighlightedSlice: (slice) => set({ highlightedSlice: slice }),
-        
-        // Outbox filters
-        activeOutboxTab: 'recent',
-        setActiveOutboxTab: (tab) => set({ activeOutboxTab: tab }),
         
         // View preferences
         viewMode: 'grid',

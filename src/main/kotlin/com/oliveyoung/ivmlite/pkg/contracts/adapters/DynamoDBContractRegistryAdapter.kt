@@ -205,8 +205,8 @@ class DynamoDBContractRegistryAdapter(
             .tableName(tableName)
             .key(
                 mapOf(
-                    "id" to AttributeValue.builder().s(ref.id).build(),
-                    "version" to AttributeValue.builder().s(ref.version.toString()).build(),
+                    "PK" to AttributeValue.builder().s(ref.id).build(),
+                    "SK" to AttributeValue.builder().s(ref.version.toString()).build(),
                 ),
             )
             .build()
@@ -823,6 +823,14 @@ class DynamoDBContractRegistryAdapter(
     private suspend fun queryByKindStatus(
         kind: ContractKind,
         status: ContractStatus?
+    ): List<ContractRef> {
+        // Scan 사용 (GSI kind-status-index는 일부 환경에서 비어있거나 미구축일 수 있음)
+        return scanByKindStatusWithPagination(kind, status)
+    }
+
+    private suspend fun queryByKindStatusGsi(
+        kind: ContractKind,
+        status: ContractStatus?
     ): List<ContractRef> = suspendCoroutine { cont ->
         val builder = software.amazon.awssdk.services.dynamodb.model.QueryRequest.builder()
             .tableName(tableName)
@@ -848,21 +856,63 @@ class DynamoDBContractRegistryAdapter(
             if (error != null) {
                 cont.resumeWithException(error)
             } else {
-                val refs = response.items().map { item ->
-                    val id = item["id"]?.s()
-                        ?: throw DomainError.StorageError("Missing required field 'id' in contract registry item")
-                    val versionStr = item["version"]?.s()
-                        ?: throw DomainError.StorageError("Missing required field 'version' in contract registry item for id: $id")
-                    val version = try {
-                        SemVer.parse(versionStr)
-                    } catch (e: Exception) {
-                        throw DomainError.StorageError("Invalid version format in contract registry item for id: $id, version: $versionStr")
-                    }
-                    ContractRef(id, version)
-                }
+                val refs = response.items().map { item -> parseItemToContractRef(item) }
                 cont.resume(refs)
             }
         }
+    }
+
+    private suspend fun scanByKindStatusWithPagination(
+        kind: ContractKind,
+        status: ContractStatus?
+    ): List<ContractRef> = suspendCoroutine { cont ->
+        val filterExpr = if (status != null) {
+            "kind = :kind AND #status = :status"
+        } else {
+            "kind = :kind"
+        }
+        val values = buildMap {
+            put(":kind", AttributeValue.builder().s(kind.wireValue).build())
+            if (status != null) {
+                put(":status", AttributeValue.builder().s(status.name).build())
+            }
+        }
+        val names = if (status != null) mapOf("#status" to "status") else emptyMap()
+
+        val request = software.amazon.awssdk.services.dynamodb.model.ScanRequest.builder()
+            .tableName(tableName)
+            .filterExpression(filterExpr)
+            .expressionAttributeValues(values)
+            .let { b -> if (names.isNotEmpty()) b.expressionAttributeNames(names) else b }
+            .build()
+
+        log.info("Scanning table={} for kind={} status={}", tableName, kind.wireValue, status?.name)
+        dynamoClient.scan(request).whenComplete { response, error ->
+            if (error != null) {
+                log.error("Scan failed: table={} kind={}", tableName, kind.wireValue, error)
+                cont.resumeWithException(error)
+            } else {
+                val refs = response.items().map { parseItemToContractRef(it) }
+                log.info("Scan returned {} items for kind={} (table={})", refs.size, kind.wireValue, tableName)
+                cont.resume(refs)
+            }
+        }
+    }
+
+    private fun parseItemToContractRef(item: Map<String, AttributeValue>): ContractRef {
+        // PK/SK 형식(CONTRACT#id, VERSION#version) 또는 id/version 속성 지원
+        val id = item["id"]?.s()
+            ?: item["PK"]?.s()?.removePrefix("CONTRACT#")
+            ?: throw DomainError.StorageError("Missing required field 'id' or 'PK' in contract registry item")
+        val versionStr = item["version"]?.s()
+            ?: item["SK"]?.s()?.removePrefix("VERSION#")
+            ?: throw DomainError.StorageError("Missing required field 'version' or 'SK' in contract registry item for id: $id")
+        val version = try {
+            SemVer.parse(versionStr)
+        } catch (e: Exception) {
+            throw DomainError.StorageError("Invalid version format in contract registry item for id: $id, version: $versionStr")
+        }
+        return ContractRef(id, version)
     }
 
     // ===== Save Operations =====
@@ -943,6 +993,8 @@ class DynamoDBContractRegistryAdapter(
             .tableName(tableName)
             .item(
                 mapOf(
+                    "PK" to AttributeValue.builder().s(id).build(),
+                    "SK" to AttributeValue.builder().s(version).build(),
                     "id" to AttributeValue.builder().s(id).build(),
                     "version" to AttributeValue.builder().s(version).build(),
                     "kind" to AttributeValue.builder().s(kind.wireValue).build(),

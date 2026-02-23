@@ -13,7 +13,6 @@ const PAGE_BUDGETS: Record<string, { load: number; fcp: number }> = {
   '/dashboard': { load: 5000, fcp: 2000 },
   '/contracts': { load: 5000, fcp: 2000 },
   '/explorer': { load: 5000, fcp: 2000 },
-  '/outbox': { load: 5000, fcp: 2000 },
   '/workflow': { load: 6000, fcp: 2500 },
   '/playground': { load: 8000, fcp: 3000 }, // Monaco 에디터 로드
   '/traces': { load: 5000, fcp: 2000 },

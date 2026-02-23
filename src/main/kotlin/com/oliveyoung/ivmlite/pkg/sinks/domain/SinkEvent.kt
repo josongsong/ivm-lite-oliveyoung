@@ -20,7 +20,7 @@ import java.util.UUID
  * @property version 버전
  * @property viewType View 타입
  * @property payload View JSON 페이로드
- * @property sinkTargets Sink 대상 목록 (["s3-raw", "opensearch"])
+ * @property sinkTargets Sink 플러그인 ID 목록 (SinkTargetType.toPluginId(), 예: ["opensearch-sink", "s3-sink"])
  * @property status 처리 상태 (PENDING, PROCESSING, COMPLETED, FAILED)
  * @property createdAt 생성 시각
  * @property processedAt 처리 완료 시각

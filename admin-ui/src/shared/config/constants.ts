@@ -53,10 +53,6 @@ export const EXPLORER_DEFAULTS = {
   MAX_PAGE_SIZE: 100,
 } as const
 
-/** Outbox 탭 타입 */
-export const OUTBOX_TABS = ['recent', 'failed', 'dlq', 'stale'] as const
-export type OutboxTabType = typeof OUTBOX_TABS[number]
-
 /** 네비게이션 아이템 */
 export const NAV_ITEMS = [
   { path: '/', label: 'Dashboard', icon: 'LayoutDashboard' },
@@ -64,7 +60,6 @@ export const NAV_ITEMS = [
   { path: '/workflow', label: 'Workflow', icon: 'GitBranch' },
   { path: '/explorer', label: 'Explorer', icon: 'Database' },
   { path: '/pipeline', label: 'Pipeline', icon: 'Workflow' },
-  { path: '/outbox', label: 'Outbox', icon: 'Inbox' },
   { path: '/playground', label: 'Playground', icon: 'FlaskConical' },
 ] as const
 

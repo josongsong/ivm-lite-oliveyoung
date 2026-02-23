@@ -31,7 +31,7 @@ Sink (검색 엔진 인덱싱)
 
 ### 1단계: Raw Data (원본 데이터)
 
-**위치**: PostgreSQL `raw_data` 테이블
+**위치**: DynamoDB (RawDataRepositoryPort)
 
 **데이터 구조**:
 ```json
@@ -66,9 +66,10 @@ Sink (검색 엔진 인덱싱)
 
 **프로세스**:
 1. **RuleSet Contract 로드**: `ruleset.core.v1.yaml` 등
-2. **SliceDefinition 기반 변환**: 각 SliceType별로 데이터 추출
-3. **Light JOIN 실행**: 필요시 관련 엔티티 조인
-4. **Inverted Index 생성**: 검색용 인덱스 엔트리 생성
+2. **실행 계획 수립 (RFC-018)**: `SliceExecutionPlanner`가 의존성 순서 산출 (TopoSort)
+3. **SliceDefinition 기반 변환**: 각 SliceType별로 데이터 추출 (Wave별 병렬 실행)
+4. **Light JOIN 실행**: 필요시 관련 엔티티 조인
+5. **Inverted Index 생성**: 검색용 인덱스 엔트리 생성
    - **정방향 인덱스**: 항상 생성 (검색용)
    - **역방향 인덱스**: `references` 있을 때만 생성 (Fanout용)
 
@@ -112,6 +113,62 @@ impactMap:
 - 영향받은 SliceType만 재슬라이싱 (`slicePartial()`)
 - **증분 최적화**: 변경되지 않은 SliceType은 재계산 안 함
 
+#### 2.1.1 ChangeSet 이벤트 구조 및 diff
+
+**목적**: old vs new 비교를 통한 atomic diff 기반 slice rebuild 판단
+
+**ChangeSet 이벤트 구조** (`pkg/changeset/domain/ChangeSet.kt`):
+```kotlin
+data class ChangeSet(
+    val changeSetId: String,
+    val tenantId: TenantId,
+    val entityType: String,
+    val entityKey: EntityKey,
+    val fromVersion: Long,      // old 버전
+    val toVersion: Long,        // new 버전
+    val changeType: ChangeType,  // CREATE, UPDATE, DELETE, NO_CHANGE
+    val changedPaths: List<ChangedPath>,  // atomic diff 목록 (JSON Pointer)
+    val impactedSliceTypes: Set<String>,
+    val impactMap: Map<String, ImpactDetail>,
+    val payloadHash: String,
+)
+
+data class ChangedPath(
+    val path: String,       // RFC6901 JSON Pointer (예: /options/3/price)
+    val valueHash: String,   // sha256:... (변경 후 값의 해시)
+)
+```
+
+**old vs new 비교 방식** (`ChangeSetBuilder.diffJsonPointers()`):
+- `fromPayload`(old)와 `toPayload`(new)를 JSON 트리로 파싱
+- `walkDiff()` 재귀 순회로 경로별 diff 추출
+- **객체**: 필드별 비교, 추가/삭제/변경 감지
+- **배열**: 인덱스별 비교 (`/options/0`, `/options/1`, ...)
+- **리프**: 값 다르면 `ChangedPath(path, valueHash)` 추가
+- 결과: `changedPaths` = atomic diff 배열 (예: `["/options/3/price", "/title"]`)
+
+**예시**:
+```json
+// fromPayload (v1)
+{ "options": [{ "price": 12000 }], "title": "상품A" }
+
+// toPayload (v2)
+{ "options": [{ "price": 10000 }], "title": "상품A" }
+
+// changedPaths
+[
+  { "path": "/options/0/price", "valueHash": "sha256:..." }
+]
+```
+
+**rebuild 판단 흐름**:
+1. `ChangeSetBuilder.build()` → `changedPaths` 생성
+2. `ImpactCalculator.calculate(changeSet, ruleSet)` → `changedPaths`와 `impactMap` 매칭
+3. 매칭된 SliceType → `impactedSliceTypes`
+4. `SlicingWorkflow.executeIncremental()` → `slicePartial(impactedTypes)` 호출
+
+**계약 정의**: `contracts/v1/changeset.v1.yaml`
+
 #### 2.2 BuildRules Policy (필드 추출 규칙)
 
 **목적**: 각 SliceType별로 어떤 필드를 추출할지 정의
@@ -148,7 +205,51 @@ slices:
 - `PassThrough`: 지정된 필드만 추출
 - `MapFields`: 필드명 변환 (예: `brandId` → `brand.code`)
 
-#### 2.3 Join Policy (Light JOIN 규칙)
+**현재 스코프 vs 확장 계획**:
+
+| 구분 | 현재 (Phase 1) | 확장 로드맵 (Phase 2+) |
+|-----|---------------|------------------------|
+| PassThrough | ✅ | - |
+| MapFields | ✅ | - |
+| Join (LOOKUP) | ✅ | - |
+| 집계 (SUM, COUNT 등) | ❌ | 로드맵 후보 |
+| 파생 필드 증분 계산 | ❌ | 로드맵 후보 |
+| 정렬키 재계산 | ❌ | 로드맵 후보 |
+| facet count 증분 | ❌ | 로드맵 후보 |
+
+- **IVM-Lite** = 경량 IVM. 1차 목표는 **증분 슬라이싱**(영향받은 Slice만 재빌드).
+- 현재 buildRules는 **Projection + Join** 수준. Slice 내부 집계/파생은 `SliceBuildRules` sealed class 확장으로 Phase 2+에서 추가 가능.
+
+#### 2.3 Slice 실행 순서 및 의존성 (RFC-018)
+
+**목적**: Slice 간 의존성을 보장하여 올바른 실행 순서 강제
+
+**자동 추론 규칙**:
+- **ENRICHMENT 슬라이스** (`sliceKind: ENRICHMENT`) → CORE 의존 (동일 RuleSet에 CORE가 있으면)
+- **joins.targetSliceType** → 동일 RuleSet 내 해당 SliceType 참조 시 의존성 추가
+
+**동작 방식**:
+- `SliceExecutionPlanner.plan(ruleSet)` → TopoSort로 DAG 위상 정렬
+- **계약 로드 시점 검증**: `GatedContractRegistryAdapter`가 RuleSet 로드 시 DAG 검증 (cycle 감지 시 fail-closed)
+- **병렬 실행**: 의존성 없는 Slice는 동일 Wave에서 `async`/`awaitAll`로 동시 실행
+- **slicePartial 시**: `computeClosure(impactedTypes)`로 의존성 closure 계산 → ENRICHED만 영향받아도 CORE 포함
+
+**에러 메시지 (cycle 감지 시)**:
+```
+Slice dependency cycle detected. Involved slices: X → Y.
+Fix: ensure ENRICHMENT slices come after CORE, or remove circular dependsOn.
+```
+
+**설명 가능한 ExecutionPlan**: 각 스텝에 `reason` 필드로 "왜 이 순서인가" 기록 (Admin UI 표시용)
+
+| 항목 | 설명 |
+|------|------|
+| 의존성 자동 추론 | `dependsOn` 수동 작성 불필요 |
+| 계약 검증 시점 | RuleSet 로드 시 DAG 검증 |
+| 병렬 실행 | Wave별 독립 Slice 동시 실행 |
+| 에러 피드백 | cycle/누락 시 구체적 수정 제안 |
+
+#### 2.4 Join Policy (Light JOIN 규칙)
 
 **목적**: 관련 엔티티 조인하여 Slice에 병합
 
@@ -174,7 +275,7 @@ slices:
 - 조인 결과를 원본 payload에 병합
 - `required: false`면 조인 실패해도 슬라이싱 계속 진행
 
-#### 2.4 Index Policy (인덱싱 규칙)
+#### 2.5 Index Policy (인덱싱 규칙)
 
 **목적**: Inverted Index 생성 및 Fanout 설정
 
@@ -604,7 +705,7 @@ override suspend fun ship(
 
 **특징**:
 - **멱등성**: 동일 `(tenantId, entityKey, version)` → 동일 문서
-- **비동기 처리**: Outbox를 통한 안정적 전달
+- **비동기 처리**: SinkEvent(DynamoDB Streams)를 통한 안정적 전달
 - **다중 Sink 지원**: OpenSearch, Personalize 등 동시 전송 가능
 
 ---
@@ -613,7 +714,7 @@ override suspend fun ship(
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│ 1. Raw Data (PostgreSQL)                                     │
+│ 1. Raw Data (DynamoDB)                                      │
 │    - tenantId: "oliveyoung"                                 │
 │    - entityKey: "A000000001"                                 │
 │    - version: 1738000000000000001                            │
@@ -703,7 +804,7 @@ override suspend fun ship(
 
 ### 4. 비동기 처리
 
-- **Outbox Pattern**: Ship은 Outbox를 통해 비동기 처리
+- **SinkEvent**: Ship은 SinkEvent(DynamoDB Streams)를 통해 비동기 처리
 - **자동 트리거**: Slicing 완료 시 SinkRule 기반 자동 ShipRequested 생성
 - **재시도**: 실패 시 자동 재시도 (최대 5회)
 
@@ -799,9 +900,9 @@ sinkRuleRegistry.register(
 
 **자동 동작**:
 1. `SlicingWorkflow` 완료
-2. `OutboxPollingWorker`가 `SlicingCompleted` 이벤트 처리
-3. 매칭되는 SinkRule 기반으로 `ShipRequested` outbox 생성
-4. `ShipEventHandler`가 `ShipWorkflow.execute()` 호출
+2. DynamoDB Streams → Lambda가 SinkEvent 처리
+3. 매칭되는 SinkRule 기반으로 `ShipRequested` SinkEvent 생성
+4. `ShipWorkflow.execute()` 호출
 5. `ShipWorkflow`가 `SliceMerger.merge()` → View 문서 생성
 6. `ElasticsearchSinkAdapter.ship()` 호출 → 인덱싱
 
@@ -813,13 +914,14 @@ sinkRuleRegistry.register(
 
 | 단계 | 데이터 형태 | 저장 위치 | 목적 |
 |------|------------|----------|------|
-| **Raw** | 원본 비즈니스 데이터 | PostgreSQL | SSOT, 버전 관리 |
+| **Raw** | 원본 비즈니스 데이터 | DynamoDB | SSOT, 버전 관리 |
 | **Slice** | 계약 기반 분리 데이터 | DynamoDB | 증분 최적화, 물리 분리 |
 | **View** | Slice 병합 문서 | 메모리 (임시) | 인덱싱용 완전한 문서 |
 | **Sink** | 인덱싱된 문서 | 검색 엔진 | 검색/추천 서비스 |
 
 **핵심 메시지**:
 - **Raw → Slice**: RuleSet Contract Policy 기반 변환 (물리 분리)
+  - **Slice 실행 순서 (RFC-018)**: 의존성 자동 추론, TopoSort, Wave별 병렬 실행
   - ImpactMap Policy: 증분 최적화
   - BuildRules Policy: 필드 추출
   - **Join Policy: 엔티티 조인 (Slicing 단계에서 실행, 조회된 Slice에 이미 포함됨)**
@@ -901,6 +1003,14 @@ indexes:
 
 **Policy 적용 순서**:
 1. `impactMap` → 영향받는 SliceType 계산 (증분 최적화)
-2. `buildRules` → 필드 추출 (PassThrough 또는 MapFields)
-3. `joins` → 관련 엔티티 조인 (LOOKUP)
-4. `indexes` → Inverted Index 생성 (검색/Fanout용)
+2. **SliceExecutionPlanner** → 의존성 순서 산출 (TopoSort, RFC-018)
+3. `buildRules` → 필드 추출 (PassThrough 또는 MapFields)
+4. `joins` → 관련 엔티티 조인 (LOOKUP)
+5. `indexes` → Inverted Index 생성 (검색/Fanout용)
+
+---
+
+## 📎 참고 문서
+
+- **RFC-018 Slice 실행 순서**: [RFC-018-slice-execution-order-enforcement.md](../rfc/RFC-018-slice-execution-order-enforcement.md) — 의존성 자동 추론, TopoSort, 병렬 실행
+- **ChangeSet·buildRules 설계 반박자료**: [REBUTTAL-IVM-DESIGN-CRITIQUE.md](../REBUTTAL-IVM-DESIGN-CRITIQUE.md) — ChangeSet 모델, old vs new 비교, 현재 스코프 vs 확장 계획 상세

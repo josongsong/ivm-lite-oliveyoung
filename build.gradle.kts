@@ -300,6 +300,47 @@ tasks.register("generateSchema") {
 }
 
 // ============================================
+// Product DX 도구 (product-schema-dx-proposal RFC 2.2, 5.1)
+// ============================================
+
+tasks.register<JavaExec>("extractJsonPaths") {
+    group = "dx"
+    description = "📂 JSON 샘플에서 PathExpr 경로 추출 (options[*].gdsSelprcUprc 형식)"
+
+    mainClass.set("com.oliveyoung.ivmlite.tooling.application.ExtractJsonPathsKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+
+    val sample = System.getProperty("sample") ?: ".tmp/product/UA11279226.json"
+    val output = System.getProperty("output") ?: "paths.yaml"
+
+    args = listOf("--sample", sample, "--output", output)
+}
+
+tasks.register<JavaExec>("pathsToImpactMap") {
+    group = "dx"
+    description = "🗺️ PathExpr → impactMap 초안 생성 (슬라이스 추천)"
+
+    mainClass.set("com.oliveyoung.ivmlite.tooling.application.PathsToImpactMapMainKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+
+    val paths = System.getProperty("paths") ?: "paths.yaml"
+    val output = System.getProperty("output") ?: "impact-map-draft.yaml"
+
+    args = listOf("--paths", paths, "--output", output)
+}
+
+tasks.register<JavaExec>("validateRawData") {
+    group = "dx"
+    description = "✅ RawData Pre-Ingest 검증 (JSON 파싱 + 필수 경로 + RuleSet 존재성)"
+
+    mainClass.set("com.oliveyoung.ivmlite.tooling.application.ValidateRawDataMainKt")
+    classpath = sourceSets.main.get().runtimeClasspath
+
+    val sample = System.getProperty("sample") ?: ".tmp/product/UA11279226.json"
+    args = listOf("--sample", sample)
+}
+
+// ============================================
 // Task Dependencies
 // ============================================
 
@@ -819,6 +860,8 @@ tasks.register<JavaExec>("runAdminDev") {
     environment.putAll(System.getenv())
     environment("ADMIN_PORT", System.getenv("ADMIN_PORT") ?: "8081")
     environment("DEV_MODE", "true")
+    // Contract Hot Reload: YAML 파일 직접 로드 (재시작 없이 반영)
+    environment("CONTRACTS_FILE_PATH", "${project.projectDir.absolutePath}/src/main/resources/contracts/v1")
 
     // JVM 최적화 (개발 모드)
     jvmArgs(

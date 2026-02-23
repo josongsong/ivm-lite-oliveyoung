@@ -20,7 +20,7 @@ export function PanelHeaderShowcase() {
         <LivePreview>
           <PanelHeader
             icon={<Inbox size={18} />}
-            title="Outbox Queue"
+            title="Sink Event Queue"
           />
         </LivePreview>
       </section>
@@ -30,9 +30,9 @@ export function PanelHeaderShowcase() {
         <LivePreview>
           <PanelHeader
             icon={<Inbox size={18} />}
-            title="Outbox Queue"
+            title="Sink Event Queue"
             link={{
-              to: '/outbox',
+              to: '/dashboard',
               label: '상세보기',
             }}
           />
@@ -44,7 +44,7 @@ export function PanelHeaderShowcase() {
         <LivePreview>
           <PanelHeader
             icon={<Inbox size={18} />}
-            title="Outbox Queue"
+            title="Sink Event Queue"
             actions={
               <Button variant="ghost" size="sm" icon={<ArrowRight size={14} />}>
                 View All
@@ -62,16 +62,16 @@ import { Inbox, ArrowRight } from 'lucide-react'
 
 <PanelHeader
   icon={<Inbox size={18} />}
-  title="Outbox Queue"
+  title="Sink Event Queue"
   link={{
-    to: '/outbox',
+    to: '/dashboard',
     label: '상세보기',
   }}
 />
 
 <PanelHeader
   icon={<Inbox size={18} />}
-  title="Outbox Queue"
+  title="Sink Event Queue"
   actions={<Button variant="ghost">View All</Button>}
 />`}
         </pre>

@@ -100,10 +100,7 @@ export function Dashboard() {
         >
           <div className="panel-header">
             <Inbox size={18} />
-            <h3>Outbox Queue</h3>
-            <Link to="/outbox" className="view-all">
-              상세보기 <ArrowRight size={14} />
-            </Link>
+            <h3>Sink Event Queue</h3>
           </div>
 
           <div className="outbox-stats">

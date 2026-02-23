@@ -139,3 +139,7 @@ out/
 # ⚠️ src/main/kotlin/**/generated/는 git 관리 (jOOQ 코드)
 !**/src/main/**/generated/
 gen/
+
+# DX 도구 출력 (product-schema-dx-proposal RFC 2.2)
+paths.yaml
+impact-map-draft.yaml

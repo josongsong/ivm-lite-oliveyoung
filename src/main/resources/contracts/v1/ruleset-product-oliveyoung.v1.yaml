@@ -200,6 +200,10 @@ indexes:
     selector: $.masterInfo.brand.code
     references: BRAND
     maxFanout: 10000
+  - type: category
+    selector: $.displayCategories[*].sclsCtgrNo
+    references: CATEGORY
+    maxFanout: 50000
   - type: keyword
     selector: $.additionalInfo.srchKeyWordText
   - type: gtin

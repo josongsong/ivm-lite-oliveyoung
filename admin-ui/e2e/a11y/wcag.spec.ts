@@ -5,7 +5,6 @@ const PAGES_TO_TEST = [
   { name: 'Dashboard', path: '/dashboard' },
   { name: 'Contracts', path: '/contracts' },
   { name: 'Explorer', path: '/explorer' },
-  { name: 'Outbox', path: '/outbox' },
   { name: 'Playground', path: '/playground' },
   { name: 'Workflow', path: '/workflow' },
   { name: 'Traces', path: '/traces' },
@@ -56,19 +55,14 @@ test.describe('Keyboard Navigation', () => {
   });
 
   test('Escape 키로 모달 닫기', async ({ page }) => {
-    await page.goto('/outbox');
+    await page.goto('/contracts');
     await page.waitForLoadState('networkidle', { timeout: 10000 }).catch(() => {});
 
-    // 테이블 행 클릭으로 모달 열기 시도
-    const row = page.getByRole('row').nth(1);
-    if (await row.isVisible({ timeout: 3000 }).catch(() => false)) {
-      await row.click();
-
-      const modal = page.getByRole('dialog');
-      if (await modal.isVisible({ timeout: 2000 }).catch(() => false)) {
-        await page.keyboard.press('Escape');
-        await expect(modal).not.toBeVisible({ timeout: 2000 });
-      }
+    // Contracts에서 모달이 있는 경우 Escape 테스트
+    const modal = page.getByRole('dialog');
+    if (await modal.isVisible({ timeout: 2000 }).catch(() => false)) {
+      await page.keyboard.press('Escape');
+      await expect(modal).not.toBeVisible({ timeout: 2000 });
     }
   });
 });

@@ -690,8 +690,8 @@ const PATTERNS: Record<string, PatternInfo> = {
         description: '아이콘, 제목, 링크가 있는 패널 헤더',
         code: `<div className="panel-header">
   <Inbox size={18} />
-  <h3>Outbox Queue</h3>
-  <Link to="/outbox" className="view-all">
+  <h3>Sink Event Queue</h3>
+  <Link to="/dashboard" className="view-all">
     상세보기 <ArrowRight size={14} />
   </Link>
 </div>`,
@@ -700,9 +700,9 @@ const PATTERNS: Record<string, PatternInfo> = {
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                 <Inbox size={18} />
-                <h3 style={{ margin: 0 }}>Outbox Queue</h3>
+                <h3 style={{ margin: 0 }}>Sink Event Queue</h3>
               </div>
-              <Link to="#" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--accent-cyan)', textDecoration: 'none' }}>
+              <Link to="/dashboard" style={{ display: 'flex', alignItems: 'center', gap: '0.25rem', color: 'var(--accent-cyan)', textDecoration: 'none' }}>
                 상세보기 <ArrowRight size={14} />
               </Link>
             </div>
@@ -2202,8 +2202,8 @@ import { CheckCircle2 } from 'lucide-react'
   <div className="outbox-panel">
     <div className="panel-header">
       <Inbox size={18} />
-      <h3>Outbox Queue</h3>
-      <Link to="/outbox" className="view-all">상세보기</Link>
+      <h3>Sink Event Queue</h3>
+      <Link to="/dashboard" className="view-all">상세보기</Link>
     </div>
     {/* 패널 내용 */}
   </div>
@@ -2217,7 +2217,7 @@ import { CheckCircle2 } from 'lucide-react'
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
                   <Inbox size={18} />
-                  <h3 style={{ margin: 0 }}>Outbox Queue</h3>
+                  <h3 style={{ margin: 0 }}>Sink Event Queue</h3>
                 </div>
                 <Link to="#" style={{ color: 'var(--accent-cyan)', textDecoration: 'none', fontSize: '0.875rem' }}>상세보기</Link>
               </div>

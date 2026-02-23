@@ -3,7 +3,6 @@ import {
   DashboardPage,
   ContractsPage,
   ExplorerPage,
-  OutboxPage,
   PlaygroundPage,
   WorkflowPage,
   TracesPage,
@@ -14,7 +13,6 @@ type PageObjects = {
   dashboardPage: DashboardPage;
   contractsPage: ContractsPage;
   explorerPage: ExplorerPage;
-  outboxPage: OutboxPage;
   playgroundPage: PlaygroundPage;
   workflowPage: WorkflowPage;
   tracesPage: TracesPage;
@@ -35,11 +33,6 @@ export const test = base.extend<PageObjects>({
   explorerPage: async ({ page }, use) => {
     const explorerPage = new ExplorerPage(page);
     await use(explorerPage);
-  },
-
-  outboxPage: async ({ page }, use) => {
-    const outboxPage = new OutboxPage(page);
-    await use(outboxPage);
   },
 
   playgroundPage: async ({ page }, use) => {

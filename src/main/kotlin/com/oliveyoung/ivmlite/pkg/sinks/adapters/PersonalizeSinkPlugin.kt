@@ -6,6 +6,7 @@ import com.oliveyoung.ivmlite.sinks.contract.ErrorReasonCode
 import com.oliveyoung.ivmlite.sinks.contract.PluginCapabilities
 import com.oliveyoung.ivmlite.sinks.contract.SinkError
 import com.oliveyoung.ivmlite.sinks.contract.SinkPayload
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkTargetType
 import com.oliveyoung.ivmlite.sinks.contract.SinkPlugin
 import com.oliveyoung.ivmlite.sinks.contract.SinkResult
 import com.oliveyoung.ivmlite.sinks.contract.SinkStatus
@@ -30,7 +31,7 @@ class PersonalizeSinkPlugin(
     private val datasetArn: String,
 ) : SinkPlugin {
 
-    override val pluginId = "personalize-sink"
+    override val pluginId = SinkTargetType.PERSONALIZE.toPluginId()
 
     override val supportsDelete: Boolean = true
 

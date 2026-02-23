@@ -6,25 +6,54 @@ SDK와 Runtime API가 사용하는 핵심 엔진들의 위치와 역할을 정�
 
 ---
 
-## 1. SlicingEngine (슬라이싱 엔진)
+## 1. SliceExecutionPlanner (실행 계획 산출, RFC-018)
+
+**위치**: `src/main/kotlin/com/oliveyoung/ivmlite/pkg/slices/domain/SliceExecutionPlanner.kt`
+
+**역할**:
+- **의존성 자동 추론**: SliceKind.ENRICHMENT → CORE, joins.targetSliceType (동일 RuleSet 내)
+- **TopoSort**: DAG 위상 정렬로 올바른 실행 순서 산출
+- **의존성 closure**: slicePartial 시 impactedTypes + transitive 의존성 계산
+- **설명 가능한 Plan**: `SliceExecutionStep.reason`으로 "왜 이 순서인가" 기록
+
+**주요 메서드**:
+```kotlin
+// 실행 계획 산출 (의존성 순서)
+fun plan(ruleSet: RuleSetContract): Result<SliceExecutionPlan>
+
+// slicePartial용 의존성 closure
+fun computeClosure(
+    ruleSet: RuleSetContract,
+    impactedTypes: Set<SliceType>
+): Set<SliceType>
+```
+
+**사용처**:
+- `SlicingEngine.slice()` / `slicePartial()`: 실행 순서 결정
+- `GatedContractRegistryAdapter.loadRuleSetContract()`: RuleSet 로드 시 DAG 검증 (cycle 감지 시 fail-closed)
+
+---
+
+## 2. SlicingEngine (슬라이싱 엔진)
 
 **위치**: `src/main/kotlin/com/oliveyoung/ivmlite/pkg/slices/domain/SlicingEngine.kt`
 
 **역할**:
 - **RawData → Slice 변환**: RuleSet Contract 기반으로 원본 데이터를 여러 Slice로 분리
+- **ExecutionPlan 기반 실행 (RFC-018)**: SliceExecutionPlanner로 산출한 순서 + Wave별 병렬 실행
 - **JOIN 실행**: Light JOIN을 통한 관련 엔티티 데이터 병합
 - **Inverted Index 생성**: 검색용 인덱스 동시 생성
 - **결정성 보장**: 동일 RawData + RuleSet → 동일 Slices (멱등성)
 
 **주요 메서드**:
 ```kotlin
-// FULL 슬라이싱
+// FULL 슬라이싱 (ExecutionPlan + Wave별 병렬)
 suspend fun slice(
     rawData: RawDataRecord,
     ruleSetRef: ContractRef
 ): Result<SlicingResult>
 
-// INCREMENTAL 슬라이싱 (영향받은 타입만)
+// INCREMENTAL 슬라이싱 (의존성 closure + 영향받은 타입만)
 suspend fun slicePartial(
     rawData: RawDataRecord,
     ruleSetRef: ContractRef,
@@ -39,10 +68,11 @@ suspend fun slicePartial(
 **의존성**:
 - `ContractRegistryPort`: RuleSet Contract 로드
 - `JoinExecutor` (optional): JOIN 실행
+- `SliceExecutionPlanner`: 실행 순서 산출 (object, 의존성 없음)
 
 ---
 
-## 2. QueryViewWorkflow (뷰 조회 엔진)
+## 3. QueryViewWorkflow (뷰 조회 엔진)
 
 **위치**: `src/main/kotlin/com/oliveyoung/ivmlite/pkg/orchestration/application/QueryViewWorkflow.kt`
 
@@ -90,7 +120,7 @@ suspend fun executeCount(
 
 ---
 
-## 3. SlicingWorkflow (슬라이싱 오케스트레이션)
+## 4. SlicingWorkflow (슬라이싱 오케스트레이션)
 
 **위치**: `src/main/kotlin/com/oliveyoung/ivmlite/pkg/orchestration/application/SlicingWorkflow.kt`
 
@@ -136,7 +166,7 @@ suspend fun executePartial(
 
 ---
 
-## 4. IngestWorkflow (데이터 수집 엔진)
+## 5. IngestWorkflow (데이터 수집 엔진)
 
 **위치**: `src/main/kotlin/com/oliveyoung/ivmlite/pkg/orchestration/application/IngestWorkflow.kt`
 
@@ -165,7 +195,7 @@ suspend fun execute(
 
 ---
 
-## 5. DeployExecutor (SDK 배포 실행 엔진)
+## 6. DeployExecutor (SDK 배포 실행 엔진)
 
 **위치**: `src/main/kotlin/com/oliveyoung/ivmlite/sdk/execution/DeployExecutor.kt`
 
@@ -250,6 +280,7 @@ suspend fun execute(
                │
 ┌──────────────▼──────────────────────────┐
 │  Domain Engine Layer                     │
+│  - SliceExecutionPlanner (실행 순서 산출) │
 │  - SlicingEngine (슬라이싱 로직)         │
 │  - JoinExecutor (JOIN 실행)               │
 │  - ChangeSetBuilder (변경 추적)          │

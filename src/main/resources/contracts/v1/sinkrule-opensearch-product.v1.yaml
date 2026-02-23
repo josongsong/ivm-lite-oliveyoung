@@ -14,7 +14,8 @@ input:
 target:
   type: OPENSEARCH
   endpoint: ${OPENSEARCH_ENDPOINT:-http://localhost:9200}
-  indexPattern: "ivm-products-{tenantId}"
+  # opensearch-index-plan v2: Static write alias (실제 인덱싱 대상)
+  indexPattern: "ivm-products-{tenantId}__write"
   auth:
     type: BASIC
     username: ${OPENSEARCH_USERNAME:-}

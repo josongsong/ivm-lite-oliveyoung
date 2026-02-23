@@ -18,8 +18,8 @@ test.describe('Navigation', () => {
     await page.click('a[href*="explorer"]');
     await expect(page).toHaveURL(/explorer/);
 
-    // Outbox 링크 클릭
-    await page.click('a[href*="outbox"]');
-    await expect(page).toHaveURL(/outbox/);
+    // Pipeline 링크 클릭
+    await page.click('a[href*="pipeline"]');
+    await expect(page).toHaveURL(/pipeline/);
   });
 });

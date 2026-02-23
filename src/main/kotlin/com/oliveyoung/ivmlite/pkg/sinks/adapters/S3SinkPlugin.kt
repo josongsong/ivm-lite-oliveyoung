@@ -7,6 +7,7 @@ import com.oliveyoung.ivmlite.sinks.contract.PluginCapabilities
 import com.oliveyoung.ivmlite.sinks.contract.SinkError
 import com.oliveyoung.ivmlite.sinks.contract.SinkJson
 import com.oliveyoung.ivmlite.sinks.contract.SinkPayload
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkTargetType
 import com.oliveyoung.ivmlite.sinks.contract.SinkPlugin
 import com.oliveyoung.ivmlite.sinks.contract.SinkResult
 import com.oliveyoung.ivmlite.sinks.contract.SinkStatus
@@ -33,7 +34,7 @@ class S3SinkPlugin(
     private val bucketName: String,
 ) : SinkPlugin {
 
-    override val pluginId = "s3-sink"
+    override val pluginId = SinkTargetType.S3.toPluginId()
 
     override val supportsDelete: Boolean = true
 

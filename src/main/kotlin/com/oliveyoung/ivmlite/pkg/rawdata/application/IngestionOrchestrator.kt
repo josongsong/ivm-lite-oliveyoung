@@ -101,7 +101,7 @@ class IngestionOrchestrator(
         return when (val result = sinkRuleRegistry.findByEntityType(entityType)) {
             is Result.Ok -> result.value
                 .filter { rule -> rule.status == SinkRuleStatus.ACTIVE }
-                .map { rule -> rule.target.type.name.lowercase() }
+                .map { rule -> rule.target.type.toPluginId() }
                 .distinct()
             is Result.Err -> {
                 logger.warn("Failed to resolve sink targets: {}", result.error)

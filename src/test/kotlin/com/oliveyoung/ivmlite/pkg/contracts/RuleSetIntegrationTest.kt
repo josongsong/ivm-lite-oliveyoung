@@ -84,8 +84,8 @@ class RuleSetIntegrationTest : StringSpec({
 
         val mockClient = mockk<DynamoDbAsyncClient>()
 
-        // ViewDefinition 로드
-        every { mockClient.getItem(match<GetItemRequest> { it.key()["id"]?.s() == "view.product.v1" }) } returns
+        // ViewDefinition 로드 (DynamoDB PK/SK 키 사용)
+        every { mockClient.getItem(match<GetItemRequest> { it.key()["PK"]?.s() == "view.product.v1" }) } returns
             CompletableFuture.completedFuture(
                 GetItemResponse.builder()
                     .item(mapOf(
@@ -98,8 +98,8 @@ class RuleSetIntegrationTest : StringSpec({
                     .build()
             )
 
-        // RuleSet 로드
-        every { mockClient.getItem(match<GetItemRequest> { it.key()["id"]?.s() == "ruleset.core.v1" }) } returns
+        // RuleSet 로드 (DynamoDB PK/SK 키 사용)
+        every { mockClient.getItem(match<GetItemRequest> { it.key()["PK"]?.s() == "ruleset.core.v1" }) } returns
             CompletableFuture.completedFuture(
                 GetItemResponse.builder()
                     .item(mapOf(
@@ -153,8 +153,8 @@ class RuleSetIntegrationTest : StringSpec({
 
         val mockClient = mockk<DynamoDbAsyncClient>()
 
-        // ViewDefinition은 존재
-        every { mockClient.getItem(match<GetItemRequest> { it.key()["id"]?.s() == "view.product.v1" }) } returns
+        // ViewDefinition은 존재 (DynamoDB PK/SK 키 사용)
+        every { mockClient.getItem(match<GetItemRequest> { it.key()["PK"]?.s() == "view.product.v1" }) } returns
             CompletableFuture.completedFuture(
                 GetItemResponse.builder()
                     .item(mapOf(
@@ -167,8 +167,8 @@ class RuleSetIntegrationTest : StringSpec({
                     .build()
             )
 
-        // RuleSet은 없음
-        every { mockClient.getItem(match<GetItemRequest> { it.key()["id"]?.s() == "ruleset.nonexistent.v1" }) } returns
+        // RuleSet은 없음 (DynamoDB PK/SK 키 사용)
+        every { mockClient.getItem(match<GetItemRequest> { it.key()["PK"]?.s() == "ruleset.nonexistent.v1" }) } returns
             CompletableFuture.completedFuture(
                 GetItemResponse.builder()
                     .item(emptyMap())

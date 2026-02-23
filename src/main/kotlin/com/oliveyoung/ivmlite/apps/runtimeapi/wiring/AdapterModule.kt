@@ -11,15 +11,18 @@ import com.oliveyoung.ivmlite.pkg.changeset.ports.ImpactCalculatorPort
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.DynamoDBContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.GatedContractRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.contracts.adapters.LocalYamlContractRegistryAdapter
+import java.io.File
 import com.oliveyoung.ivmlite.pkg.contracts.domain.DefaultContractStatusGate
 import com.oliveyoung.ivmlite.pkg.contracts.ports.ContractRegistryPort
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
+import software.amazon.awssdk.services.sqs.SqsAsyncClient
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.DynamoDbRawDataRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.adapters.InMemoryRawDataRepository
 import com.oliveyoung.ivmlite.pkg.rawdata.ports.RawDataRepositoryPort
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.DynamoDbSinkEventRepository
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.DynamoDBSinkRuleRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkEventRepository
+import com.oliveyoung.ivmlite.pkg.sinks.adapters.SqsSinkEventRepository
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.LocalYamlSinkRuleRegistryAdapter
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkEventRepositoryPort
 import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkRuleRegistryPort
@@ -166,16 +169,36 @@ val productionAdapterModule = module {
         InMemoryContractCache(config.cache)
     }
 
-    // Contract Registry (DynamoDB + StatusGate + Cache)
+    // Contract Registry (DynamoDB + StatusGate + Cache, 또는 Hot Reload용 LocalYaml)
+    // CONTRACTS_FILE_PATH 설정 시 파일 시스템에서 직접 로드 (재시작 없이 반영)
     single {
         val config: AppConfig = get()
-        GatedContractRegistryAdapter(
-            delegate = DynamoDBContractRegistryAdapter(
+        val filePath = config.contracts.filePath?.takeIf { it.isNotBlank() }
+        val delegate = if (filePath != null) {
+            val dir = File(filePath)
+            if (dir.exists() && dir.isDirectory) {
+                LocalYamlContractRegistryAdapter(
+                    resourceRoot = config.contracts.resourcePath,
+                    fileBaseDir = dir,
+                )
+            } else {
+                DynamoDBContractRegistryAdapter(
+                    dynamoClient = get<DynamoDbAsyncClient>(),
+                    tableName = config.dynamodb.tableName,
+                    cache = get<ContractCachePort>(),
+                    tracer = get<Tracer>(),
+                )
+            }
+        } else {
+            DynamoDBContractRegistryAdapter(
                 dynamoClient = get<DynamoDbAsyncClient>(),
                 tableName = config.dynamodb.tableName,
                 cache = get<ContractCachePort>(),
                 tracer = get<Tracer>(),
-            ),
+            )
+        }
+        GatedContractRegistryAdapter(
+            delegate = delegate,
             statusGate = DefaultContractStatusGate,
         )
     } binds arrayOf(ContractRegistryPort::class, HealthCheckable::class)
@@ -210,13 +233,22 @@ val productionAdapterModule = module {
     // ChangeSet Repository (InMemory - 저장 미사용, HealthCheck만)
     single { InMemoryChangeSetRepository() } binds arrayOf(ChangeSetRepositoryPort::class, HealthCheckable::class)
 
-    // SinkEvent Repository (DynamoDB Streams 기반)
+    // SinkEvent Repository: SQS_SINK_QUEUE_URL 설정 시 SQS, 미설정 시 DynamoDB
+    // SQS 모드: SinkBatchHandler Lambda가 Batch Window로 벌크 처리
     single<SinkEventRepositoryPort> {
-        val config: AppConfig = get()
-        DynamoDbSinkEventRepository(
-            dynamoClient = get<DynamoDbAsyncClient>(),
-            tableName = config.dynamodb.sinkEventsTableName
-        )
+        val queueUrl = System.getenv("SQS_SINK_QUEUE_URL")
+        if (!queueUrl.isNullOrBlank()) {
+            SqsSinkEventRepository(
+                sqsClient = SqsAsyncClient.builder().build(),
+                queueUrl = queueUrl,
+            )
+        } else {
+            val config: AppConfig = get()
+            DynamoDbSinkEventRepository(
+                dynamoClient = get<DynamoDbAsyncClient>(),
+                tableName = config.dynamodb.sinkEventsTableName
+            )
+        }
     }
 
     // SinkRule Registry (RFC-022 Phase 2: DynamoDB)

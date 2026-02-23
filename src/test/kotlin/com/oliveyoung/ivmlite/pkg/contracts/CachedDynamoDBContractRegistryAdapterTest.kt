@@ -243,8 +243,8 @@ class CachedDynamoDBContractRegistryAdapterTest : StringSpec({
         every { mockClient.getItem(any<GetItemRequest>()) } answers {
             callCounter.incrementAndGet()
             val request = firstArg<GetItemRequest>()
-            val id = request.key()["id"]?.s()
-            val item = if (id == "changeset.v1") createChangeSetResponseItem() else joinSpecItem
+            val pk = request.key()["PK"]?.s()  // DynamoDB 어댑터는 PK/SK 사용
+            val item = if (pk == "changeset.v1") createChangeSetResponseItem() else joinSpecItem
             CompletableFuture.completedFuture(
                 GetItemResponse.builder().item(item).build(),
             )

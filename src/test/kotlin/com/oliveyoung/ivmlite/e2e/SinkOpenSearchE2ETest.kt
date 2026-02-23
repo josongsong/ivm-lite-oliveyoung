@@ -39,6 +39,10 @@ import java.util.UUID
  * 6. 구버전 재전송 → version_type:external로 거부 확인
  *
  * 실행: SINK_E2E_ENABLED=true ./gradlew integrationTest --tests "*.SinkOpenSearchE2ETest"
+ *
+ * Lambda와 동일한 OpenSearch 설정 사용 (같은 클러스터/인덱스):
+ * - OPENSEARCH_ENDPOINT, OPENSEARCH_USERNAME, OPENSEARCH_PASSWORD
+ * - OPENSEARCH_STATIC_WRITE_ALIAS 또는 OPENSEARCH_INDEX_PATTERN (기본: ivm-products-{tenantId}__write)
  */
 class SinkOpenSearchE2ETest : StringSpec(init@{
     tags(IntegrationTag)
@@ -51,13 +55,16 @@ class SinkOpenSearchE2ETest : StringSpec(init@{
 
     val region = Region.of(System.getenv("AWS_REGION") ?: "ap-northeast-2")
     val sinkEventTable = System.getenv("SINK_EVENT_TABLE") ?: "ivm-sink-events-registry"
+    val tenantId = "oliveyoung"
     val opensearchEndpoint = System.getenv("OPENSEARCH_ENDPOINT")
         ?: "https://search-ivm-opensearch-registry-3e2cnnyk3qos5kn4t5s226xgbq.ap-northeast-2.es.amazonaws.com"
     val opensearchUser = System.getenv("OPENSEARCH_USERNAME") ?: "admin"
     val opensearchPass = System.getenv("OPENSEARCH_PASSWORD") ?: "Whthdals123!@#"
-    val opensearchIndex = "ivm-products-oliveyoung"
-
-    val tenantId = "oliveyoung"
+    val indexPattern = System.getenv("OPENSEARCH_STATIC_WRITE_ALIAS")
+        ?: System.getenv("OPENSEARCH_INDEX_PATTERN")
+        ?: System.getenv("OPENSEARCH_INDEX")
+        ?: "ivm-products-{tenantId}__write"
+    val opensearchIndex = indexPattern.replace("{tenantId}", tenantId)
     val json = Json { ignoreUnknownKeys = true }
 
     val dynamoClient = DynamoDbAsyncClient.builder()
@@ -273,36 +280,128 @@ class SinkOpenSearchE2ETest : StringSpec(init@{
         httpClient.send(request, HttpResponse.BodyHandlers.ofString())
     }
 
+    /**
+     * PRODUCT_SEARCH View 구조 (CORE, PRICE, CATEGORY, INDEX, MEDIA)
+     * ProductStaticProjection이 기대하는 형식 → Static 문서로 변환됨
+     */
     fun productFixture(productId: String, version: Long = 1L): Map<String, Any> {
         val suffix = productId.substringAfterLast("-") // P001, P002, ...
+        val title = "[올영픽] 테스트 상품 $productId v$version"
+        val brand = when (suffix) {
+            "P001", "P002" -> "라운드랩"
+            "P003", "P004" -> "토리든"
+            else -> "닥터지"
+        }
+        val brandCode = when (suffix) {
+            "P001", "P002" -> "roundlab"
+            "P003", "P004" -> "torriden"
+            else -> "drg"
+        }
         return mapOf(
-            "productId" to productId,
             "testRunId" to testRunId,
-            "title" to "[올영픽] 테스트 상품 $productId v$version",
-            "brand" to when (suffix) {
-                "P001", "P002" -> "라운드랩"
-                "P003", "P004" -> "토리든"
-                else -> "닥터지"
-            },
-            "brandId" to when (suffix) {
-                "P001", "P002" -> "BRAND#oliveyoung#roundlab"
-                "P003", "P004" -> "BRAND#oliveyoung#torriden"
-                else -> "BRAND#oliveyoung#drg"
-            },
-            "price" to if (version == 1L) 25000 else 22000,
-            "salePrice" to if (version == 1L) 19900 else 17900,
-            "discount" to if (version == 1L) 20 else 28,
-            "stock" to 1500,
-            "availability" to "IN_STOCK",
-            "categoryId" to "CAT-SKINCARE-SUN",
-            "categoryPath" to listOf("스킨케어", "선케어", "선크림"),
-            "tags" to listOf("자외선차단", "수분", "민감피부"),
-            "reviewCount" to 12847,
-            "averageRating" to 4.8,
-            "isNew" to (version >= 2L),
-            "isBestSeller" to true,
-            "description" to "E2E 테스트용 상품 $productId 버전 $version",
+            "CORE" to mapOf(
+                "uaCode" to productId,
+                "masterInfo" to mapOf(
+                    "gdsNm" to title,
+                    "gdsEngNm" to "Test Product $productId v$version",
+                    "brand" to mapOf(
+                        "code" to brandCode,
+                        "krName" to brand,
+                        "enName" to brand,
+                    ),
+                    "standardCategory" to mapOf(
+                        "large" to mapOf("code" to "10"),
+                        "medium" to mapOf("code" to "101"),
+                        "small" to mapOf("code" to "1011"),
+                    ),
+                ),
+                "onlineInfo" to mapOf("prdtName" to title),
+            ),
+            "PRICE" to mapOf(
+                "options" to listOf(
+                    mapOf("gdsCd" to "8809690390048", "gdsNm" to "$title (온)"),
+                ),
+            ),
+            "CATEGORY" to mapOf(
+                "displayCategories" to listOf(
+                    mapOf("sclsCtgrNo" to "1000000160"),
+                    mapOf("sclsCtgrNo" to "1000000158"),
+                ),
+            ),
+            "INDEX" to mapOf(
+                "additionalInfo" to mapOf("srchKeyWordText" to "시카,보습,수분,$testRunId"),
+                "emblemInfo" to mapOf(
+                    "veganYn" to "false",
+                    "cleanBeautyYn" to "true",
+                    "crueltyFreeYn" to "false",
+                ),
+                "attributes" to listOf(
+                    mapOf("attrCode" to "2", "attrValue" to "수분크림 제형"),
+                    mapOf("attrCode" to "6", "attrValue" to "모든피부타입"),
+                    mapOf("attrCode" to "42", "attrValue" to "보습"),
+                    mapOf("attrCode" to "81", "attrValue" to "히알루론산"),
+                ),
+            ),
+            "MEDIA" to mapOf(
+                "thumbnailImages" to listOf(
+                    mapOf("url" to "https://cdn.example.com/e2e-thumb-$productId.jpg"),
+                ),
+            ),
         )
+    }
+
+    // ========== Index Setup ==========
+
+    beforeSpec {
+        if (!enabled) return@beforeSpec
+        val existsReq = HttpRequest.newBuilder()
+            .uri(URI.create("$opensearchEndpoint/$opensearchIndex"))
+            .header("Authorization", authHeader())
+            .timeout(Duration.ofSeconds(5))
+            .GET()
+            .build()
+        val existsRes = httpClient.send(existsReq, HttpResponse.BodyHandlers.ofString())
+        if (existsRes.statusCode() == 200) {
+            println("OpenSearch 인덱스 이미 존재: $opensearchIndex")
+            return@beforeSpec
+        }
+        val mapping = """
+            {
+              "settings": { "number_of_shards": 1, "number_of_replicas": 0 },
+              "mappings": {
+                "dynamic": true,
+                "properties": {
+                  "tenantId": { "type": "keyword" },
+                  "entityKey": { "type": "keyword" },
+                  "uaCode": { "type": "keyword" },
+                  "productId": { "type": "keyword" },
+                  "testRunId": { "type": "keyword" },
+                  "title_ko": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+                  "brand_ko": { "type": "text", "fields": { "keyword": { "type": "keyword" } } },
+                  "brand_code": { "type": "keyword" },
+                  "category_display": { "type": "keyword" },
+                  "search_keywords": { "type": "text" },
+                  "attr_formulation": { "type": "keyword" },
+                  "attr_skin_type": { "type": "keyword" },
+                  "attr_main_functions": { "type": "keyword" },
+                  "attr_ingredients": { "type": "keyword" }
+                }
+              }
+            }
+        """.trimIndent()
+        val createReq = HttpRequest.newBuilder()
+            .uri(URI.create("$opensearchEndpoint/$opensearchIndex"))
+            .header("Content-Type", "application/json")
+            .header("Authorization", authHeader())
+            .timeout(Duration.ofSeconds(10))
+            .PUT(HttpRequest.BodyPublishers.ofString(mapping))
+            .build()
+        val createRes = httpClient.send(createReq, HttpResponse.BodyHandlers.ofString())
+        if (createRes.statusCode() in 200..299) {
+            println("OpenSearch 인덱스 생성 완료: $opensearchIndex")
+        } else {
+            println("인덱스 생성 실패 (status=${createRes.statusCode()}): ${createRes.body().take(300)}")
+        }
     }
 
     // ========== Test Cleanup ==========
@@ -362,16 +461,22 @@ class SinkOpenSearchE2ETest : StringSpec(init@{
             val source = doc["_source"]!!.jsonObject
             source["productId"]!!.jsonPrimitive.content shouldBe productId
             source["testRunId"]!!.jsonPrimitive.content shouldBe testRunId
+            source["title_ko"]!!.jsonPrimitive.content shouldContain "[올영픽] 테스트 상품"
+            source["brand_code"]!!.jsonPrimitive.content.isNotBlank() shouldBe true
+            source["attr_formulation"]!!.jsonArray.any { it.jsonPrimitive.content == "수분크림 제형" } shouldBe true
+            source["attr_skin_type"]!!.jsonArray.any { it.jsonPrimitive.content == "모든피부타입" } shouldBe true
+            source["attr_main_functions"]!!.jsonArray.any { it.jsonPrimitive.content == "보습" } shouldBe true
+            source["attr_ingredients"]!!.jsonArray.any { it.jsonPrimitive.content == "히알루론산" } shouldBe true
             val docVersion = doc["_version"]!!.jsonPrimitive.long
             docVersion shouldBe 1L
-            println("OpenSearch 문서 확인: $productId, version=$docVersion")
+            println("OpenSearch Static 문서 확인: $productId, version=$docVersion, title_ko=${source["title_ko"]!!.jsonPrimitive.content}")
         }
 
         val searchResult = searchOpenSearch("""
             {
-                "query": { "term": { "testRunId.keyword": "$testRunId" } },
+                "query": { "term": { "testRunId": "$testRunId" } },
                 "size": 10,
-                "_source": ["productId", "brand"]
+                "_source": ["productId", "brand_ko", "brand_code"]
             }
         """.trimIndent())
 
@@ -384,13 +489,13 @@ class SinkOpenSearchE2ETest : StringSpec(init@{
                 "query": {
                     "bool": {
                         "must": [
-                            { "term": { "testRunId.keyword": "$testRunId" } },
-                            { "match": { "brand": "라운드랩" } }
+                            { "term": { "testRunId": "$testRunId" } },
+                            { "match": { "brand_ko": "라운드랩" } }
                         ]
                     }
                 },
                 "size": 10,
-                "_source": ["productId", "brand"]
+                "_source": ["productId", "brand_ko"]
             }
         """.trimIndent())
 
@@ -442,31 +547,29 @@ class SinkOpenSearchE2ETest : StringSpec(init@{
             val docVersion = doc["_version"]!!.jsonPrimitive.long
 
             docVersion shouldBe 2L
-            source["price"]!!.jsonPrimitive.int shouldBe 22000
-            source["salePrice"]!!.jsonPrimitive.int shouldBe 17900
-            source["title"]!!.jsonPrimitive.content shouldContain "v2"
+            source["title_ko"]!!.jsonPrimitive.content shouldContain "v2"
 
-            println("v2 확인: $productId, version=$docVersion, price=${source["price"]!!.jsonPrimitive.int}")
+            println("v2 확인: $productId, version=$docVersion, title_ko=${source["title_ko"]!!.jsonPrimitive.content}")
         }
 
-        val priceSearchResult = searchOpenSearch("""
+        val v2SearchResult = searchOpenSearch("""
             {
                 "query": {
                     "bool": {
                         "must": [
-                            { "term": { "testRunId.keyword": "$testRunId" } },
-                            { "range": { "salePrice": { "lte": 18000 } } }
+                            { "term": { "testRunId": "$testRunId" } },
+                            { "match": { "title_ko": "v2" } }
                         ]
                     }
                 },
                 "size": 10,
-                "_source": ["productId", "salePrice"]
+                "_source": ["productId", "title_ko"]
             }
         """.trimIndent())
 
-        val priceHits = priceSearchResult["hits"]!!.jsonObject["hits"]!!.jsonArray
-        priceHits.size shouldBe testProductIds.size
-        println("가격 검색 (salePrice <= 18000): ${priceHits.size}개")
+        val v2Hits = v2SearchResult["hits"]!!.jsonObject["hits"]!!.jsonArray
+        v2Hits.size shouldBe testProductIds.size
+        println("v2 title_ko 검색: ${v2Hits.size}개")
     }
 
     "E2E: 구버전 재전송 (v1) → OpenSearch version_type:external 거부 확인" {
@@ -504,7 +607,7 @@ class SinkOpenSearchE2ETest : StringSpec(init@{
         refreshOpenSearch()
         delay(1_000)
 
-        // OpenSearch에서 여전히 v2인지 확인
+        // OpenSearch에서 여전히 v2인지 확인 (version_type:external로 v1 거부됨)
         retryProductIds.forEach { productId ->
             val docId = "${tenantId}__PRODUCT#oliveyoung#$productId"
             val doc = getOpenSearchDoc(docId)
@@ -513,14 +616,13 @@ class SinkOpenSearchE2ETest : StringSpec(init@{
             val source = doc["_source"]!!.jsonObject
 
             docVersion shouldBe 2L
-            source["price"]!!.jsonPrimitive.int shouldBe 22000
-            source["title"]!!.jsonPrimitive.content shouldContain "v2"
+            source["title_ko"]!!.jsonPrimitive.content shouldContain "v2"
 
             println("v1 거부 확인: $productId, version=$docVersion (v2 유지)")
         }
     }
 
-    "E2E: 키워드 검색 (한글) → OpenSearch 결과 확인" {
+    "E2E: 키워드 검색 (한글) → OpenSearch Static 결과 확인" {
         refreshOpenSearch()
         delay(1_000)
 
@@ -529,58 +631,58 @@ class SinkOpenSearchE2ETest : StringSpec(init@{
                 "query": {
                     "bool": {
                         "must": [
-                            { "term": { "testRunId.keyword": "$testRunId" } },
-                            { "match": { "title": "테스트 상품" } }
+                            { "term": { "testRunId": "$testRunId" } },
+                            { "match": { "title_ko": "테스트 상품" } }
                         ]
                     }
                 },
                 "size": 10,
-                "_source": ["productId", "title"]
+                "_source": ["productId", "title_ko"]
             }
         """.trimIndent())
 
         val keywordHits = keywordSearchResult["hits"]!!.jsonObject["hits"]!!.jsonArray
         keywordHits.size shouldBe testProductIds.size
-        println("키워드 검색 '테스트 상품': ${keywordHits.size}개")
+        println("키워드 검색 '테스트 상품' (title_ko): ${keywordHits.size}개")
 
         val categorySearchResult = searchOpenSearch("""
             {
                 "query": {
                     "bool": {
                         "must": [
-                            { "term": { "testRunId.keyword": "$testRunId" } },
-                            { "term": { "categoryId.keyword": "CAT-SKINCARE-SUN" } }
+                            { "term": { "testRunId": "$testRunId" } },
+                            { "term": { "category_display": "1000000160" } }
                         ]
                     }
                 },
                 "size": 10,
-                "_source": ["productId", "categoryId"]
+                "_source": ["productId", "category_display"]
             }
         """.trimIndent())
 
         val categoryHits = categorySearchResult["hits"]!!.jsonObject["hits"]!!.jsonArray
         categoryHits.size shouldBe testProductIds.size
-        println("카테고리 검색: ${categoryHits.size}개")
+        println("카테고리 검색 (category_display): ${categoryHits.size}개")
 
         val complexSearchResult = searchOpenSearch("""
             {
                 "query": {
                     "bool": {
                         "must": [
-                            { "term": { "testRunId.keyword": "$testRunId" } },
-                            { "match": { "brand": "토리든" } },
-                            { "range": { "salePrice": { "lte": 18000 } } }
+                            { "term": { "testRunId": "$testRunId" } },
+                            { "match": { "brand_ko": "토리든" } },
+                            { "match": { "search_keywords": "시카" } }
                         ]
                     }
                 },
                 "size": 10,
-                "_source": ["productId", "brand", "salePrice"]
+                "_source": ["productId", "brand_ko", "search_keywords"]
             }
         """.trimIndent())
 
         val complexHits = complexSearchResult["hits"]!!.jsonObject["hits"]!!.jsonArray
         complexHits.size shouldBe 2
-        println("복합 검색 (토리든 AND salePrice<=18000): ${complexHits.size}개")
+        println("복합 검색 (토리든 AND 시카): ${complexHits.size}개")
     }
 
     "E2E: jobId 기반 SinkEvent 추적 확인" {

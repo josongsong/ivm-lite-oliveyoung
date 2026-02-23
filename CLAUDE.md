@@ -189,8 +189,9 @@ source .env && ./gradlew run
 | DB_URL | PostgreSQL JDBC URL |
 | DB_USER | DB 사용자 |
 | DB_PASSWORD | DB 비밀번호 |
-| AWS_ACCESS_KEY_ID | DynamoDB 접근 |
-| AWS_SECRET_ACCESS_KEY | DynamoDB 접근 |
+| AWS_PROFILE | AWS CLI 프로필명 (~/.aws/credentials, accessKey보다 우선) |
+| AWS_ACCESS_KEY_ID | DynamoDB 접근 (AWS_PROFILE 미설정 시) |
+| AWS_SECRET_ACCESS_KEY | DynamoDB 접근 (AWS_PROFILE 미설정 시) |
 | DYNAMODB_TABLE | DynamoDB 테이블명 |
 
 ---
@@ -228,6 +229,7 @@ just admin-dev
 - Configuration Cache와 `--continuous` 모드 호환성 문제로 `--no-configuration-cache` 옵션 권장
 - 포트 충돌 시: `just kill-ports` 또는 `lsof -ti:8081 | xargs kill -9`
 - `DEV_MODE=true` 환경변수 자동 설정 (에러 상세 출력)
+- **Contract Hot Reload**: `CONTRACTS_FILE_PATH` 자동 설정 → contracts/v1 YAML 수정 시 재시작 없이 반영
 
 ### Admin UI 개발 모드 (Frontend)
 ```bash

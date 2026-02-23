@@ -9,15 +9,20 @@ import com.oliveyoung.ivmlite.shared.domain.types.SliceKind
 import com.oliveyoung.ivmlite.shared.domain.types.SliceType
 import com.oliveyoung.ivmlite.shared.ports.HealthCheckable
 import org.yaml.snakeyaml.Yaml
+import java.io.File
 import java.io.InputStream
 
 /**
  * v1 모드: contracts는 repo 내부 리소스(YAML)에서만 로드한다.
  * (id, version)의 immutability/hash enforcement는 "registry service"가 수행하고,
  * 런타임은 status/required fields만 fail-closed로 검증한다.
+ *
+ * Hot Reload (product-schema-dx-proposal RFC 5.3): fileBaseDir 설정 시 파일 시스템에서 직접 로드.
+ * CONTRACTS_FILE_PATH=src/main/resources/contracts/v1 환경변수로 개발 모드에서 재시작 없이 반영.
  */
 class LocalYamlContractRegistryAdapter(
-    private val resourceRoot: String = "/contracts/v1"
+    private val resourceRoot: String = "/contracts/v1",
+    private val fileBaseDir: File? = null,
 ) : ContractRegistryPort, HealthCheckable {
     override val healthName: String = "contracts"
     override suspend fun healthCheck(): Boolean = true
@@ -111,6 +116,12 @@ class LocalYamlContractRegistryAdapter(
     }
 
     private fun loadYaml(filename: String): Map<String, Any?>? {
+        if (fileBaseDir != null) {
+            val file = File(fileBaseDir, filename)
+            if (!file.exists()) return null
+            @Suppress("UNCHECKED_CAST")
+            return yaml.load(file.readText()) as? Map<String, Any?>
+        }
         val path = resourceRoot.trimEnd('/') + "/" + filename
         val stream: InputStream = javaClass.getResourceAsStream(path) ?: return null
         @Suppress("UNCHECKED_CAST")

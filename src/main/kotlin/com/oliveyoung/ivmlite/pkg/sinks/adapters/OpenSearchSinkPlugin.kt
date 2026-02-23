@@ -7,6 +7,8 @@ import com.oliveyoung.ivmlite.sinks.contract.PluginCapabilities
 import com.oliveyoung.ivmlite.sinks.contract.SinkError
 import com.oliveyoung.ivmlite.sinks.contract.SinkJson
 import com.oliveyoung.ivmlite.sinks.contract.SinkPayload
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkTargetType
+import com.oliveyoung.ivmlite.pkg.sinks.projection.ProductStaticProjection
 import com.oliveyoung.ivmlite.sinks.contract.SinkPlugin
 import com.oliveyoung.ivmlite.sinks.contract.SinkResult
 import com.oliveyoung.ivmlite.sinks.contract.SinkStatus
@@ -27,18 +29,19 @@ import java.time.Instant
 private val logger = LoggerFactory.getLogger("OpenSearchSinkPlugin")
 
 /**
- * OpenSearch Sink Plugin
+ * OpenSearch Sink Plugin (opensearch-index-plan v2)
  *
- * View 데이터를 OpenSearch에 직접 인덱싱.
+ * View 데이터를 OpenSearch에 인덱싱.
  * - Bulk API 사용 (배치 효율성)
  * - 문서 ID: {tenantId}__{entityKey} (멱등성)
- * - Dynamic mapping 사용 (필드 매핑은 OpenSearch 운영팀 책임)
+ * - useStaticProjection=true 시 PRODUCT_SEARCH View → Static 문서(flatten) 변환 후 인덱싱
  */
 class OpenSearchSinkPlugin(
     private val endpoint: String,
     private val indexPattern: String,
     private val auth: AuthConfig? = null,
     private val timeoutMs: Long = 30_000,
+    private val useStaticProjection: Boolean = false,
 ) : SinkPlugin {
 
     data class AuthConfig(
@@ -46,7 +49,7 @@ class OpenSearchSinkPlugin(
         val password: String,
     )
 
-    override val pluginId = "opensearch-sink"
+    override val pluginId = SinkTargetType.OPENSEARCH.toPluginId()
 
     override val supportsDelete: Boolean = true
 
@@ -242,7 +245,7 @@ class OpenSearchSinkPlugin(
      * OpenSearch Bulk API body 생성 (RFC-020 R2: 외부 버전화)
      *
      * version_type: external → incoming version > current version 일 때만 반영
-     * incoming version <= current version → 409 Conflict (자동 무시)
+     * useStaticProjection=true 시 View → Static 문서 변환 후 인덱싱
      */
     private fun buildBulkBody(payloads: List<SinkPayload>): String {
         val sb = StringBuilder()
@@ -251,13 +254,22 @@ class OpenSearchSinkPlugin(
                 is SinkPayload.V1 -> {
                     val index = resolveIndex(payload.tenantId)
                     val docId = "${payload.tenantId}__${payload.entityKey}"
-                    val viewDataStr = SinkJson.json.encodeToString(payload.viewData)
+                    val docJson = if (useStaticProjection) {
+                        val staticDoc = ProductStaticProjection.project(
+                            viewData = payload.viewData,
+                            tenantId = payload.tenantId,
+                            entityKey = payload.entityKey,
+                        )
+                        SinkJson.json.encodeToString(staticDoc)
+                    } else {
+                        SinkJson.json.encodeToString(payload.viewData)
+                    }
 
                     val action = """{"index":{"_index":"$index","_id":"$docId",""" +
                         """"version":${payload.entityVersion},"version_type":"external"}}"""
                     sb.append(action)
                     sb.append('\n')
-                    sb.append(viewDataStr)
+                    sb.append(docJson)
                     sb.append('\n')
                 }
             }

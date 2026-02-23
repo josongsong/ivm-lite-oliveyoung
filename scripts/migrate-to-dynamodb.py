@@ -62,31 +62,31 @@ def convert_to_dynamodb_format(obj):
 def migrate_raw_data():
     """raw_data 테이블 마이그레이션"""
     print("\n=== RawData 마이그레이션 시작 ===")
-    
+
     conn = get_pg_connection()
     cur = conn.cursor()
     dynamodb = get_dynamodb()
     table = dynamodb.Table(DATA_TABLE)
-    
+
     cur.execute("""
-        SELECT tenant_id, entity_key, version, schema_id, schema_version, 
+        SELECT tenant_id, entity_key, version, schema_id, schema_version,
                content, content_hash, created_at
         FROM raw_data
     """)
-    
+
     rows = cur.fetchall()
     print(f"마이그레이션할 raw_data: {len(rows)}건")
-    
+
     for row in rows:
         tenant_id, entity_key, version, schema_id, schema_version, content, content_hash, created_at = row
-        
+
         # DynamoDB 키 형식
         pk = f"TENANT#{tenant_id}#ENTITY#{entity_key}"
         sk = f"RAWDATA#v{version}"
-        
+
         # content를 JSON 문자열로 변환
         payload_json = json.dumps(content, ensure_ascii=False) if content else '{}'
-        
+
         item = {
             'PK': pk,
             'SK': sk,
@@ -99,7 +99,7 @@ def migrate_raw_data():
             'payload_hash': content_hash or '',
             'created_at': created_at.isoformat() if created_at else '',
         }
-        
+
         # Latest 마커도 추가
         latest_item = {
             'PK': pk,
@@ -113,14 +113,14 @@ def migrate_raw_data():
             'payload_hash': content_hash or '',
             'created_at': created_at.isoformat() if created_at else '',
         }
-        
+
         try:
             table.put_item(Item=item)
             table.put_item(Item=latest_item)
             print(f"  ✓ {tenant_id}/{entity_key} v{version}")
         except Exception as e:
             print(f"  ✗ {tenant_id}/{entity_key}: {e}")
-    
+
     cur.close()
     conn.close()
     print(f"=== RawData 마이그레이션 완료: {len(rows)}건 ===\n")
@@ -128,31 +128,31 @@ def migrate_raw_data():
 def migrate_slices():
     """slices 테이블 마이그레이션"""
     print("\n=== Slices 마이그레이션 시작 ===")
-    
+
     conn = get_pg_connection()
     cur = conn.cursor()
     dynamodb = get_dynamodb()
     table = dynamodb.Table(DATA_TABLE)
-    
+
     cur.execute("""
-        SELECT tenant_id, entity_key, slice_version, slice_type, 
+        SELECT tenant_id, entity_key, slice_version, slice_type,
                content, content_hash, created_at
         FROM slices
     """)
-    
+
     rows = cur.fetchall()
     print(f"마이그레이션할 slices: {len(rows)}건")
-    
+
     for row in rows:
         tenant_id, entity_key, version, slice_type, content, content_hash, created_at = row
-        
+
         # DynamoDB 키 형식
         pk = f"TENANT#{tenant_id}#ENTITY#{entity_key}"
         sk = f"SLICE#v{version}#{slice_type}"
-        
+
         # content를 JSON 문자열로 변환
         data_json = json.dumps(content, ensure_ascii=False) if content else '{}'
-        
+
         item = {
             'PK': pk,
             'SK': sk,
@@ -164,7 +164,7 @@ def migrate_slices():
             'hash': content_hash or '',
             'created_at': created_at.isoformat() if created_at else '',
         }
-        
+
         # Latest 마커도 추가
         latest_item = {
             'PK': pk,
@@ -177,14 +177,14 @@ def migrate_slices():
             'hash': content_hash or '',
             'created_at': created_at.isoformat() if created_at else '',
         }
-        
+
         try:
             table.put_item(Item=item)
             table.put_item(Item=latest_item)
             print(f"  ✓ {tenant_id}/{entity_key}/{slice_type} v{version}")
         except Exception as e:
             print(f"  ✗ {tenant_id}/{entity_key}/{slice_type}: {e}")
-    
+
     cur.close()
     conn.close()
     print(f"=== Slices 마이그레이션 완료: {len(rows)}건 ===\n")
@@ -192,28 +192,28 @@ def migrate_slices():
 def migrate_inverted_index():
     """inverted_index 테이블 마이그레이션"""
     print("\n=== InvertedIndex 마이그레이션 시작 ===")
-    
+
     conn = get_pg_connection()
     cur = conn.cursor()
     dynamodb = get_dynamodb()
     table = dynamodb.Table(DATA_TABLE)
-    
+
     cur.execute("""
         SELECT tenant_id, index_type, index_value, entity_key, slice_type, slice_version
         FROM inverted_index
         WHERE index_type IS NOT NULL AND index_value IS NOT NULL
     """)
-    
+
     rows = cur.fetchall()
     print(f"마이그레이션할 inverted_index: {len(rows)}건")
-    
+
     for row in rows:
         tenant_id, index_type, index_value, entity_key, slice_type, version = row
-        
+
         # DynamoDB 키 형식
         pk = f"TENANT#{tenant_id}#INDEX#{index_type}#{index_value}"
         sk = f"ENTITY#{entity_key}#SLICE#{slice_type or 'UNKNOWN'}"
-        
+
         item = {
             'PK': pk,
             'SK': sk,
@@ -225,13 +225,13 @@ def migrate_inverted_index():
             'sliceType': slice_type or '',
             'version': version or 0,
         }
-        
+
         try:
             table.put_item(Item=item)
             print(f"  ✓ {tenant_id}/{index_type}:{index_value} -> {entity_key}")
         except Exception as e:
             print(f"  ✗ {tenant_id}/{index_type}:{index_value}: {e}")
-    
+
     cur.close()
     conn.close()
     print(f"=== InvertedIndex 마이그레이션 완료: {len(rows)}건 ===\n")
@@ -239,24 +239,24 @@ def migrate_inverted_index():
 def migrate_contracts():
     """Contract YAML을 DynamoDB Schema Registry에 등록"""
     print("\n=== Contract 마이그레이션 시작 ===")
-    
+
     import yaml
     import os
-    
+
     dynamodb = get_dynamodb()
     table = dynamodb.Table(SCHEMA_TABLE)
-    
+
     contracts_path = "/Users/mac/Documents/code-oyg-v2/ivm-lite-oliveyoung-full/src/main/resources/contracts/v1"
-    
+
     if not os.path.exists(contracts_path):
         print(f"계약 디렉토리를 찾을 수 없습니다: {contracts_path}")
         return
-    
+
     count = 0
     for filename in os.listdir(contracts_path):
         if filename.endswith('.yaml') or filename.endswith('.yml'):
             filepath = os.path.join(contracts_path, filename)
-            
+
             with open(filepath, 'r', encoding='utf-8') as f:
                 content = f.read()
                 try:
@@ -264,19 +264,19 @@ def migrate_contracts():
                 except:
                     print(f"  ✗ YAML 파싱 실패: {filename}")
                     continue
-            
+
             if not contract:
                 continue
-                
+
             contract_id = contract.get('id') or contract.get('name') or filename.replace('.yaml', '').replace('.yml', '')
             kind = contract.get('kind', 'UNKNOWN')
             version = contract.get('version', '1.0.0')
             status = contract.get('status', 'ACTIVE')
-            
+
             # DynamoDB 키 형식
             pk = f"CONTRACT#{contract_id}"
             sk = f"VERSION#{version}"
-            
+
             item = {
                 'PK': pk,
                 'SK': sk,
@@ -289,7 +289,7 @@ def migrate_contracts():
                 'createdAt': datetime.now().isoformat(),
                 'updatedAt': datetime.now().isoformat(),
             }
-            
+
             # Latest 마커
             latest_item = {
                 'PK': pk,
@@ -303,7 +303,7 @@ def migrate_contracts():
                 'createdAt': datetime.now().isoformat(),
                 'updatedAt': datetime.now().isoformat(),
             }
-            
+
             try:
                 table.put_item(Item=item)
                 table.put_item(Item=latest_item)
@@ -311,26 +311,26 @@ def migrate_contracts():
                 count += 1
             except Exception as e:
                 print(f"  ✗ {contract_id}: {e}")
-    
+
     print(f"=== Contract 마이그레이션 완료: {count}건 ===\n")
 
 def main():
     print("=" * 60)
     print("PostgreSQL → DynamoDB 마이그레이션")
     print("=" * 60)
-    
+
     # 1. Contract (스키마) 마이그레이션
     migrate_contracts()
-    
+
     # 2. RawData 마이그레이션
     migrate_raw_data()
-    
+
     # 3. Slices 마이그레이션
     migrate_slices()
-    
+
     # 4. InvertedIndex 마이그레이션
     migrate_inverted_index()
-    
+
     print("=" * 60)
     print("마이그레이션 완료!")
     print("=" * 60)

@@ -15,7 +15,6 @@ import {
   GitBranch,
   Globe,
   Heart,
-  Inbox,
   LayoutDashboard,
   Network,
   Package,
@@ -121,19 +120,6 @@ const FEATURES: Record<string, FeatureInfo> = {
     icon: <Activity size={32} />,
     components: [
       { name: 'ObservabilityPage', description: '관측성 대시보드', path: 'observability/ui/ObservabilityPage' },
-    ],
-  },
-  outbox: {
-    title: 'Outbox',
-    description: 'Outbox 관리에서 사용되는 컴포넌트들입니다.',
-    icon: <Inbox size={32} />,
-    components: [
-      { name: 'Outbox', description: 'Outbox 메인 페이지', path: 'outbox/ui/Outbox' },
-      { name: 'RecentTable', description: '최근 이벤트 테이블', path: 'outbox/components/RecentTable' },
-      { name: 'FailedTable', description: '실패 이벤트 테이블', path: 'outbox/components/FailedTable' },
-      { name: 'DlqTable', description: 'DLQ 테이블', path: 'outbox/components/DlqTable' },
-      { name: 'StaleTable', description: 'Stale 이벤트 테이블', path: 'outbox/components/StaleTable' },
-      { name: 'OutboxDetailModal', description: '이벤트 상세 모달', path: 'outbox/components/OutboxDetailModal' },
     ],
   },
   pipeline: {

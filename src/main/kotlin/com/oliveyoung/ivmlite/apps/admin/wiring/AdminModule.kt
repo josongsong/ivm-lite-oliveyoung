@@ -67,6 +67,7 @@ import com.oliveyoung.ivmlite.pkg.slices.ports.SliceRepositoryPort
 import com.oliveyoung.ivmlite.pkg.orchestration.application.QueryViewWorkflow
 
 import org.jetbrains.exposed.sql.Database
+import org.koin.core.qualifier.named
 import org.koin.dsl.module
 
 /**
@@ -156,8 +157,8 @@ val alertsModule = module {
     // Rule Loader
     single<AlertRuleLoaderPort> { DefaultAlertRuleLoader() }
 
-    // Notifiers
-    single<List<NotifierPort>> {
+    // Notifiers (named으로 구분 - List<HealthCheckPort>와 타입 소거 충돌 방지)
+    single<List<NotifierPort>>(named("alertNotifiers")) {
         val config = get<AppConfig>()
         listOf(
             SlackNotifier(config.admin?.slackWebhookUrl)
@@ -178,7 +179,7 @@ val alertsModule = module {
             metricCollector = get(),
             ruleLoader = get(),
             alertRepository = get(),
-            notifiers = get(),
+            notifiers = get(named("alertNotifiers")),
             config = AlertEngineConfig(
                 evaluationIntervalMs = 10_000  // 10초마다 평가
             )
@@ -218,8 +219,8 @@ val backfillModule = module {
  * Health 도메인 모듈
  */
 val healthModule = module {
-    // Health Checks
-    single<List<HealthCheckPort>> {
+    // Health Checks (named으로 구분 - List 타입 소거 충돌 방지)
+    single<List<HealthCheckPort>>(named("healthChecks")) {
         listOf(
             PostgresHealthCheck(get<Database>())
         )
@@ -228,7 +229,7 @@ val healthModule = module {
     // Health Service
     single {
         HealthService(
-            healthChecks = get()
+            healthChecks = get(named("healthChecks"))
         )
     }
 }

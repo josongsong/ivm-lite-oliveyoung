@@ -5,6 +5,12 @@
 rootProject.name = "ivm-lite"
 
 // ============================================
+// Module Structure (RFC-017)
+// ============================================
+include(":sinks-contract")        // Sink 플러그인 계약 (독립 모듈)
+include(":plugins:sink-s3")       // S3 Sink 플러그인
+
+// ============================================
 // Plugin Management (버전 일관성)
 // ============================================
 pluginManagement {

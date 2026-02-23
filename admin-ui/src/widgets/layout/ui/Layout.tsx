@@ -8,7 +8,6 @@ import {
   GitBranch,
   GitMerge,
   HeartPulse,
-  Inbox,
   LayoutDashboard,
   Palette,
   Play,
@@ -30,7 +29,6 @@ const navItems = [
   { path: '/contracts', label: 'Contracts', icon: FileCode2 },
   { path: '/pipeline', label: 'Pipeline', icon: GitBranch },
   { path: '/workflow', label: 'Workflow', icon: GitMerge },
-  { path: '/outbox', label: 'Outbox', icon: Inbox },
   { path: '/playground', label: 'Playground', icon: Play },
   { path: '/design-system', label: 'Design System', icon: Palette },
 ]

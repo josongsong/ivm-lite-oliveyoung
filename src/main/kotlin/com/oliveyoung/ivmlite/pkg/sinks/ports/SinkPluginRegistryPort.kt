@@ -17,7 +17,7 @@ interface SinkPluginRegistryPort {
     /**
      * target 식별자로 SinkPlugin 조회
      *
-     * @param target Sink 타겟 식별자 (예: "opensearch", "s3", "personalize")
+     * @param target Sink 플러그인 ID (SinkTargetType.toPluginId(), 예: "opensearch-sink", "s3-sink")
      * @return SinkPlugin or null (미등록 target)
      */
     fun resolve(target: String): SinkPlugin?

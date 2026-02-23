@@ -44,6 +44,8 @@ data class DynamoDbConfig(
     val accessKeyId: String? = null,
     /** AWS Secret Access Key (환경 변수 AWS_SECRET_ACCESS_KEY 우선) */
     val secretAccessKey: String? = null,
+    /** AWS CLI 프로필명 (설정 시 ~/.aws/credentials 프로필 사용, accessKeyId/secretAccessKey보다 우선) */
+    val awsProfile: String? = null,
 ) {
     /** DynamoDB 데이터 테이블명 (환경 suffix 자동 추출) */
     val dataTableName: String get() =
@@ -73,6 +75,8 @@ data class KafkaConfig(
 
 data class ContractsConfig(
     val resourcePath: String = "/contracts/v1",
+    /** 개발 모드 Hot Reload: 설정 시 파일 시스템에서 직접 로드 (재시작 없이 반영) */
+    val filePath: String? = null,
 )
 
 data class ObservabilityConfig(

@@ -338,13 +338,6 @@ export const mockUsageData: Record<string, UsageInfo[]> = {
       snippet: '<Button variant="secondary" onClick={handleRefresh}>',
       feature: 'explorer',
     },
-    {
-      filePath: 'src/features/outbox/ui/Outbox.tsx',
-      lineNumber: 78,
-      count: 1,
-      snippet: '<Button variant="danger" onClick={handleRetry}>',
-      feature: 'outbox',
-    },
   ],
   Input: [
     {

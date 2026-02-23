@@ -1,6 +1,5 @@
 import { motion } from 'framer-motion'
-import { Link } from 'react-router-dom'
-import { AlertTriangle, ArrowRight, CheckCircle2, Clock, Inbox, Loader2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Clock, Inbox, Loader2 } from 'lucide-react'
 import { fadeInUp, staggerContainer } from '@/shared/ui'
 
 interface OutboxPanelProps {
@@ -22,10 +21,7 @@ export function OutboxPanel({ outbox }: OutboxPanelProps) {
     >
       <div className="panel-header">
         <Inbox size={18} />
-        <h3>Outbox Queue</h3>
-        <Link to="/outbox" className="view-all">
-          상세보기 <ArrowRight size={14} />
-        </Link>
+        <h3>Sink Event Queue</h3>
       </div>
 
       <div className="outbox-stats">

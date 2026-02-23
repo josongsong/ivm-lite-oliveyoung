@@ -55,26 +55,25 @@ object ConfigValidator {
 
         // AWS 자격 증명 검증 (endpoint가 없으면 AWS 사용)
         if (config.endpoint.isNullOrBlank()) {
-            // AWS 사용 시 자격 증명 필요
+            // AWS 사용 시: awsProfile > accessKey/secretKey > IAM 역할
+            val hasProfile = config.awsProfile?.isNotBlank() == true
             val hasAccessKey = config.accessKeyId?.isNotBlank() == true
             val hasSecretKey = config.secretAccessKey?.isNotBlank() == true
-
-            // 환경 변수에서도 확인 (환경 변수가 우선이므로)
             val envAccessKey = System.getenv("AWS_ACCESS_KEY_ID")
             val envSecretKey = System.getenv("AWS_SECRET_ACCESS_KEY")
 
-            val hasCredentials = hasAccessKey && hasSecretKey ||
-                                envAccessKey != null && envSecretKey != null
+            val hasCredentials = hasProfile ||
+                                (hasAccessKey && hasSecretKey) ||
+                                (envAccessKey != null && envSecretKey != null)
 
             if (!hasCredentials) {
                 logger.warn(
                     "AWS 자격 증명이 설정되지 않았습니다. " +
-                    "환경 변수(AWS_ACCESS_KEY_ID, AWS_SECRET_ACCESS_KEY) 또는 " +
-                    "IAM 역할을 사용하세요."
+                    "AWS_PROFILE, AWS_ACCESS_KEY_ID/AWS_SECRET_ACCESS_KEY, 또는 IAM 역할을 사용하세요."
                 )
                 // 경고만 (IAM 역할 사용 가능하므로)
-            } else {
-                // 자격 증명 형식 검증
+            } else if (!hasProfile) {
+                // awsProfile이 아닐 때만 accessKey/secretKey 형식 검증
                 val accessKeyId = envAccessKey ?: config.accessKeyId
                 val secretAccessKey = envSecretKey ?: config.secretAccessKey
 

@@ -17,16 +17,6 @@ export const QUERY_CONFIG = {
   CHART_INTERVAL: 60_000,
 } as const
 
-/** Outbox 관련 설정 */
-export const OUTBOX_CONFIG = {
-  /** 목록 조회 기본 limit */
-  DEFAULT_LIMIT: 50,
-  /** 일괄 재시도 limit */
-  BATCH_RETRY_LIMIT: 100,
-  /** Stale 판정 타임아웃 (초) */
-  STALE_TIMEOUT_SECONDS: 300,
-} as const
-
 /** 차트 관련 설정 */
 export const CHART_CONFIG = {
   /** 시간별 통계 조회 기간 (시간) */

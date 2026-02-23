@@ -59,6 +59,14 @@ class GatedContractRegistryAdapter(
         return gateCheck(delegate.loadViewDefinitionContract(ref)) { it.meta }
     }
 
+    override suspend fun listContractRefs(kind: ContractKind, status: ContractStatus?): Result<List<ContractRef>> {
+        return delegate.listContractRefs(kind, status)
+    }
+
+    override suspend fun listViewDefinitions(status: ContractStatus?): Result<List<ViewDefinitionContract>> {
+        return delegate.listViewDefinitions(status)
+    }
+
     private inline fun <T> gateCheck(
         result: Result<T>,
         getMeta: (T) -> ContractMeta,

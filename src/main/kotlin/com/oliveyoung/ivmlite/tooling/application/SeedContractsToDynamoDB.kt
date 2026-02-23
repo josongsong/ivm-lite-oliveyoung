@@ -61,11 +61,8 @@ object SeedContractsToDynamoDB {
 
         val adapter = DynamoDBContractRegistryAdapter(dynamoClient, tableName)
 
-        // YAML 파일을 읽기 위해 리소스 경로 사용
-        // 실제 파일 경로를 리소스 경로로 변환
-        val resourcePath = contractsDir.path.replace(File("src/main/resources").absolutePath, "")
-            .trimStart('/').replace('\\', '/')
-        val yamlAdapter = LocalYamlContractRegistryAdapter("/$resourcePath")
+        // 파일 시스템에서 직접 로드 (classpath 리소스 의존성 제거)
+        val yamlAdapter = LocalYamlContractRegistryAdapter(fileBaseDir = contractsDir)
 
         var successCount = 0
         var skipCount = 0
@@ -176,8 +173,9 @@ object SeedContractsToDynamoDB {
                 }
             }
 
-            // SINK_RULE 시드 (RFC-022 Phase 2)
-            seedSinkRules(dynamoClient, tableName, "/$resourcePath", dryRun) { s, e ->
+            // SINK_RULE 시드 (RFC-022 Phase 2) - classpath 리소스 경로
+            val resourcePath = "/contracts/v1"
+            seedSinkRules(dynamoClient, tableName, resourcePath, dryRun) { s, e ->
                 successCount += s
                 errorCount += e
             }

@@ -58,7 +58,15 @@ enum class SinkTargetType {
     OPENSEARCH,
     PERSONALIZE,
     KAFKA,
-    S3
+    S3;
+
+    /**
+     * SinkPluginRegistry에 등록되는 플러그인 ID (단일 진실 소스)
+     *
+     * SinkEvent.sinkTargets와 SinkModule 플러그인 키가 이 값으로 일치해야 함.
+     * 규칙: {type}-sink (예: opensearch-sink, s3-sink)
+     */
+    fun toPluginId(): String = "${name.lowercase()}-sink"
 }
 
 data class AuthSpec(

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { APP_INFO, CHART_CONFIG, OUTBOX_CONFIG, QUERY_CONFIG } from './index'
+import { APP_INFO, CHART_CONFIG, QUERY_CONFIG } from './index'
 
 describe('Config', () => {
   describe('QUERY_CONFIG', () => {
@@ -17,25 +17,6 @@ describe('Config', () => {
         expect(value).toBeGreaterThanOrEqual(1_000)
         expect(value).toBeLessThanOrEqual(120_000)
       })
-    })
-  })
-
-  describe('OUTBOX_CONFIG', () => {
-    it('모든 outbox 설정 값이 정의되어 있다', () => {
-      expect(OUTBOX_CONFIG.DEFAULT_LIMIT).toBe(50)
-      expect(OUTBOX_CONFIG.BATCH_RETRY_LIMIT).toBe(100)
-      expect(OUTBOX_CONFIG.STALE_TIMEOUT_SECONDS).toBe(300)
-    })
-
-    it('limit 값들이 양수이다', () => {
-      expect(OUTBOX_CONFIG.DEFAULT_LIMIT).toBeGreaterThan(0)
-      expect(OUTBOX_CONFIG.BATCH_RETRY_LIMIT).toBeGreaterThan(0)
-    })
-
-    it('stale timeout이 합리적인 범위이다', () => {
-      // 1분 ~ 1시간 사이
-      expect(OUTBOX_CONFIG.STALE_TIMEOUT_SECONDS).toBeGreaterThanOrEqual(60)
-      expect(OUTBOX_CONFIG.STALE_TIMEOUT_SECONDS).toBeLessThanOrEqual(3600)
     })
   })
 

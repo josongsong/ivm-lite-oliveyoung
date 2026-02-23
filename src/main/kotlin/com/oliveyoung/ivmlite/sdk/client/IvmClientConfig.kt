@@ -1,12 +1,13 @@
 package com.oliveyoung.ivmlite.sdk.client
 
+import com.oliveyoung.ivmlite.pkg.sinks.domain.SinkTargetType
 import java.time.Duration
 
 data class IvmClientConfig(
     val baseUrl: String = "http://localhost:8080",
     val tenantId: String? = null,
     val timeout: Duration = Duration.ofSeconds(30),
-    val defaultSinks: List<String> = listOf("opensearch")
+    val defaultSinks: List<String> = listOf(SinkTargetType.OPENSEARCH.toPluginId())
 ) {
     companion object {
         /**
@@ -23,7 +24,7 @@ data class IvmClientConfig(
         private var baseUrl: String = "http://localhost:8080"
         private var tenantId: String? = null
         private var timeout: Duration = Duration.ofSeconds(30)
-        private var defaultSinks: List<String> = listOf("opensearch")
+        private var defaultSinks: List<String> = listOf(SinkTargetType.OPENSEARCH.toPluginId())
 
         fun baseUrl(value: String) {
             baseUrl = value

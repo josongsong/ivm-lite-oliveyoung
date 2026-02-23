@@ -6,7 +6,9 @@ import com.zaxxer.hikari.HikariDataSource
 import org.jetbrains.exposed.sql.Database
 import org.koin.dsl.module
 import software.amazon.awssdk.auth.credentials.AwsBasicCredentials
+import software.amazon.awssdk.auth.credentials.AwsCredentialsProvider
 import software.amazon.awssdk.auth.credentials.DefaultCredentialsProvider
+import software.amazon.awssdk.auth.credentials.ProfileCredentialsProvider
 import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
 import software.amazon.awssdk.regions.Region
 import software.amazon.awssdk.services.dynamodb.DynamoDbAsyncClient
@@ -17,6 +19,23 @@ import java.net.URI
  *
  * DB 커넥션, AWS 클라이언트 등 인프라 의존성.
  * wiring 위치: apps/runtimeapi/wiring/ (RFC-IMPL-009 P0)
+ *
+ * ## CredentialsProvider 주입 (외부 앱 embed 시)
+ *
+ * 외부 앱이 IVM-Lite를 라이브러리로 embed할 때, 자체 CredentialsProvider를 주입하려면
+ * infraModule보다 먼저 다음 모듈을 로드하세요:
+ *
+ * ```kotlin
+ * val myCredentialsModule = module {
+ *     single<AwsCredentialsProvider> {
+ *         // 자체 IAM/STS/WebIdentity 등
+ *         MyAppCredentialsProvider.create()
+ *     }
+ * }
+ * loadKoinModules(listOf(myCredentialsModule) + productionModules)
+ * ```
+ *
+ * 우선순위: 주입된 AwsCredentialsProvider > awsProfile > accessKey/secretKey > DefaultCredentialsProvider
  */
 val infraModule = module {
 
@@ -46,20 +65,9 @@ val infraModule = module {
         val builder = DynamoDbAsyncClient.builder()
             .region(Region.of(config.dynamodb.region))
 
-        // 자격 증명 설정 (환경 변수 우선, 없으면 설정 파일)
-        val credentialsProvider = when {
-            // 환경 변수 또는 설정 파일에 명시적 자격 증명이 있으면 사용
-            config.dynamodb.accessKeyId?.isNotBlank() == true &&
-            config.dynamodb.secretAccessKey?.isNotBlank() == true -> {
-                val accessKeyId = config.dynamodb.accessKeyId!!
-                val secretAccessKey = config.dynamodb.secretAccessKey!!
-                StaticCredentialsProvider.create(
-                    AwsBasicCredentials.create(accessKeyId, secretAccessKey)
-                )
-            }
-            // 그 외에는 기본 자격 증명 체인 사용 (환경 변수, ~/.aws/credentials, IAM 역할 등)
-            else -> DefaultCredentialsProvider.create()
-        }
+        // 자격 증명 설정 (우선순위: 주입된 Provider > awsProfile > accessKey/secretKey > 기본 체인)
+        val credentialsProvider = getOrNull<AwsCredentialsProvider>()
+            ?: resolveCredentialsFromConfig(config)
         builder.credentialsProvider(credentialsProvider)
 
         // endpoint override는 opt-in (기본은 AWS 엔드포인트 사용)
@@ -69,4 +77,21 @@ val infraModule = module {
 
         builder.build()
     }
+}
+
+/**
+ * Config 기반 자격 증명 생성 (주입된 Provider가 없을 때 사용)
+ */
+private fun resolveCredentialsFromConfig(config: AppConfig): AwsCredentialsProvider = when {
+    config.dynamodb.awsProfile?.isNotBlank() == true ->
+        ProfileCredentialsProvider.create(config.dynamodb.awsProfile)
+    config.dynamodb.accessKeyId?.isNotBlank() == true &&
+        config.dynamodb.secretAccessKey?.isNotBlank() == true -> {
+        val accessKeyId = config.dynamodb.accessKeyId
+        val secretAccessKey = config.dynamodb.secretAccessKey
+        StaticCredentialsProvider.create(
+            AwsBasicCredentials.create(accessKeyId, secretAccessKey)
+        )
+    }
+    else -> DefaultCredentialsProvider.create()
 }

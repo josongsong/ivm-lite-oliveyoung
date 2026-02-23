@@ -32,20 +32,6 @@ export type {
   EntityFlowResponse,
 } from './pipeline'
 
-// Outbox types
-export type {
-  RecentOutboxResponse,
-  OutboxItem,
-  DlqResponse,
-  OutboxEntryDto,
-  RetryResponse,
-  BatchRetryResponse,
-  StaleOutboxItem,
-  StaleResponse,
-  FailedOutboxItem,
-  FailedResponse,
-} from './outbox'
-
 // Health types
 export type {
   HealthResponse,

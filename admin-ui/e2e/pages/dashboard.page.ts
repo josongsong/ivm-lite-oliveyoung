@@ -11,7 +11,7 @@ export class DashboardPage extends BasePage {
   readonly contractCard: Locator;
 
   // Panels
-  readonly outboxPanel: Locator;
+  readonly sinkEventPanel: Locator;
   readonly actionsPanel: Locator;
 
   constructor(page: Page) {
@@ -20,7 +20,7 @@ export class DashboardPage extends BasePage {
     this.rawDataCard = page.getByText(/rawdata/i).first();
     this.sliceCard = page.getByText(/slice/i).first();
     this.contractCard = page.getByText(/contract/i).first();
-    this.outboxPanel = page.locator('[class*="outbox"]').first();
+    this.sinkEventPanel = page.locator('[class*="outbox-panel"]').first();
     this.actionsPanel = page.locator('[class*="action"]').first();
   }
 

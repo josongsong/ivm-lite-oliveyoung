@@ -5,7 +5,6 @@ import { Dashboard } from '@/features/dashboard'
 import { ContractDetail, Contracts } from '@/features/contracts'
 import { Pipeline } from '@/features/pipeline'
 import { Workflow } from '@/features/workflow'
-import { Outbox } from '@/features/outbox'
 import { Environment } from '@/features/environment'
 import { Health } from '@/features/health'
 import { Observability } from '@/features/observability'
@@ -61,7 +60,6 @@ export function AppRoutes() {
           <Route path="/contracts/:kind/:id" element={<ContractDetail />} />
           <Route path="/pipeline" element={<Pipeline />} />
           <Route path="/workflow" element={<Workflow />} />
-          <Route path="/outbox" element={<Outbox />} />
           <Route path="/environment" element={<Environment />} />
           <Route path="/health" element={<Health />} />
           <Route path="/observability" element={<Observability />} />

@@ -22,7 +22,7 @@ const componentIcons: Record<string, typeof Database> = {
   'Postgres': Database,
   'PostgreSQL': Database,
   'Worker': Zap,
-  'Outbox': Inbox,
+  'SinkEvent': Inbox,
   'DynamoDB': Cloud,
   'Kafka': Activity,
   'OpenSearch': Search,

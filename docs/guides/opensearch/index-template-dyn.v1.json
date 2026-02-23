@@ -1,0 +1,44 @@
+{
+  "index_patterns": ["ivm-products-dyn-*"],
+  "priority": 100,
+  "template": {
+    "settings": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0
+    },
+    "mappings": {
+      "dynamic": false,
+      "properties": {
+        "tenantId": { "type": "keyword" },
+        "entityKey": { "type": "keyword" },
+        "uaCode": { "type": "keyword" },
+        "dynVersion": { "type": "long" },
+        "schemaVersion": { "type": "keyword" },
+        "updatedAt": { "type": "date" },
+        "sellable": { "type": "boolean" },
+        "in_stock": { "type": "boolean" },
+        "stock_qty": { "type": "integer" },
+        "option_count": { "type": "integer" },
+        "option_in_stock_count": { "type": "integer" },
+        "price_min": { "type": "integer" },
+        "price_max": { "type": "integer" },
+        "dc_price_min": { "type": "integer" },
+        "discount_rate_max": { "type": "integer" },
+        "review_cnt": { "type": "integer" },
+        "rating_avg": { "type": "float" },
+        "sales_7d": { "type": "integer" },
+        "sales_30d": { "type": "integer" },
+        "rank_score_base": { "type": "float" },
+        "options": {
+          "type": "nested",
+          "properties": {
+            "sku": { "type": "keyword" },
+            "price": { "type": "integer" },
+            "dc_price": { "type": "integer" },
+            "in_stock": { "type": "boolean" }
+          }
+        }
+      }
+    }
+  }
+}
