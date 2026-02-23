@@ -5,17 +5,18 @@ RawData → Snapshot/ChangeSet → Slice → Virtual View → (v4.1) CDC → Sin
 
 ## Quickstart
 
-### 0) AWS 자격 증명 설정 (자동 설정)
+### 0) AWS 자격 증명 설정
 
 ```bash
-# .env 파일 자동 생성 및 환경 변수 로드
+# .env 파일 생성 (없으면 load-env.sh가 자동 생성)
+cp .env.example .env   # 템플릿 복사 후 값 채우기
 source scripts/load-env.sh
 
 # 또는 환경 변수 자동 로드 후 애플리케이션 실행
 ./scripts/run-with-env.sh ./gradlew run
 ```
 
-**자세한 설정 방법**: [AWS 자격 증명 설정 가이드](./docs/archive/aws-credentials-setup.md) 참고
+**자세한 설정 방법**: [AWS 자격 증명 설정 가이드](./docs/guides/aws-credentials-setup.md) 참고
 
 ### 1) 인프라 시작
 

@@ -304,6 +304,7 @@ private fun FailedSinkEventItem.toResponse() = FailedSinkEventItemResponse(
     createdAt = createdAt?.toString()
 )
 
+@Suppress("UnusedPrivateMember")
 private fun SinkEventEntryDetail.toSinkEventResponse() = SinkEventEntryResponse(
     id = id,
     idempotencyKey = idempotencyKey,

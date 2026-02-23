@@ -117,7 +117,7 @@ class SinkSqsE2ETest : StringSpec(init@{
 
         // 2. SQS 수신 (최대 10초 대기)
         var messages: List<com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage> = emptyList()
-        for (i in 0 until 20) {
+        for (attempt in 0 until 20) {
             val response = sqsClient!!.receiveMessage(
                 ReceiveMessageRequest.builder()
                     .queueUrl(queueUrl)
@@ -132,7 +132,7 @@ class SinkSqsE2ETest : StringSpec(init@{
                 }
             }
             if (messages.isNotEmpty()) break
-            Thread.sleep(500)
+            if (attempt > 0) Thread.sleep(500)
         }
 
         messages.shouldHaveSize(2)
@@ -181,7 +181,7 @@ class SinkSqsE2ETest : StringSpec(init@{
         runBlocking { repo.putAll(listOf(event)) }
 
         var messages: List<com.amazonaws.services.lambda.runtime.events.SQSEvent.SQSMessage> = emptyList()
-        for (i in 0 until 20) {
+        for (attempt in 0 until 20) {
             val response = sqsClient!!.receiveMessage(
                 ReceiveMessageRequest.builder().queueUrl(queueUrl).maxNumberOfMessages(10).waitTimeSeconds(1).build()
             ).await()
@@ -192,7 +192,7 @@ class SinkSqsE2ETest : StringSpec(init@{
                 }
             }
             if (messages.isNotEmpty()) break
-            Thread.sleep(500)
+            if (attempt > 0) Thread.sleep(500)
         }
 
         val result = runBlocking {

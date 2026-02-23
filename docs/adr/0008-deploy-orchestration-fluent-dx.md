@@ -237,6 +237,6 @@ Ivm.client().deploy.status(job.id)
 
 ## 참고
 
-- [RFC-V4-008](../rfc_archive/rfc008.md) - 원본 RFC 문서
-- [RFC-V4-007](../rfc_archive/rfc007.md) - Sink Orchestration
-- [RFC-V4-003](../rfc_archive/rfc003.md) - Contract Enhancement
+- RFC-V4-008 (원본 RFC 문서)
+- RFC-V4-007 (Sink Orchestration)
+- RFC-V4-003 (Contract Enhancement)

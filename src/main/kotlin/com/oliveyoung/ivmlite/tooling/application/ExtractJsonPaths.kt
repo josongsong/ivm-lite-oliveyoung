@@ -29,9 +29,7 @@ object ExtractJsonPaths {
      * @return 추출된 경로 수
      */
     fun extract(sampleFile: File, outputFile: File): Int {
-        if (!sampleFile.exists()) {
-            throw IllegalArgumentException("Sample file not found: ${sampleFile.path}")
-        }
+        require(sampleFile.exists()) { "Sample file not found: ${sampleFile.path}" }
 
         val root = mapper.readTree(sampleFile.readText())
         val paths = mutableSetOf<String>()

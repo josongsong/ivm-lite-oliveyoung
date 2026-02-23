@@ -109,8 +109,7 @@ class IngestRoutesTest : StringSpec({
         jobId: String? = null,
         skipSink: Boolean = false,
         inProcessSink: Boolean = false,
-    ): String {
-        return buildJsonObject {
+    ): String = buildJsonObject {
             jobId?.let { put("jobId", it) }
             put("tenantId", tenantId)
             put("entityKey", entityKey)
@@ -125,7 +124,6 @@ class IngestRoutesTest : StringSpec({
             if (skipSink) put("skipSink", true)
             if (inProcessSink) put("inProcessSink", true)
         }.toString()
-    }
 
     fun createOrchestratorWithInProcessSink(
         sinkEventRepo: InMemorySinkEventRepository,

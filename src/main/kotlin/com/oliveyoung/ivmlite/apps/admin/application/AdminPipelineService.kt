@@ -25,8 +25,7 @@ class AdminPipelineService(
     /**
      * 파이프라인 전체 개요 조회
      */
-    suspend fun getOverview(tenantId: String = "default"): Result<PipelineOverview> {
-        return try {
+    suspend fun getOverview(tenantId: String = "default"): Result<PipelineOverview> = try {
             val rawDataStats = getRawDataStatsInternal(tenantId)
             val sliceStats = getSliceStatsInternal(tenantId)
             val sinkEventStats = getSinkEventPipelineStatsInternal()
@@ -66,9 +65,8 @@ class AdminPipelineService(
                     timestamp = Instant.now()
                 )
             )
-        } catch (e: Exception) {
-            Result.Err(DomainError.StorageError("Failed to get pipeline overview: ${e.message}"))
-        }
+    } catch (e: Exception) {
+        Result.Err(DomainError.StorageError("Failed to get pipeline overview: ${e.message}"))
     }
 
     /**
@@ -205,8 +203,8 @@ class AdminPipelineService(
         ) ?: emptyList()
     }
 
-    private suspend fun getSinkEventPipelineStatsInternal(): SinkEventPipelineStats {
-        return if (sinkEventRepo != null) {
+    private suspend fun getSinkEventPipelineStatsInternal(): SinkEventPipelineStats =
+        if (sinkEventRepo != null) {
             val pending = (sinkEventRepo.findByStatus("PENDING", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
             val processing = (sinkEventRepo.findByStatus("PROCESSING", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
             val shipped = (sinkEventRepo.findByStatus("COMPLETED", 10000) as? Result.Ok)?.value?.size?.toLong() ?: 0L
@@ -215,7 +213,6 @@ class AdminPipelineService(
         } else {
             SinkEventPipelineStats(0, 0, 0, 0)
         }
-    }
 
     private suspend fun getRecentRawDataInternal(tenantId: String, limit: Int): List<RawDataItem> {
         val tenant = TenantId(tenantId)

@@ -167,6 +167,6 @@ cutlineVersion: 42
 
 ## 참고
 
-- [RFC-V4-004](../rfc_archive/rfc004.md) - 원본 RFC 문서
-- [RFC-V4-001](../rfc_archive/rfc001.md) - Contract-First 아키텍처
-- [RFC-V4-003](../rfc_archive/rfc003.md) - Contract Enhancement
+- RFC-V4-004 (원본 RFC 문서)
+- RFC-V4-001 (Contract-First 아키텍처)
+- RFC-V4-003 (Contract Enhancement)

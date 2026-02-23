@@ -1,3 +1,11 @@
+# =============================================================================
+# IVM-Lite .gitignore — Kotlin · React · Python · Infra
+# =============================================================================
+
+# -----------------------------------------------------------------------------
+# Build & Dependencies
+# -----------------------------------------------------------------------------
+
 # Gradle
 .gradle/
 build/
@@ -5,7 +13,35 @@ build/
 !**/src/main/**/build/
 !**/src/test/**/build/
 
-# IntelliJ IDEA
+# Node.js / npm / pnpm / yarn
+node_modules/
+.npm/
+.pnpm-store/
+.yarn/cache/
+.yarn/unplugged/
+.yarn/install-state.gz
+.pnp.*
+.npmrc.local
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env/
+*.egg-info/
+.eggs/
+*.egg
+
+# -----------------------------------------------------------------------------
+# IDE & Editors
+# -----------------------------------------------------------------------------
+
+# IntelliJ IDEA / JetBrains
 .idea/
 *.iml
 *.iws
@@ -13,6 +49,14 @@ build/
 out/
 !**/src/main/**/out/
 !**/src/test/**/out/
+
+# VS Code
+.vscode/
+!.vscode/settings.json
+!.vscode/tasks.json
+!.vscode/launch.json
+!.vscode/extensions.json
+*.code-workspace
 
 # Eclipse
 .classpath
@@ -22,13 +66,15 @@ bin/
 !**/src/main/**/bin/
 !**/src/test/**/bin/
 
-# VS Code
-.vscode/
-!.vscode/settings.json
-!.vscode/tasks.json
-!.vscode/launch.json
-!.vscode/extensions.json
-*.code-workspace
+# AI / Agent tools (Cursor, Claude, Conductor, Serena)
+.cursor/
+.claude/
+.conductor/
+.serena/
+
+# -----------------------------------------------------------------------------
+# OS & System
+# -----------------------------------------------------------------------------
 
 # macOS
 .DS_Store
@@ -50,33 +96,55 @@ $RECYCLE.BIN/
 .directory
 .Trash-*
 
-# Kotlin
+# -----------------------------------------------------------------------------
+# Kotlin / JVM
+# -----------------------------------------------------------------------------
+
 *.kt.swp
 *.kt~
 *.kt.bak
+*.kotlin_module
+*.class
 
-# Logs
+# -----------------------------------------------------------------------------
+# Logs & Runtime
+# -----------------------------------------------------------------------------
+
 *.log
 logs/
 *.log.*
-
-# Runtime
 *.pid
 *.seed
 *.pid.lock
 
-# Application specific
-*.local
-.env
-.env.local
-.env.*.local
+# -----------------------------------------------------------------------------
+# Secrets & Local Config
+# -----------------------------------------------------------------------------
 
-# Test coverage
+.env
+.env.*
+!.env.example
+*.local
+config/local/
+application-local.yml
+application-local.properties
+
+# -----------------------------------------------------------------------------
+# Test & Coverage
+# -----------------------------------------------------------------------------
+
 .nyc_output/
 coverage/
 *.lcov
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
 
-# Temporary files
+# -----------------------------------------------------------------------------
+# Temporary & Cache
+# -----------------------------------------------------------------------------
+
 *.tmp
 .tmp/
 *.temp
@@ -85,7 +153,10 @@ coverage/
 *~
 .cache/
 
-# Package files
+# -----------------------------------------------------------------------------
+# Package & Artifacts
+# -----------------------------------------------------------------------------
+
 *.jar
 !gradle/wrapper/gradle-wrapper.jar
 *.war
@@ -94,19 +165,35 @@ coverage/
 *.zip
 *.tar.gz
 *.rar
+dist/
+target/
 
-# Database
+# -----------------------------------------------------------------------------
+# Database & Storage
+# -----------------------------------------------------------------------------
+
 *.db
 *.sqlite
 *.sqlite3
-
-# DynamoDB Local
 .dynamodb/
 
-# Docker
+# -----------------------------------------------------------------------------
+# Infra (Terraform, Docker)
+# -----------------------------------------------------------------------------
+
+*.tfstate
+*.tfstate.*
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+.terraform/
+# .terraform.lock.hcl → 버전 재현성 위해 커밋 (ignore 안 함)
 docker-compose.override.yml
 
-# Secrets
+# -----------------------------------------------------------------------------
+# Security
+# -----------------------------------------------------------------------------
+
 secrets/
 *.pem
 *.key
@@ -114,33 +201,18 @@ secrets/
 *.p12
 *.jks
 
-# Terraform
-*.tfstate
-*.tfstate.backup
-*.tfvars
-.terraform/
-# .terraform.lock.hcl 제외 → 버전 재현성 위해 커밋
+# -----------------------------------------------------------------------------
+# Project-specific
+# -----------------------------------------------------------------------------
 
-# Local configuration
-application-local.yml
-application-local.properties
-config/local/
-
-# Build artifacts
-dist/
-target/
-out/
-
-# Kotlin compiler
-*.kotlin_module
-*.class
-
-# Generated files (build 디렉토리의 생성 파일)
-# ⚠️ src/main/kotlin/**/generated/는 git 관리 (jOOQ 코드)
+# jOOQ generated (build output)
+# src/main/kotlin/**/generated/ 는 jOOQ 코드로 git 관리
 !**/src/main/**/generated/
 gen/
 
-# DX 도구 출력 (product-schema-dx-proposal RFC 2.2)
-# DX 도구 생성물 (루트에 남은 경우)
+# DX 도구 출력 (extract-paths, paths-to-impact)
 paths.yaml
 impact-map-draft.yaml
+
+# _wip: 작업 중 임시 디렉터리
+_wip/

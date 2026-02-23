@@ -451,9 +451,4 @@ startKoin {
 
 ## 참고 문서
 
-- [SDK Guide](sdk-guide.md)
-- [RFC 아카이브](../rfc_archive/)
-  - RFC-003: ViewDefinition Contract
-  - RFC-010: Slicing Engine
-  - RFCIMPL-009: OpenTelemetry Tracing
-  - RFCIMPL-010: INCREMENTAL Slicing
+- [RFC 아카이브](../rfc_archive/2026-02/)

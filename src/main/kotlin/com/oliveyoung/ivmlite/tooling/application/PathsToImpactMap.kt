@@ -59,9 +59,7 @@ object PathsToImpactMap {
      * @return 매핑된 경로 수
      */
     fun generate(pathsFile: File, outputFile: File): Int {
-        if (!pathsFile.exists()) {
-            throw IllegalArgumentException("Paths file not found: ${pathsFile.path}")
-        }
+        require(pathsFile.exists()) { "Paths file not found: ${pathsFile.path}" }
 
         val yaml = Yaml()
         @Suppress("UNCHECKED_CAST")

@@ -3,7 +3,6 @@ package com.oliveyoung.ivmlite.apps.lambda
 import com.amazonaws.services.lambda.runtime.Context
 import com.amazonaws.services.lambda.runtime.LambdaLogger
 import com.amazonaws.services.lambda.runtime.events.SQSEvent
-import com.amazonaws.services.lambda.runtime.events.SQSBatchResponse
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkFailureRepository
 import com.oliveyoung.ivmlite.pkg.sinks.adapters.InMemorySinkPluginRegistry
 import com.oliveyoung.ivmlite.sinks.contract.BatchResult
@@ -21,7 +20,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.JsonPrimitive
-import org.koin.core.context.GlobalContext
 import org.koin.core.context.startKoin
 import org.koin.core.context.stopKoin
 import org.koin.dsl.module

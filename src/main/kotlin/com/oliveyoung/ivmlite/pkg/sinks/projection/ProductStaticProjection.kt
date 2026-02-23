@@ -1,7 +1,6 @@
 package com.oliveyoung.ivmlite.pkg.sinks.projection
 
 import kotlinx.serialization.json.JsonArray
-import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonArray
@@ -50,7 +49,7 @@ object ProductStaticProjection {
         val media = viewData["MEDIA"]?.jsonObject
 
         val uaCode = core?.get("uaCode")?.jsonPrimitive?.content
-            ?: (viewData["uaCode"]?.jsonPrimitive?.content)
+            ?: viewData["uaCode"]?.jsonPrimitive?.content
 
         return buildJsonObject {
             put("tenantId", JsonPrimitive(tenantId))
@@ -130,7 +129,8 @@ object ProductStaticProjection {
             ?: core?.get("displayCategories")?.jsonArray
             ?: return buildJsonArray { }
         val codes = list.mapNotNull { it.jsonObject["sclsCtgrNo"]?.jsonPrimitive?.content }
-            .distinct().sorted()
+            .distinct()
+            .sorted()
         return buildJsonArray { codes.forEach { add(JsonPrimitive(it)) } }
     }
 
@@ -148,7 +148,8 @@ object ProductStaticProjection {
     private fun resolveAttrCodes(index: JsonObject?): JsonArray {
         val attrs = index?.get("attributes")?.jsonArray ?: return buildJsonArray { }
         val codes = attrs.mapNotNull { it.jsonObject["attrCode"]?.jsonPrimitive?.content }
-            .distinct().sorted()
+            .distinct()
+            .sorted()
         return buildJsonArray { codes.forEach { add(JsonPrimitive(it)) } }
     }
 
@@ -158,7 +159,8 @@ object ProductStaticProjection {
             val code = attr.jsonObject["attrCode"]?.jsonPrimitive?.content ?: return@mapNotNull null
             val value = attr.jsonObject["attrValue"]?.jsonPrimitive?.content?.let { normalizeValue(it) } ?: return@mapNotNull null
             "$code=$value"
-        }.distinct().sorted()
+        }.distinct()
+            .sorted()
         return buildJsonArray { kv.forEach { add(JsonPrimitive(it)) } }
     }
 
@@ -182,9 +184,10 @@ object ProductStaticProjection {
     private fun resolveBadge(index: JsonObject?, field: String): Boolean {
         val emblem = index?.get("emblemInfo")?.jsonObject ?: return false
         val v = emblem[field] ?: return false
-        return when (v) {
-            is kotlinx.serialization.json.JsonPrimitive -> v.content == "true" || v.content == "Y"
-            else -> false
+        return if (v is kotlinx.serialization.json.JsonPrimitive) {
+            v.content == "true" || v.content == "Y"
+        } else {
+            false
         }
     }
 

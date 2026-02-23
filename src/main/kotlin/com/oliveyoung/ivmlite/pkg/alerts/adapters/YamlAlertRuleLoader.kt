@@ -53,7 +53,7 @@ class YamlAlertRuleLoader(
         cachedRules = loadFromYaml()
     }
 
-    @Suppress("UNCHECKED_CAST")
+    @Suppress("UNCHECKED_CAST", "TooGenericExceptionCaught")
     private fun loadFromYaml(): List<AlertRule> {
         return try {
             val stream = javaClass.getResourceAsStream(resourcePath)
@@ -71,7 +71,7 @@ class YamlAlertRuleLoader(
         }
     }
 
-    @Suppress("UNCHECKED_CAST")
+    @Suppress("UNCHECKED_CAST", "TooGenericExceptionCaught")
     private fun parseRule(raw: Map<String, Any>): AlertRule? {
         return try {
             val id = raw["id"]?.toString() ?: return null
@@ -88,7 +88,7 @@ class YamlAlertRuleLoader(
             if (channels.isEmpty()) return null
 
             val cooldownMinutes = (raw["cooldownMinutes"] as? Number)?.toLong() ?: 5L
-            val enabled = (raw["enabled"] as? Boolean) ?: true
+            val enabled = raw["enabled"] as? Boolean ?: true
 
             AlertRule(
                 id = id,

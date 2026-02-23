@@ -90,7 +90,10 @@ class SinkBatchProcessorTest : StringSpec({
         val messages = listOf(
             SqsSinkMessage("msg-1", sqsMessageBody("evt-001", "t1", "product:1", 1L, "core", """{"a":1}""", listOf("opensearch"))),
             SqsSinkMessage("msg-2", "invalid-json"),
-            SqsSinkMessage("msg-3", sqsMessageBody("evt-003", "t1", "p3", 3L, "core", "123", listOf("opensearch"))),  // payload가 JSON Object 아님 (숫자)
+            SqsSinkMessage(
+                "msg-3",
+                sqsMessageBody("evt-003", "t1", "p3", 3L, "core", "123", listOf("opensearch"))
+            ), // payload가 JSON Object 아님 (숫자)
         )
 
         val result = runBlocking { processor.processBatch(messages) }

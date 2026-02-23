@@ -51,7 +51,7 @@ object ValidateRawData {
         // 1. JSON 파싱
         val root = try {
             mapper.readTree(sampleFile.readText())
-        } catch (e: Exception) {
+        } catch (e: com.fasterxml.jackson.core.JsonProcessingException) {
             errors.add("JSON 파싱 실패: ${e.message}")
             return ValidationResult(valid = false, errors = errors)
         }

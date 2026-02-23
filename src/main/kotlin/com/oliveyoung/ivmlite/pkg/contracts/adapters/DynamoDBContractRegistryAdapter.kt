@@ -823,11 +823,11 @@ class DynamoDBContractRegistryAdapter(
     private suspend fun queryByKindStatus(
         kind: ContractKind,
         status: ContractStatus?
-    ): List<ContractRef> {
+    ): List<ContractRef> =
         // Scan 사용 (GSI kind-status-index는 일부 환경에서 비어있거나 미구축일 수 있음)
-        return scanByKindStatusWithPagination(kind, status)
-    }
+        scanByKindStatusWithPagination(kind, status)
 
+    @Suppress("UnusedPrivateMember")
     private suspend fun queryByKindStatusGsi(
         kind: ContractKind,
         status: ContractStatus?

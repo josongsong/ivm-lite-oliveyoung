@@ -63,8 +63,8 @@ object ConfigValidator {
             val envSecretKey = System.getenv("AWS_SECRET_ACCESS_KEY")
 
             val hasCredentials = hasProfile ||
-                                (hasAccessKey && hasSecretKey) ||
-                                (envAccessKey != null && envSecretKey != null)
+                                hasAccessKey && hasSecretKey ||
+                                envAccessKey != null && envSecretKey != null
 
             if (!hasCredentials) {
                 logger.warn(

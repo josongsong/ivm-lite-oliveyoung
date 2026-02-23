@@ -56,7 +56,7 @@ class SqsSinkEventRepository(
             }
             logger.debug("SinkEvents sent to SQS: {} events, queue={}", events.size, queueUrl)
             Result.Ok(events)
-        } catch (e: Exception) {
+        } catch (e: software.amazon.awssdk.core.exception.SdkException) {
             logger.error("Failed to send SinkEvents to SQS", e)
             Result.Err(DomainError.StorageError("Failed to send to SQS: ${e.message}"))
         }

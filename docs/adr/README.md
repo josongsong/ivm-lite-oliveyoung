@@ -52,7 +52,7 @@ ADR은 중요한 아키텍처 결정사항을 문서화하여:
 
 이 ADR들은 원본 RFC 문서들을 기반으로 작성되었습니다:
 
-- **RFC-V4-001 ~ RFC-V4-010**: 핵심 아키텍처 결정사항 (rfc_archive)
+- **RFC-V4-001 ~ RFC-V4-010**: 핵심 아키텍처 결정사항 (원본 삭제, ADR에 압축)
 - **RFC-017 ~ RFC-022**: Sink, SDK, Contract 등 (rfc_archive/2026-02)
 - 각 ADR은 해당 RFC의 핵심 결정사항을 요약
 

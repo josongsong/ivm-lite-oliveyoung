@@ -3,7 +3,6 @@ package com.oliveyoung.ivmlite.pkg.sinks.projection
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
-import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonArray
 import kotlinx.serialization.json.jsonObject
@@ -19,6 +18,7 @@ import org.junit.jupiter.api.Test
 class ProductStaticProjectionTest {
 
     @Test
+    @Suppress("LongMethod")
     fun `View CORE+PRICE+CATEGORY+INDEX+MEDIA → Static 문서 변환`() {
         val viewData = buildJsonObject {
             putJsonObject("CORE") {

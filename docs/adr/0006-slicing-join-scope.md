@@ -140,6 +140,6 @@ JoinSpec 필수 필드:
 
 ## 참고
 
-- [RFC-V4-006](../rfc_archive/rfc006.md) - 원본 RFC 문서
-- [RFC-V4-001](../rfc_archive/rfc001.md) - Contract-First 아키텍처
-- [RFC-V4-009](../rfc_archive/rfc009.md) - Rule-Driven Compiler Architecture
+- RFC-V4-006 (원본 RFC 문서)
+- RFC-V4-001 (Contract-First 아키텍처)
+- RFC-V4-009 (Rule-Driven Compiler Architecture)

@@ -25,6 +25,17 @@
 *.sh text eol=lf
 *.bash text eol=lf
 *.zsh text eol=lf
+justfile text eol=lf
+Makefile text eol=lf
+
+# Frontend
+*.ts text eol=lf
+*.tsx text eol=lf
+*.js text eol=lf
+*.jsx text eol=lf
+
+# Python
+*.py text eol=lf
 
 # SQL
 *.sql text eol=lf

@@ -7,7 +7,6 @@ import com.oliveyoung.ivmlite.pkg.sinks.ports.SinkPluginRegistryPort
 import com.oliveyoung.ivmlite.sinks.contract.SinkError
 import com.oliveyoung.ivmlite.sinks.contract.SinkLedger
 import com.oliveyoung.ivmlite.sinks.contract.SinkPayload
-import com.oliveyoung.ivmlite.sinks.contract.SinkPlugin
 import kotlinx.serialization.Serializable
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
@@ -34,6 +33,7 @@ class SinkBatchProcessor(
      * @param messages SQS 메시지 (body = SinkEventMessageDto JSON)
      * @return 처리 결과
      */
+    @Suppress("LongMethod", "CyclomaticComplexMethod")
     suspend fun processBatch(messages: List<SqsSinkMessage>): SinkBatchProcessResult {
         val payloadsByTarget = mutableMapOf<String, MutableList<SinkPayload.V1>>()
         var parseErrors = 0

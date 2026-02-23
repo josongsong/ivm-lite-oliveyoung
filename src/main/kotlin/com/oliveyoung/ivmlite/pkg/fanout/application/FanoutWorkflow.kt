@@ -451,8 +451,7 @@ class FanoutWorkflow(
         target: FanoutTarget,
         dependency: FanoutDependency,
         effectiveConfig: FanoutConfig,
-    ): Boolean {
-        return try {
+    ): Boolean = try {
             // 재슬라이싱 실행 (version+1로 새 슬라이스 생성)
             val newVersion = target.currentVersion + 1
 
@@ -487,10 +486,9 @@ class FanoutWorkflow(
                     }
                 }
             }
-        } catch (e: Exception) {
-            log.error("Exception during re-slicing {}: {}", target.entityKey.value, e.message, e)
-            false
-        }
+    } catch (e: Exception) {
+        log.error("Exception during re-slicing {}: {}", target.entityKey.value, e.message, e)
+        false
     }
 
     // ===== Metrics & Monitoring =====

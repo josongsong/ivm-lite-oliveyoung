@@ -12,8 +12,7 @@ docs/
 ├── adr/              # ADR만 (NNNN-슬러그.md)
 ├── guides/           # 개발 가이드
 ├── proposals/       # 제안서
-├── archive/         # 아카이브 (YYYY-MM/ 하위 허용)
-└── rfc_archive/      # RFC 원본 (YYYY-MM/ 하위 허용)
+└── rfc_archive/      # RFC 원본 (2026-02/ 하위)
 ```
 
 - **docs 루트**: README.md, RULES.md, engineering-gates.md 등 최소한만
@@ -66,7 +65,6 @@ docs/
 ### 사용
 
 - RFC: `../rfc_archive/2026-02/RFC-017-*.md`
-- 기존 RFC: `../rfc_archive/rfc001.md`
 - ADR: `./0015-sink-plugin-architecture.md`
 - 가이드: `../guides/lambda-sqs-setup-guide.md`
 

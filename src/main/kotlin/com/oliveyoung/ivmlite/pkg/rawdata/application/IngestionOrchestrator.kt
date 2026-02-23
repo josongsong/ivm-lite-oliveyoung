@@ -131,8 +131,8 @@ class IngestionOrchestrator(
         }
     }
 
-    private suspend fun resolveSinkTargets(entityType: String): List<String> {
-        return when (val result = sinkRuleRegistry.findByEntityType(entityType)) {
+    private suspend fun resolveSinkTargets(entityType: String): List<String> =
+        when (val result = sinkRuleRegistry.findByEntityType(entityType)) {
             is Result.Ok -> result.value
                 .filter { rule -> rule.status == SinkRuleStatus.ACTIVE }
                 .map { rule -> rule.target.type.toPluginId() }
@@ -142,7 +142,6 @@ class IngestionOrchestrator(
                 emptyList()
             }
         }
-    }
 
     /**
      * 같은 세션에서 SinkPlugin 직접 호출 (Lambda/DynamoDB 미사용)
@@ -156,7 +155,7 @@ class IngestionOrchestrator(
         for (view in views) {
             val viewData = try {
                 json.parseToJsonElement(view.data) as JsonObject
-            } catch (e: Exception) {
+            } catch (e: kotlinx.serialization.SerializationException) {
                 return Result.Err(DomainError.ValidationError("viewData", "Invalid view JSON: ${e.message}"))
             }
             val payloadDigest = SinkPayload.computePayloadDigest(viewData)

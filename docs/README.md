@@ -9,9 +9,7 @@ docs/
 ├── adr/              # Architecture Decision Records (아키텍처 결정사항)
 ├── guides/           # 개발 가이드 및 아키텍처 문서
 ├── proposals/        # 제안서 및 개선 계획
-├── archive/          # 아카이브된 문서 (참고용)
-│   └── 2026-02/      # 2026-02 완료/구버전 문서
-└── rfc_archive/      # RFC 문서 아카이브 (원본 보존)
+└── rfc_archive/      # RFC 문서 아카이브
     └── 2026-02/      # RFC-017~022, product-schema-dx
 ```
 
@@ -34,10 +32,8 @@ docs/
 1. **ADR**: 핵심 아키텍처 결정사항만 기록
 2. **Guides**: 개발자가 참고할 실용적인 가이드
 3. **Proposals**: 향후 개선 계획 및 제안
-4. **Archive**: 더 이상 활발히 사용하지 않는 문서 (참고용)
 
 ## 참고
 
 - **ADR**: RFC 핵심 결정을 압축한 아키텍처 결정 기록 (22개)
-- **RFC 원본**: `rfc_archive/`, `rfc_archive/2026-02/`
-- **아카이브**: `archive/`, `archive/2026-02/` (완료 보고서, 구버전)
+- **RFC 원본**: `rfc_archive/2026-02/`

@@ -16,6 +16,10 @@ import software.amazon.awssdk.auth.credentials.StaticCredentialsProvider
  */
 class CredentialsModuleTest : DescribeSpec({
 
+    beforeEach {
+        stopKoin()
+    }
+
     afterEach {
         stopKoin()
     }

@@ -263,7 +263,9 @@ class OpenSearchSinkPluginProjectionTest {
             SinkPayload.V1(
                 correlationId = "batch-1",
                 timestamp = Instant.now().toString(),
-                idempotencyKey = SinkPayload.generateIdempotencyKey("oliveyoung", "PRODUCT:oliveyoung:UA-BATCH-1", 1L, "product-search", digest1),
+                idempotencyKey = SinkPayload.generateIdempotencyKey(
+                    "oliveyoung", "PRODUCT:oliveyoung:UA-BATCH-1", 1L, "product-search", digest1
+                ),
                 payloadDigest = digest1,
                 tenantId = "oliveyoung",
                 entityKey = "PRODUCT:oliveyoung:UA-BATCH-1",
@@ -274,7 +276,9 @@ class OpenSearchSinkPluginProjectionTest {
             SinkPayload.V1(
                 correlationId = "batch-2",
                 timestamp = Instant.now().toString(),
-                idempotencyKey = SinkPayload.generateIdempotencyKey("oliveyoung", "PRODUCT:oliveyoung:UA-BATCH-2", 1L, "product-search", digest2),
+                idempotencyKey = SinkPayload.generateIdempotencyKey(
+                    "oliveyoung", "PRODUCT:oliveyoung:UA-BATCH-2", 1L, "product-search", digest2
+                ),
                 payloadDigest = digest2,
                 tenantId = "oliveyoung",
                 entityKey = "PRODUCT:oliveyoung:UA-BATCH-2",

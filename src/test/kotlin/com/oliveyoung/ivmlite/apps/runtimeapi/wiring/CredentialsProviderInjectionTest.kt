@@ -83,8 +83,7 @@ class CredentialsProviderInjectionTest : DescribeSpec({
     }
 })
 
-private fun createTestConfig(): AppConfig {
-    return AppConfig(
+private fun createTestConfig(): AppConfig = AppConfig(
         server = ServerConfig(),
         database = DatabaseConfig(
             url = PostgresTestContainer.jdbcUrl(),
@@ -104,4 +103,3 @@ private fun createTestConfig(): AppConfig {
         worker = WorkerConfig(),
         cache = CacheConfig()
     )
-}

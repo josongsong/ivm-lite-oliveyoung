@@ -72,6 +72,6 @@ RawData → Slice → Virtual View → Direct Query (DynamoDB)
 
 ## 참고
 
-- [RFC-V4-001](../rfc_archive/rfc001.md) - 원본 RFC 문서
-- [RFC-V4-002](../rfc_archive/rfc002.md) - Determinism & Safety Enforcement
-- [RFC-V4-003](../rfc_archive/rfc003.md) - Contract Enhancement & DX
+- RFC-V4-001 (원본 RFC 문서)
+- RFC-V4-002 (Determinism & Safety Enforcement)
+- RFC-V4-003 (Contract Enhancement & DX)

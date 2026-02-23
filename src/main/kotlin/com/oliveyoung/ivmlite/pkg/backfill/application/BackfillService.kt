@@ -250,18 +250,18 @@ class BackfillService(
      * @param limit 최대 조회 수
      * @param status 필터할 상태 (null이면 전체)
      */
-    suspend fun getRecentJobs(limit: Int = 20, status: BackfillStatus? = null): List<BackfillJob> {
-        return when {
-            status != null -> when (val r = jobRepository.findByStatus(status, limit)) {
+    suspend fun getRecentJobs(limit: Int = 20, status: BackfillStatus? = null): List<BackfillJob> =
+        if (status != null) {
+            when (val r = jobRepository.findByStatus(status, limit)) {
                 is Result.Ok -> r.value
                 is Result.Err -> emptyList()
             }
-            else -> when (val r = jobRepository.findRecent(limit)) {
+        } else {
+            when (val r = jobRepository.findRecent(limit)) {
                 is Result.Ok -> r.value
                 is Result.Err -> emptyList()
             }
         }
-    }
 
     /**
      * 통계
