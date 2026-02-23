@@ -401,7 +401,25 @@ terraform apply
 
 ---
 
-## 8. 체크리스트
+## 8. E2E 테스트 (LocalStack)
+
+SQS + SinkBatchProcessor 플로우를 LocalStack으로 검증:
+
+```bash
+# Docker 필요
+./gradlew integrationTest --tests "*.SinkSqsE2ETest"
+```
+
+시나리오:
+1. LocalStack SQS 큐 생성
+2. SqsSinkEventRepository.putAll() → SQS 전송
+3. SQS ReceiveMessage → 메시지 수신
+4. SinkBatchProcessor.processBatch() → SinkPlugin 실행
+5. Capture Plugin으로 수신 페이로드 검증
+
+---
+
+## 9. 체크리스트
 
 ### Lambda (SinkStreamHandler)
 
